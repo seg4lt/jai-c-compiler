@@ -1,5 +1,5 @@
 UNAME_S := $(shell uname -s)
-FILE_NAME := return_2
+FILE_NAME := neg_bitwise
 
 ifeq ($(UNAME_S),Darwin)
     CC = clang

@@ -6,9 +6,9 @@
         "type": "lldb",
         "request": "launch",
         "program": "./out/target",
-        "args": ["asdf", "--lex"],
+        "args": ["./C_testfiles/03_binary/binary.c"],
         "preLaunchTask": "Compile Current Jai File",
-        "cwd": "${fileDirname}",
+        // "cwd": "${fileDirname}",
         "console": "integratedTerminal"
     }
     ]
