@@ -47,7 +47,8 @@ scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "
             continue;
         }
         if String.is_digit(current_char) {
-            number(lexer);
+            success, err_msg := number(lexer);
+            if !success return success = success, err_msg = err_msg;
             continue;
         }
 
@@ -57,19 +58,44 @@ scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "
             case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});continue;
             case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});continue;
             case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});continue;
+            case #char "/"; comment(lexer); continue;
         }
         return success = false, err_msg = tprint("Unexpected character %", String.to_string(*current_char, 1));
     }
     return success = true;
 }
 
-number :: (using lexer: *Lexer) {
-    while !is_at_end(lexer) && String.is_digit(peek(lexer)) {
+comment :: (using lexer: *Lexer) -> success: bool = true {
+    if peek(lexer) == {
+        case #char "/";
+            while !is_at_end(lexer) && peek(lexer) != #char "\n" {
+                consume(lexer);
+            }
+            line += 1;
+        case #char "*";
+            consume(lexer);
+            while !is_at_end(lexer) && consume(lexer) != #char "*" && peek(lexer) != #char "/" {}
+            consume(lexer); // consume closing /, if not found, this is an error
+        case; return success = false;
+    }
+    return true;
+}
+
+number :: (using lexer: *Lexer) -> status: bool = true, err_msg: string = "" {
+    found_alpha := false;
+    while !is_at_end(lexer) && (String.is_digit(peek(lexer)) || String.is_alpha(peek(lexer))) {
+        if String.is_alpha(peek(lexer)) {
+            found_alpha = true;
+        }
         consume(lexer);
     }
     str := String.slice(src, start, current-start);
+    if found_alpha {
+        return status = false, err_msg = tprint("Invalid identifier found: %", str);
+    }
     token := Token.{ .INT_VALUE, str, line};
     array_add(*tokens, token); 
+    return status = true;
 }
 
 ident_or_keyword :: (using lexer: *Lexer) {
@@ -92,7 +118,7 @@ find_token_type :: (str: string) -> Token_Type {
 
 consume :: (using lexer: *Lexer) -> u8 {
     c := peek(lexer);
-    if peek(lexer) == #char "\n" line += 1;
+    if c == #char "\n" line += 1;
     current += 1;
     return c;
 }
@@ -110,21 +136,65 @@ is_at_end :: (using lexer: *Lexer) -> bool {
 #import "Basic";
 String :: #import "String";
 
-#run build();
+#run run_test();
 
-build :: () {
+run_test :: () {
     #import "Compiler";
     options := get_build_options();
     args := options.compile_time_command_line;
     for arg: args {
         if arg == {
           case "test";  
-            simple_program_test();
+            // test_simple_program();
+            // test_with_slash_comment();
+            // test_with_multiline_comment();
+            test_invalid_identifier();
         }
     }
 }
 
-simple_program_test :: () {
+test_invalid_identifier :: () {
+    src := #string done
+    int main () {
+        return 2a;
+    }
+    done
+    lexer := Lexer.{src = src};
+    success, msg := scan(*lexer);
+    assert(!success, "Invalid identifier test should have failed");
+    assert(msg == "Invalid identifier found: 2a");
+}
+
+test_with_multiline_comment :: () {
+    src := #string done
+    /* yello this is long comment
+        new line
+    */
+    int main () {
+        return 2;
+    }
+    done
+    lexer := Lexer.{src = src};
+    success := scan(*lexer);
+    assert(success);
+    assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
+}
+
+
+test_with_slash_comment :: () {
+    src := #string done
+    int main () {
+        // this is a comment
+        return 2;
+    }
+    done
+    lexer := Lexer.{src = src};
+    success := scan(*lexer);
+    assert(success);
+    assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
+}
+
+test_simple_program :: () {
     src := #string done
     int main () {
         return 2;
