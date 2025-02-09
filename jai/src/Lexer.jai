@@ -4,7 +4,6 @@ Lexer :: struct {
     start: int = 0; // current token start position
     current: int = 0; // where is cursor right now
     tokens: [..]Token;
-    allocator: Allocator;
 }
 
 Token_Type :: enum {
@@ -28,7 +27,7 @@ Token :: struct {
     line: int;
 }
 
-scan :: (using lexer: *Lexer) {
+scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "" {
     c := 0;
     while !is_at_end(lexer) {
         c += 1;
@@ -53,13 +52,15 @@ scan :: (using lexer: *Lexer) {
         }
 
         if current_char == {
-            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});
-            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});
-            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});
-            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});
-            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});
+            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});continue; 
+            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});continue;
+            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});continue;
+            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});continue;
+            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});continue;
         }
+        return success = false, err_msg = tprint("Unexpected character %", String.to_string(*current_char, 1));
     }
+    return success = true;
 }
 
 number :: (using lexer: *Lexer) {
@@ -123,7 +124,6 @@ build :: () {
     }
 }
 
-
 simple_program_test :: () {
     src := #string done
     int main () {
@@ -131,8 +131,9 @@ simple_program_test :: () {
     }
     done
 
-    lexer := Lexer.{src = src, allocator = temp};
-    scan(*lexer);
+    lexer := Lexer.{src = src};
+    success := scan(*lexer);
+    assert(success);
 
     assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
     assert(lexer.tokens[0].type == .INT, "expected token to be int, found %", lexer.tokens[0].type);
