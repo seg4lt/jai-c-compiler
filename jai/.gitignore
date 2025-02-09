@@ -1,0 +1,11 @@
+.build
+*
+!/**/
+!*.*
+!/bin/*
+.build
+*.dSYM
+*.dylib
+out/
+.build/
+*.symlink
