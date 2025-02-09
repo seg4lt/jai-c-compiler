@@ -1,1 +1,6 @@
+# preprocessed output
+*.i
+# ASM 
 *.s
+# object files
+*.o

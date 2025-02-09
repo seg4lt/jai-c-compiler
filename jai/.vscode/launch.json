@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Run Current Jai File",
+        "type": "lldb",
+        "request": "launch",
+        "program": "./out/target",
+        "args": ["asdf", "--lex"],
+        "preLaunchTask": "Compile Current Jai File",
+        "cwd": "${fileDirname}",
+        "console": "integratedTerminal"
+    }
+    ]
+  }
