@@ -6,7 +6,7 @@ build:: () {
     options := get_build_options(w);
     set_working_directory(#filepath);
 
-    modules_path := join(#filepath, "src" ,"My_Modules");
+    modules_path := join(#filepath, "src/My_Modules");
     modules_paths: [..] string;
     array_add(*modules_paths, modules_path);
     array_add(*modules_paths, ..options.import_path);
@@ -16,7 +16,7 @@ build:: () {
 
     set_build_options(options, w);
 
-    add_build_file("main.jai", w);
+    add_build_file(join("src", "main.jai", separator="/"), w);
 
     set_build_options_dc(.{do_output=false, output_path="out", output_executable_name="target"});
 }
