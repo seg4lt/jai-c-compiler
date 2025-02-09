@@ -1,0 +1,8 @@
+*
+!/**/
+!*.*
+!/bin/*
+.build
+*.dSYM
+*.dylib
+out/
