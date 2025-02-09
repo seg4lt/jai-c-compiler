@@ -6,7 +6,7 @@ build:: () {
     options := get_build_options(w);
     set_working_directory(#filepath);
 
-    modules_path := join(#filepath, "My_Modules");
+    modules_path := join(#filepath, "src" ,"My_Modules");
     modules_paths: [..] string;
     array_add(*modules_paths, modules_path);
     array_add(*modules_paths, ..options.import_path);
