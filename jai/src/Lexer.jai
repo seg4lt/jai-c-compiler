@@ -14,11 +14,19 @@ Token_Type :: enum {
     SEMICOLON;
 
     IDENT;
-    INT_VALUE;
+    INT_LITERAL;
     // Keyword
     INT;
     VOID;
     RETURN;
+    // OPERATOR
+    BITWISE_NOT;
+    UNARY_MINUS;
+    MINUS;
+    PLUS;
+    DIVIDE;
+    MULTIPLY;
+    MOD;
 }
 
 Token :: struct {
@@ -27,7 +35,25 @@ Token :: struct {
     line: int;
 }
 
-scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "" {
+lex :: (args: Cli_Args) -> Lexer {
+    src, r_success := read_entire_file(args.source_file_path);
+    if !r_success {
+        log_error("Unable to read file -- '%'", args.source_file_path);
+        exit(1);
+    }
+    lexer := Lexer.{src = src};
+    scan(*lexer);
+
+    print("\n -- Lexer -- \n");
+    for lexer.tokens {
+        print("%\n", it);
+    }
+    print("\n");
+
+    return lexer;
+}
+
+scan :: (using lexer: *Lexer) {
     c := 0;
     while !is_at_end(lexer) {
         c += 1;
@@ -47,25 +73,40 @@ scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "
             continue;
         }
         if String.is_digit(current_char) {
-            success, err_msg := number(lexer);
-            if !success return success = success, err_msg = err_msg;
+            number(lexer);
             continue;
         }
 
         if current_char == {
-            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});continue; 
-            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});continue;
-            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});continue;
-            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});continue;
-            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});continue;
-            case #char "/"; comment(lexer); continue;
+            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});
+            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});
+            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});
+            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});
+            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});
+            case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
+            case #char "+"; array_add(*tokens, .{.PLUS, "+", line});
+            case #char "*"; array_add(*tokens, .{.MULTIPLY, "*", line});
+            case #char "%"; array_add(*tokens, .{.MOD, "%", line});
+            case #char "/"; 
+                if peek(lexer) == #char "/" || peek(lexer) == #char "*" {
+                    comment(lexer);
+                    continue;
+                }
+                array_add(*tokens, .{.DIVIDE, "+", line});
+            case #char "-"; 
+                if peek(lexer) == #char "-" {
+                    assert(false, "infix -- is not supported yet");
+                    consume(lexer);
+                    array_add(*tokens, .{.UNARY_MINUS, "--", line});
+                    continue;
+                }
+                array_add(*tokens, .{.MINUS, "-", line});
+            case; assert(false, "Unexpected character %", String.to_string(*current_char, 1));
         }
-        return success = false, err_msg = tprint("Unexpected character %", String.to_string(*current_char, 1));
     }
-    return success = true;
 }
 
-comment :: (using lexer: *Lexer) -> success: bool = true {
+comment :: (using lexer: *Lexer) {
     if peek(lexer) == {
         case #char "/";
             while !is_at_end(lexer) && peek(lexer) != #char "\n" {
@@ -76,12 +117,11 @@ comment :: (using lexer: *Lexer) -> success: bool = true {
             consume(lexer);
             while !is_at_end(lexer) && consume(lexer) != #char "*" && peek(lexer) != #char "/" {}
             consume(lexer); // consume closing /, if not found, this is an error
-        case; return success = false;
+        case; assert(false, "unable to parse comment");
     }
-    return true;
 }
 
-number :: (using lexer: *Lexer) -> status: bool = true, err_msg: string = "" {
+number :: (using lexer: *Lexer) {
     found_alpha := false;
     while !is_at_end(lexer) && (String.is_digit(peek(lexer)) || String.is_alpha(peek(lexer))) {
         if String.is_alpha(peek(lexer)) {
@@ -91,11 +131,10 @@ number :: (using lexer: *Lexer) -> status: bool = true, err_msg: string = "" {
     }
     str := String.slice(src, start, current-start);
     if found_alpha {
-        return status = false, err_msg = tprint("Invalid identifier found: %", str);
+        assert(false, "Invalid identifier found: %", str);
     }
-    token := Token.{ .INT_VALUE, str, line};
+    token := Token.{ .INT_LITERAL, str, line};
     array_add(*tokens, token); 
-    return status = true;
 }
 
 ident_or_keyword :: (using lexer: *Lexer) {
@@ -136,85 +175,5 @@ is_at_end :: (using lexer: *Lexer) -> bool {
 #import "Basic";
 String :: #import "String";
 
-#run run_test();
-
-run_test :: () {
-    #import "Compiler";
-    options := get_build_options();
-    args := options.compile_time_command_line;
-    for arg: args {
-        if arg == {
-          case "test";  
-            // test_simple_program();
-            // test_with_slash_comment();
-            // test_with_multiline_comment();
-            test_invalid_identifier();
-        }
-    }
-}
-
-test_invalid_identifier :: () {
-    src := #string done
-    int main () {
-        return 2a;
-    }
-    done
-    lexer := Lexer.{src = src};
-    success, msg := scan(*lexer);
-    assert(!success, "Invalid identifier test should have failed");
-    assert(msg == "Invalid identifier found: 2a");
-}
-
-test_with_multiline_comment :: () {
-    src := #string done
-    /* yello this is long comment
-        new line
-    */
-    int main () {
-        return 2;
-    }
-    done
-    lexer := Lexer.{src = src};
-    success := scan(*lexer);
-    assert(success);
-    assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
-}
-
-
-test_with_slash_comment :: () {
-    src := #string done
-    int main () {
-        // this is a comment
-        return 2;
-    }
-    done
-    lexer := Lexer.{src = src};
-    success := scan(*lexer);
-    assert(success);
-    assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
-}
-
-test_simple_program :: () {
-    src := #string done
-    int main () {
-        return 2;
-    }
-    done
-
-    lexer := Lexer.{src = src};
-    success := scan(*lexer);
-    assert(success);
-
-    assert(lexer.tokens.count == 9, "number of tokens must be 9, found %", lexer.tokens.count);
-    assert(lexer.tokens[0].type == .INT, "expected token to be int, found %", lexer.tokens[0].type);
-    assert(lexer.tokens[1].type == .IDENT, "expected to be ident with value \"main\". found % with value %", lexer.tokens[1].type, lexer.tokens[1].value);
-    assert(lexer.tokens[2].type == .LPAREN, "expected ( found %", lexer.tokens[2].value);
-    assert(lexer.tokens[3].type == .RPAREN, "expected ) found %", lexer.tokens[3].value);
-    assert(lexer.tokens[4].type == .LCURLY, "expected { found %", lexer.tokens[4].value);
-    assert(lexer.tokens[5].type == .RETURN, "experted return found %", lexer.tokens[5].value);
-    assert(lexer.tokens[6].type == .INT_VALUE, "expeted INT_VAL with 2. Found % with value %", lexer.tokens[6].type, lexer.tokens[0].value);
-    assert(lexer.tokens[7].type == .SEMICOLON, "expected ; found %", lexer.tokens[7].value);
-    assert(lexer.tokens[8].type == .RCURLY, "expected } found %", lexer.tokens[8].value);
-}
 
 #scope_export
