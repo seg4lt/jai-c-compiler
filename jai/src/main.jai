@@ -56,8 +56,12 @@ Parser :: struct {
     current: int = 0;
 }
 
-parse_program :: (parser: *Parser) -> success: bool = true, node: *Ast_Node = null {
+parse_program :: (using parser: *Parser) -> success: bool = true, node: *Ast_Node = null {
     program := parse_function(parser);
+    if current < tokens.count {
+        log_error("found extra token: %", peek(parser).type);
+        exit(1);
+    }
     return success = true, node= program;
 }
 
@@ -66,6 +70,15 @@ parse_function :: (using parser: *Parser) -> *Ast_Node {
     ident := consume(parser, .IDENT);
     fn_name := ident.value;
     consume(parser, .LPAREN);
+
+    {
+        
+        possible_void := peek(parser);
+        if possible_void.type == .VOID {
+            consume(parser, .VOID);
+        }
+    }
+
     consume(parser, .RPAREN);
     consume(parser, .LCURLY);
     stmt := parse_stmt(parser);
