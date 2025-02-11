@@ -19,6 +19,7 @@ asm_print :: (node: *Asm_Construct, depth: int = 0) {
             print("\n");
     }
 }
+
 asm_print_inst :: (node: Instruction_Asm_Construct, depth: int = 0) {
     if #complete node.type == {
         case .MOV; 
@@ -37,7 +38,6 @@ asm_format_register :: (r: Register) -> string {
         case .EAX; return "%eax";
     }
 }
-
 
 generate_asm :: (ast: *Ast_Node) -> *Asm_Construct {
     if #complete ast.type == {

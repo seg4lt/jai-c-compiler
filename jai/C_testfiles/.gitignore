@@ -1,3 +1,6 @@
+*
+!*.c
+!Makefile
 # preprocessed output
 *.i
 # ASM 
