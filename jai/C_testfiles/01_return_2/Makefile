@@ -13,7 +13,7 @@ pp:
 asm: pp
 	$(CC) -S -O -fno-asynchronous-unwind-tables -fcf-protection=none $(FILE_NAME).i
 link: asm
-	$(CC) $(FILE_NAME).i -o $(FILE_NAME).o
+	$(CC) $(FILE_NAME).s -o $(FILE_NAME)
 	
 clean:
 	rm -f $(FILE_NAME).o $(FILE_NAME).s $(FILE_NAME).i
