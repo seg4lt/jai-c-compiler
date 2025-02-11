@@ -25,6 +25,9 @@ exp = Constant(int)
 
 
 # Notes
+`arch -x86_64` - run x86_64 binaries on M1 mac
+`arch -x86_64 fish` - run x86_64 binaries on M1 mac
+
 Chap 1:
 - Lex: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
 
