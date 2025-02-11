@@ -145,9 +145,9 @@ run_test :: () {
     for arg: args {
         if arg == {
           case "test";  
-            // test_simple_program();
-            // test_with_slash_comment();
-            // test_with_multiline_comment();
+            test_simple_program();
+            test_with_slash_comment();
+            test_with_multiline_comment();
             test_invalid_identifier();
         }
     }
