@@ -23,7 +23,7 @@
         "label": "Run Current Jai File",
         "type": "shell",
         // Can use dependOn but compile output will be in different terminal
-        "command": "jai build.jai && ./out/target",
+        "command": "jai build.jai && ./out/target ./C_testfiles/01_return_2/return_2.c",
         "group": {
           "kind": "build",
           "isDefault": false
