@@ -20,6 +20,15 @@ exp = Constant(int)
 ```
 
 
+## ASM ADSL
+```
+program = Program(function_definition)
+function_definition = Function(identifier name, instruction* instructions)
+instruction = Mov(operand src, operand dst) | Ret
+operand = Imm(int) | Register
+```
+
+
 
 
 
