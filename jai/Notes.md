@@ -30,4 +30,5 @@ exp = Constant(int)
 
 Chap 1:
 - Lex: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
+- Parse: `./test_compiler /path/to/your_compiler --chapter 1 --stage parse`
 
