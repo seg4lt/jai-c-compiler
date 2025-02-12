@@ -29,10 +29,6 @@ operand = Imm(int) | Register
 ```
 
 
-
-
-
-
 # Notes
 `arch -x86_64` - run x86_64 binaries on M1 mac
 `arch -x86_64 fish` - run x86_64 binaries on M1 mac

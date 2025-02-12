@@ -19,6 +19,10 @@ Token_Type :: enum {
     INT;
     VOID;
     RETURN;
+    // OPERATOR
+    BITWISE_NOT;
+    MINUS;
+    UNARY_MINUS;
 }
 
 Token :: struct {
@@ -39,9 +43,9 @@ lex :: (args: Cli_Args) -> Lexer {
         log_error("Failed to Lex: %", msg);
         exit(1);
     }
-    // for lexer.tokens {
-    //     print("%\n", it);
-    // }
+    for lexer.tokens {
+        print("%\n", it);
+    }
     return lexer;
 }
 
@@ -71,14 +75,22 @@ scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "
         }
 
         if current_char == {
-            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});continue; 
-            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});continue;
-            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});continue;
-            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});continue;
-            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});continue;
-            case #char "/"; comment(lexer); continue;
+            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});
+            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});
+            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});
+            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});
+            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});
+            case #char "/"; comment(lexer);
+            case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
+            case #char "-"; 
+                if peek(lexer) == #char "-" {
+                    consume(lexer);
+                    array_add(*tokens, .{.UNARY_MINUS, "--", line});
+                    continue;
+                }
+                array_add(*tokens, .{.MINUS, "-", line});
+            case; return success = false, err_msg = tprint("Unexpected character %", String.to_string(*current_char, 1));
         }
-        return success = false, err_msg = tprint("Unexpected character %", String.to_string(*current_char, 1));
     }
     return success = true;
 }
