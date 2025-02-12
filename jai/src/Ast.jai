@@ -4,130 +4,166 @@ Parser :: struct {
     current: int = 0;
 }
 
-Ast_Node_Type :: enum {
-    PROGRAM;
-    FUNCTION;
-    RETURN_STMT;
-    INT_VALUE;
-}
+Ast_Node_Type :: enum { PROGRAM; FN; STMT; EXPR; }
 
 Ast_Node :: struct {
     type: Ast_Node_Type;
     as: union {
         program: Program_Ast_Node;
         fn: Fn_Ast_Node;
-        return_stmt: Return_Stmt_Ast_Node;
-        int_value: int;
+        stmt: Stmt_Ast_Node;
+        expr: Expr_Ast_Node;
     };
 }
 
-Program_Ast_Node :: struct {
-    fn: *Ast_Node;
+Program_Ast_Node :: struct { fn: *Ast_Node; }
+
+Fn_Ast_Node :: struct { name: string; body: []*Ast_Node; }
+
+Stmt_Type :: enum { RETURN; }
+Stmt_Ast_Node :: struct {
+    type: Stmt_Type;
+    as: union {
+        return_stmt: Return_Stmt;
+    };
 }
 
-Fn_Ast_Node :: struct {
-    name: string;
-    body: []*Ast_Node;
+Return_Stmt :: struct { expr: *Ast_Node; }
+
+Expr_Ast_Type :: enum { CONSTANT; UNARY; GROUP; }
+Expr_Ast_Node :: struct {
+    type: Expr_Ast_Type;
+    as: union {
+        constant: Constant_Expr;
+        unary: Unary_Expr;
+        group: *Expr_Ast_Node;
+    };
 }
 
-Return_Stmt_Ast_Node :: struct {
-    value: *Ast_Node;
+Constant_Expr :: struct {
+    value: int;
 }
-
-ast_parse :: (lexer: *Lexer) -> *Ast_Node {
-    parser := Parser.{tokens = lexer.tokens};
-    success, program := parse_program(*parser);
-    // print("----\n");
-    // ast_print(ast);
-    return program;
+Unary_Expr :: struct {
+    op: Unary_Operator_Type;
+    expr: *Expr_Ast_Node;
 }
+Unary_Operator_Type :: enum { BITWISE_NOT; NEGATE; }
 
-ast_print :: (node: *Ast_Node, depth: int = 0) {
-    for 0..depth-1 print("    ");
-    if node == null return;
-    if #complete node.type == {
-        case .PROGRAM;
-            print("program: \n");
-            ast_print(node.as.program.fn, depth + 1);
-        case .FUNCTION;
-            print("fn: %\n", node.as.fn.name);
-            for node.as.fn.body ast_print(it, depth + 1);
-        case .RETURN_STMT;
-            print("return:\n");
-            ast_print(node.as.return_stmt.value, depth + 1);
-        case .INT_VALUE;
-            print("int: %\n", node.as.int_value);
-    }
-}
-
-parse_program :: (using parser: *Parser) -> success: bool = true, program: *Ast_Node = null {
+parse_program_ast_node :: (using parser: *Parser) -> *Ast_Node {
     program := New(Ast_Node);
-    fn := parse_function(parser);
+    fn := parse_function_ast_node(parser);
     if current < tokens.count {
         log_error("found extra token: %", peek(parser).type);
         exit(1);
     }
-    program.* = .{
-        type = .PROGRAM,
-        as = .{ program = .{ fn = fn }}
-    };
-    return success = true, program = program;
+    program.* = .{ type = .PROGRAM, as = .{ program = .{ fn = fn }} };
+    return program;
 }
 
-parse_function :: (using parser: *Parser) -> *Ast_Node {
+parse_function_ast_node :: (using parser: *Parser) -> *Ast_Node {
     consume(parser, .INT);
     ident := consume(parser, .IDENT);
     fn_name := ident.value;
-    consume(parser, .LPAREN);
 
+    // TOOD: parameters
+    consume(parser, .LPAREN);
     {
-        
         possible_void := peek(parser);
         if possible_void.type == .VOID {
             consume(parser, .VOID);
         }
     }
-
     consume(parser, .RPAREN);
     consume(parser, .LCURLY);
-    stmt := parse_stmt(parser);
-    consume(parser, .RCURLY);
-    fn_node := New(Ast_Node);
+
+    stmt := parse_stmt_ast_node(parser);
     stmts : [..]*Ast_Node;
     array_add(*stmts, stmt);
-    fn_node.* = .{
-        type = .FUNCTION,
-        as = .{ fn = .{ name = fn_name, body = stmts }, },
-    };
-    return fn_node; 
+
+    consume(parser, .RCURLY);
+
+    node := New(Ast_Node);
+    node.* = .{ type = .FN, as =.{ fn = .{ fn_name, stmts }}};
+    return node;
 }
 
-parse_stmt :: (using parser: *Parser) -> *Ast_Node {
+parse_stmt_ast_node :: (using parser: *Parser) -> *Ast_Node {
+    return_stmt := parse_return_stmt(parser);
+    node := New(Ast_Node);
+    node.* = .{ type = .STMT, as = .{ stmt = return_stmt}};
+    return node;
+}
+
+parse_return_stmt :: (using parser: *Parser) -> *Stmt_Ast_Node {
     consume(parser, .RETURN);
-    expr := parse_int_value(parser);
+    expr := parse_expression_ast_node(parser);
     consume(parser, .SEMICOLON);
-
-    stmt_node := New(Ast_Node);
-    stmt_node.* = .{
-        type = .RETURN_STMT,
-        as = .{ return_stmt = .{ value = expr } }
-    };
-    return stmt_node;
+    node := New(Stmt_Ast_Node);
+    node.* = .{ type = .RETURN, as = .{ return_stmt = .{ expr = expr } }};
+    return node;
 }
 
-parse_int_value :: (using parser: *Parser) -> *Ast_Node {
+parse_expression_ast_node :: (using parser: *Parser) -> *Ast_Node {
+    current_token := peek(parser);
+    if current_token == null {
+        log_error("expected expression but reached end of tokens");
+        exit(1);
+    }
+    expr : Expr_Ast_Node;
+    if current_token.type ==  {
+        case .BITWISE_NOT;
+            expr = parse_bitwise_not_unary_expression(parser);
+        case .INT_VALUE;
+            expr = parse_constant_expr(parser);
+        case .LPAREN;
+            expr = parse_group_expr(parser);
+        case .MINUS;
+            expr = parse_negate_expr(parser);
+        case;
+            log_error("Wanted expression don't know what I got: %", current_token.*);
+            exit(1);
+    }
+    node := New(Ast_Node);
+    node.* = .{ type = .EXPR, as = .{ expr = expr }};
+     return node;
+}
+
+parse_negate_expr :: (using parser: *Parser) -> *Expr_Ast_Node {
+    consume(parser, .MINUS);
+    expr_ast_node := parse_expression_ast_node(parser);
+    node := New(Expr_Ast_Node);
+    node.* = .{ type = .UNARY, as = .{ unary = .{ op = .NEGATE, expr = *expr_ast_node.as.expr }}};
+    return node;
+}
+
+parse_group_expr :: (using parser: *Parser) -> *Expr_Ast_Node {
+    consume(parser, .LPAREN);
+    expr_ast_node := parse_expression_ast_node(parser);
+    consume(parser, .RPAREN);
+    node := New(Expr_Ast_Node);
+    node.* = .{ type = .GROUP, as = .{ group = *expr_ast_node.as.expr }};
+    return node;
+}
+
+parse_bitwise_not_unary_expression :: (using parser: *Parser) -> *Expr_Ast_Node {
+    consume(parser, .BITWISE_NOT);
+    expr_ast_node := parse_expression_ast_node(parser);
+    node := New(Expr_Ast_Node);
+    node.* = .{ type = .UNARY, as = .{ unary = .{ op = .BITWISE_NOT, expr = *expr_ast_node.as.expr }}};
+    return node;
+}
+
+parse_constant_expr :: (using parser: *Parser) -> *Expr_Ast_Node {
     token := consume(parser, .INT_VALUE);
-    int_value_node := New(Ast_Node);
     value, success := string_to_int(token.value);
+
     if !success {
         log_error("expected int found %", token.value);
         exit(1);
     }
-    int_value_node.* = .{
-        type = .INT_VALUE,
-        as = .{ int_value = value }
-    };
-    return int_value_node;
+    node := New(Expr_Ast_Node);
+    node.* = .{ type = .CONSTANT, as = .{ constant = .{value = value} }};
+    return node;
 }
 
 consume :: (using parser: *Parser, type: Token_Type) -> Token {
@@ -151,6 +187,73 @@ is_at_end :: (using parser: *Parser) -> bool {
     return current >= parser.tokens.count;
 }
 
+
+num_space_print :: "┆⎯";
+
+ast_parse :: (lexer: *Lexer) -> *Ast_Node {
+    parser := Parser.{tokens = lexer.tokens};
+    program := parse_program_ast_node(*parser);
+    print("----\n");
+    ast_print(program);
+    return program;
+}
+
+ast_print :: (using node: *Ast_Node, depth: int = 0) {
+    if node == null return;
+    if #complete type == {
+        case .PROGRAM;
+            for 0..depth-1 print(num_space_print);
+            print("PROGRAM: \n");
+            ast_print(as.program.fn, depth + 1);
+            print("\n");
+            for 0..depth-1 print(num_space_print);
+            print(")");
+        case .FN;
+            for 0..depth-1 print(num_space_print);
+            print("FN: ( ident: %\n", as.fn.name);
+            for as.fn.body ast_print(it, depth + 1);
+            print("\n");
+            for 0..depth-1 print(num_space_print);
+            print(")");
+        case .STMT;
+            for 0..depth-1 print(num_space_print);
+            ast_print_stmt(as.stmt, depth);
+        case .EXPR;
+            ast_print_expr(as.expr, depth);
+    }
+}
+
+ast_print_expr :: (using expr: Expr_Ast_Node, depth: int) {
+    if #complete type == {
+        case .CONSTANT; 
+            print("%", as.constant.value);
+        case .UNARY; 
+            for 0..depth-1 print(num_space_print);
+            print("UNARY ( %, ",as.unary.op);
+            ast_print_expr(as.unary.expr, depth + 1);
+            print("\n");
+            for 0..depth-1 print(num_space_print);
+            print(")");
+        case .GROUP;
+            print("GROUP (\n");
+            ast_print_expr(as.group, depth + 1);
+            print("\n");
+            for 0..depth-1 print(num_space_print);
+            print(")");
+    }
+}
+
+ast_print_stmt :: (using stmt: Stmt_Ast_Node, depth: int) {
+    if #complete type == {
+        case .RETURN;
+            print("RETURN ( \n");
+            ast_print(as.return_stmt.expr, depth + 1);
+            print("\n");
+            for 0..depth-1 print(num_space_print);
+            print(")");
+    }
+}
+
 #scope_file
 
 #run run_test();
@@ -166,6 +269,19 @@ run_test :: () {
     }
 }
 
+test_bitwise_not_and_minus :: () {
+    src := #string done
+        int main () {
+            return ~(-2);
+        }
+    done
+    lexer := Lexer.{src = src};
+    l_success, msg := scan(*lexer);
+
+    parser := Parser.{tokens = lexer.tokens};
+    program := parse_program_ast_node(*parser);
+}
+
 test_simple :: () {
     src := #string done
         int main () {
@@ -176,8 +292,7 @@ test_simple :: () {
     l_success, msg := scan(*lexer);
 
     parser := Parser.{tokens = lexer.tokens};
-    p_success, program := parse_program(*parser);
-    assert(p_success, "Parsing should be success");
+    program := parse_program_ast_node(*parser);
 }
 
 #scope_export

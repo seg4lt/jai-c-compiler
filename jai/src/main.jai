@@ -7,9 +7,9 @@ main :: () {
 
     lexer := ifx args.flags & .LEX lex(args);
     ast := ifx args.flags & .PARSE ast_parse(*lexer);
-    asm_construct := ifx args.flags & .PARSE  generate_asm(ast);
-    if args.flags & .CODE_GEN start_code_emission(args, asm_construct); 
-    if args.flags & .ALL assember_and_linker(args);
+    // asm_construct := ifx args.flags & .PARSE asm_gen(ast);
+    // if args.flags & .CODE_GEN start_code_emission(args, asm_construct); 
+    // if args.flags & .ALL assember_and_linker(args);
 }
 
 #import "Basic"()(MEMORY_DEBUGGER=true);
@@ -19,9 +19,9 @@ Process :: #import "Process";
 #load "Lexer.jai";
 #load "Cli_Args.jai";
 #load "Ast.jai";
-#load "Asm_Gen.jai";
-#load "Write_Asm.jai";
-#load "Compiler_Util.jai";
+// #load "Asm_Gen.jai";
+// #load "Write_Asm.jai";
+// #load "Compiler_Util.jai";
 
 
 
