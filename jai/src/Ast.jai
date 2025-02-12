@@ -34,6 +34,14 @@ Return_Stmt_Ast_Node :: struct {
     value: *Ast_Node;
 }
 
+ast_parse :: (lexer: *Lexer) -> *Ast_Node {
+    parser := Parser.{tokens = lexer.tokens};
+    success, program := parse_program(*parser);
+    // print("----\n");
+    // ast_print(ast);
+    return program;
+}
+
 ast_print :: (node: *Ast_Node, depth: int = 0) {
     for 0..depth-1 print("    ");
     if node == null return;

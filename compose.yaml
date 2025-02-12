@@ -4,7 +4,7 @@ services:
     image: ubuntu
     command: >
       bash -c "apt update &&
-      apt install -y gcc make &&
+      DEBIAN_FRONTEND=noninteractive apt install -y gcc make python3 &&
       cp /libs/jai/bin/jai-linux /libs/jai/bin/jai &&
       echo 'Copy complete. Container started...' &&
       tail -f /dev/null"

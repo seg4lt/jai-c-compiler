@@ -45,6 +45,8 @@ generate_asm :: (ast: *Ast_Node) -> *Asm_Construct {
             fn := generate_asm(ast.as.program.fn);
             ac := New(Asm_Construct);
             ac.* = .{ type = .PROGRAM, as = .{ program = .{ fn = fn} }};
+            // print("---\n");
+            // asm_print(ac);
             return ac;
         case .FUNCTION;  return generate_asm_fn(ast.as.fn);
         case .RETURN_STMT; return generate_return_stmt(ast.as.return_stmt);

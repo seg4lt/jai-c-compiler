@@ -27,6 +27,24 @@ Token :: struct {
     line: int;
 }
 
+lex :: (args: Cli_Args) -> Lexer {
+    src, r_success := read_entire_file(args.source_file_path);
+    if !r_success {
+        log_error("Unable to read file -- '%'", args.source_file_path);
+        exit(1);
+    }
+    lexer := Lexer.{src = src};
+    success, msg := scan(*lexer);
+    if !success {
+        log_error("Failed to Lex: %", msg);
+        exit(1);
+    }
+    // for lexer.tokens {
+    //     print("%\n", it);
+    // }
+    return lexer;
+}
+
 scan :: (using lexer: *Lexer) -> success: bool = true #must, err_msg: string = "" {
     c := 0;
     while !is_at_end(lexer) {
