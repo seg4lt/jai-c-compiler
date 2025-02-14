@@ -31,6 +31,7 @@ ast_parse :: (lexer: *Lexer) -> *Program_Ast_Node {
     parser := Parser.{ tokens = lexer.tokens };
     program := parse_program_ast_node(*parser);
     print_program_ast(program);
+    if !is_at_end(*parser) assert(false, "All token not consumed");
     return program;
 }
 
