@@ -224,3 +224,25 @@ test_simple :: () {
 }
 
 #scope_export
+
+/* -- ADSL AST -- 
+
+program              = Program(function_definition)
+function_definition  = Function(identifier name, statement body)
+statement            = Return(exp)
+exp                  = Constant(int) | Unary(unary_operator, exp)
+unary_operator       = Complement | Negate
+
+*/
+
+/* E-BNF
+
+<program>         ::= <function>
+<function>        ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
+<statement>       ::= "return" <exp> ";"
+<exp>             ::= <int> | <unop> <exp> | "(" <exp> ")"
+<unop>            ::= "-" | "~"
+<identifier>      ::= ? An identifier token ?
+<int>             ::= ? A constant token ?
+
+*/

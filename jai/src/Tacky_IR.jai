@@ -1,0 +1,16 @@
+
+
+gen_tacky_ir :: (program: *Program)  {
+
+}
+
+/* -- ADSL for TACKY IR -- 
+
+program             = Program(function_definition)
+function_definition = Function(identifier, instruction* body)
+instruction         = Return(val) | Unary(unary_operator, val src, val dst)
+val                 = Constant(int) | Var(identifier)
+unary_operator      = Complement | Negate
+
+*/
+

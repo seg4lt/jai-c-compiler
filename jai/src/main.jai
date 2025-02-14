@@ -12,6 +12,10 @@ main :: () {
     // if args.flags & .ALL assember_and_linker(args);
 }
 
+
+
+
+
 #import "Basic"()(MEMORY_DEBUGGER=true);
 String :: #import "String";
 Process :: #import "Process";
@@ -19,6 +23,7 @@ Process :: #import "Process";
 #load "Lexer.jai";
 #load "Cli_Args.jai";
 #load "Ast.jai";
+#load "Tacky_IR.jai";
 // #load "Asm_Gen.jai";
 // #load "Write_Asm.jai";
 // #load "Compiler_Util.jai";
