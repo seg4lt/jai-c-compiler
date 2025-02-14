@@ -14,7 +14,7 @@ Token_Type :: enum {
     SEMICOLON;
 
     IDENT;
-    INT_VALUE;
+    INT_LITERAL;
     // Keyword
     INT;
     VOID;
@@ -123,7 +123,7 @@ number :: (using lexer: *Lexer) -> status: bool = true, err_msg: string = "" {
     if found_alpha {
         return status = false, err_msg = tprint("Invalid identifier found: %", str);
     }
-    token := Token.{ .INT_VALUE, str, line};
+    token := Token.{ .INT_LITERAL, str, line};
     array_add(*tokens, token); 
     return status = true;
 }
@@ -242,7 +242,7 @@ test_simple_program :: () {
     assert(lexer.tokens[3].type == .RPAREN, "expected ) found %", lexer.tokens[3].value);
     assert(lexer.tokens[4].type == .LCURLY, "expected { found %", lexer.tokens[4].value);
     assert(lexer.tokens[5].type == .RETURN, "experted return found %", lexer.tokens[5].value);
-    assert(lexer.tokens[6].type == .INT_VALUE, "expeted INT_VAL with 2. Found % with value %", lexer.tokens[6].type, lexer.tokens[0].value);
+    assert(lexer.tokens[6].type == .INT_LITERAL, "expeted INT_VAL with 2. Found % with value %", lexer.tokens[6].type, lexer.tokens[0].value);
     assert(lexer.tokens[7].type == .SEMICOLON, "expected ; found %", lexer.tokens[7].value);
     assert(lexer.tokens[8].type == .RCURLY, "expected } found %", lexer.tokens[8].value);
 }
