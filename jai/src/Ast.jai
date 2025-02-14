@@ -17,7 +17,6 @@ Stmt_Ast_Node :: struct {
         return_stmt: struct { expr: *Expr_Ast_Node; };
     };
 }
-
 Expr_Ast_Node :: struct {
     type: enum { CONSTANT; UNARY; GROUP; }
     as: union {
