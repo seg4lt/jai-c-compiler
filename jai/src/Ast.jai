@@ -141,6 +141,7 @@ is_at_end :: (using parser: *Parser, offset: int = 0) -> bool {
 
 
 print_program_ast :: (program: *Program_Ast_Node, depth: int = 0) {
+    print("\n\n -- AST -- \n");
     print("[PROGRAM] ");
     print_fn_ast(program.fn, depth + 1);
 }

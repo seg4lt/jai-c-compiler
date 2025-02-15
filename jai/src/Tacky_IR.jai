@@ -93,6 +93,7 @@ print_tacky :: (program: *Program_Tacky) {
     print("\n\n-- Tacky --\n");
     print("    .program\n");
     print_tacky_fn(program.fn);
+    print("\n");
 }
 
 print_tacky_fn :: (fn: *Fn_Tacky) {
@@ -123,15 +124,6 @@ print_tacky_val :: (val: *Val_Tacky) {
         case .VARIABLE; print("Var(%)", val.as.variable);
     }
 }
-
-// Unary(Complement, Constant(2), Var("tmp.0")) 
-// Return(Var("tmp.0"))
-
-// Unary(Negate, Constant(8), Var("tmp.0")) 
-// Unary(Complement, Var("tmp.0"), Var("tmp.1")) 
-// Unary(Negate, Var("tmp.1"), Var("tmp.2")) 
-// Return(Var("tmp.2"))
-
 
 /* -- ADSL for TACKY IR -- 
 

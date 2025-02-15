@@ -1,177 +1,138 @@
-asm_gen :: (ast: *Ast_Node) -> *Asm_Construct {
-    if #complete ast.type == {
-        case .PROGRAM; 
-            fn := asm_gen(ast.as.program.fn);
-            ac := New(Asm_Construct);
-            ac.* = .{ type = .PROGRAM, as = .{ program = .{ fn = fn} }};
-            print("--- AsmGen --- \n");
-            gen_asm_print(ac);
-            return ac;
-        case .FN;  return asm_gen_fn(ast.as.fn);
-        case .STMT; return asm_gen_stmt(ast.as.stmt);
-        case .EXPR; #through;
-        case; assert(false, "generate asm %", ast.type);
-    }
-    assert(false, "when case program hit all things should be consumed");
-    return null;
+
+Program_Asm :: struct {
+    fn: Fn_Asm;
+}
+Fn_Asm :: struct {
+    ident: string;
+    instructions: []Instruction_Asm;
+}
+Instruction_Asm :: struct {
+    type : enum {MOV; UNARY; ALLOCATE_STACK; RET;};
+    as: union {
+        mov: struct {src: Operand_Asm; dst: Operand_Asm;};
+        unary: struct {op: Unary_Op_Asm; operand: Operand_Asm;}
+        allocate_stack: int;
+        // ret : no value needed
+    };
+}
+Operand_Asm :: struct {
+    type: enum {IMM; REG; PSEUDO; STACK;};
+    as: union {
+        imm: int;
+        reg: Reg_Asm;
+        pseudo: string;
+        stack: int;
+    }; 
+};
+Unary_Op_Asm :: enum { NEG; NOT; }
+Reg_Asm :: enum { AX; R10; }
+
+asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
+    pasm_st_1 := asm_gen_state_1(pgt);
 }
 
-asm_gen_fn :: (fn: Fn_Ast_Node) -> *Asm_Construct {
-    fc: Fn_Asm_Construct;
-    fc.name = fn.name;
-
-    instructions: [..]Instruction_Asm_Construct;
-    for body: fn.body {
-        ret_ac := asm_gen(body);
-        if ret_ac.type == {
-            case .INSTRUCTION_LIST;
-                for ret_ac.as.instruction_list  {
-                    array_add(*instructions, it);
-                }
-            case .INSTRUCTION;
-                    array_add(*instructions, ret_ac.as.instruction);
-            case; 
-                assert(false, "Function generate_asm should only return instruction or instruction list. Found %", ret_ac.*);
-        }
-    }
-
-    ilist := New(Asm_Construct);
-    ilist.* = .{type = .INSTRUCTION_LIST, as = .{ instruction_list = instructions}};
-    fc.instruction_list = ilist;
-    ac := New(Asm_Construct);
-    ac.* = .{type = .FUNCTION, as = .{ fn = fc}};
-    return ac;
+asm_gen_state_1 :: (pgt: *Program_Tacky) -> *Program_Asm {
+    pg := New(Program_Asm);
+    fn := asm_gen_fn(pgt.fn);
+    pg.* = .{fn};
+    print_asm(pg, 1);
+    return pg;
 }
 
-asm_gen_stmt :: (using stmt_ast: Stmt_Ast_Node) -> *Asm_Construct {
-    if #complete type == {
+asm_gen_fn :: (fnt: *Fn_Tacky) -> Fn_Asm {
+    instructions : [..]Instruction_Asm;
+
+    for fnt.instructions asm_gen_inst(*instructions, it);
+
+    // fn := New(Fn_Asm);
+    // fn.* = .{fnt.ident, instructions};
+    // return fn;
+    return .{fnt.ident, instructions};
+}
+
+asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
+    if #complete instt.type == {
         case .RETURN;
-            return asm_gen_return_stmt(as.return_stmt);
-        case;
-            assert(false, "Uknonw statement: %", type);
-            return null;
-    }
-}
-
-asm_gen_return_stmt :: (return_stmt: Return_Stmt) -> *Asm_Construct {
-    if type != .INT_VALUE {
-        assert(false, "return value must be integer. Found %", value);
-    }
-    ret_value := value.as.int_value;
-    src := Asm_Operand.{type = .IMM, as = .{ imm = .{ value = ret_value }}};
-    dest := Asm_Operand.{type = .REGISTER, as = .{ register = .EAX }};
-
-    insts: [..]Instruction_Asm_Construct;
-    array_add(*insts, .{type = .MOV, as = .{ mov = .{src, dest}}});
-    array_add(*insts,.{ type = .RET });
-
-    rt := New(Asm_Construct);
-    rt.type = .INSTRUCTION_LIST;
-    rt.as.instruction_list = insts; 
-    // ins_list : [..]*Asm_Construct;
-    return rt;
-}
-
-Asm_Construct_Type :: enum {
-    PROGRAM;
-    FUNCTION;
-    INSTRUCTION_LIST;
-    INSTRUCTION;
-}
-
-Asm_Construct :: struct {
-    type: Asm_Construct_Type;
-    as: union {
-        program: Program_Asm_Construct;
-        fn: Fn_Asm_Construct;
-        instruction_list: []Instruction_Asm_Construct;
-        instruction: Instruction_Asm_Construct;
-    };
-}
-
-Program_Asm_Construct :: struct {
-    fn: *Asm_Construct;
-}
-
-Fn_Asm_Construct :: struct {
-    name: string;
-    instruction_list: *Asm_Construct;
-}
-
-Asm_Instruction_Type :: enum {
-    MOV; RET;
-}
-
-Instruction_Asm_Construct :: struct {
-    type: Asm_Instruction_Type;
-    as: union {
-        mov: Mov_Instruction;
-        // ret # no need to store value for ret
-    };
-}
-
-Mov_Instruction :: struct {
-    src: Asm_Operand;
-    dst: Asm_Operand;
-}
-Asm_Operand_Type :: enum {
-    IMM; REGISTER;
-}
-
-Asm_Operand :: struct {
-    type: Asm_Operand_Type;
-    as: union {
-        imm: Imm_Operand;
-        register: Register;
-    };
-}
-
-Imm_Operand :: struct {
-    value: int;
-}
-
-Register :: enum {
-    EAX;
-}
-
-#scope_file
-gen_asm_print :: (node: *Asm_Construct, depth: int = 0) {
-    if node == null return;
-    if #complete node.type == {
-        case .PROGRAM;
-            print("program: \n");
-            gen_asm_print(node.as.program.fn, depth + 1);
-        case .FUNCTION;
-            print("%:\n", node.as.fn.name);
-            gen_asm_print(node.as.fn.instruction_list, depth + 1);
-        case .INSTRUCTION_LIST;
-            for node.as.instruction_list  {
-                print("\t");
-                asm_print_inst(it, depth + 1);
-                print("\n");
+            src := asm_gen_val_to_operand(instt.as.ret);
+            dst := Operand_Asm.{.REG, .{ reg = .AX}};
+            array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
+            array_add(insts, .{ .RET, .{} }); 
+        case .UNARY;
+            src := asm_gen_val_to_operand(instt.as.unary.src);
+            dst := asm_gen_val_to_operand(instt.as.unary.dst);
+            array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
+            op: Unary_Op_Asm = ---;
+            if #complete instt.as.unary.op == {
+                case .BITWISE_NOT; op = .NOT;
+                case .NEGATE; op = .NEG;
             }
-        case .INSTRUCTION;
-            print("\t");
-            asm_print_inst(node.as.instruction, depth + 1);
+            array_add(insts, .{ .UNARY, .{unary = .{op, dst}}});  
+    }
+}
+
+asm_gen_val_to_operand :: (using val: *Val_Tacky) -> Operand_Asm {
+     if #complete type == {
+        case .CONSTANT;
+            return .{.IMM, .{ imm = as.constant }};
+        case .VARIABLE;
+            return .{.PSEUDO, .{ pseudo = as.variable }};
+    }
+}
+
+print_asm :: (pg: *Program_Asm, stage: int) {
+    print("\n\n---- ASM GEN % --- \n", stage);
+    print(".program\n");
+    print_asm_fn(pg.fn);
+}
+
+print_asm_fn :: (fn: Fn_Asm) {
+    print(".%:\n", fn.ident);
+    for fn.instructions print_asm_inst(it);
+}
+
+print_asm_inst :: (inst: Instruction_Asm) {
+    print("    ");
+
+    if #complete inst.type == {
+        case .MOV;
+            print("% ", inst.type);
+            print_asm_operand(inst.as.mov.src);
+            print(", ");
+            print_asm_operand(inst.as.mov.dst);
             print("\n");
+        case .UNARY;
+            print("% ", inst.as.unary.op);
+            print_asm_operand(inst.as.unary.operand);
+            print("\n");
+        case .RET;
+            print("%",inst.type);
+            print("\n");
+        case .ALLOCATE_STACK;
+            assert(false, "not implemented yet");
     }
 }
-asm_print_inst :: (node: Instruction_Asm_Construct, depth: int = 0) {
-    if #complete node.type == {
-        case .MOV; 
-            print ("mov        %, %", asm_format_operand(node.as.mov.src), asm_format_operand(node.as.mov.dst));
-        case .RET; print("ret");
+print_asm_operand :: (operand: Operand_Asm) {
+    if #complete operand.type == {
+        case .IMM;
+            print("imm(%)", operand.as.imm);
+        case .REG;
+            print("reg(%)", operand.as.reg);
+        case .PSEUDO;
+            print("pseudo(%)",operand.as.pseudo);
+        case .STACK;
+            assert(false, "not implemented");
     }
 }
-asm_format_operand :: (op: Asm_Operand) -> string {
-    if #complete op.type == {
-        case .IMM; return tprint("$%", op.as.imm.value);
-        case .REGISTER; return asm_format_register(op.as.register);
-    }
-}
-asm_format_register :: (r: Register) -> string {
-    if #complete r == {
-        case .EAX; return "%eax";
-    }
-}
-#scope_export
+
+/*
+program              = Program(function_definition)
+function_definition  = Function(identifier name, instruction* instructions)
+instruction          = Mov(operand src, operand dst)
+                       | Unary(unary_operator, operand)
+                       | AllocateStack(int)
+                       | Ret
+unary_operator       = Neg | Not
+operand              = Imm(int) | Reg(reg) | Pseudo(identifier) | Stack(int)
+reg                  = AX | R10
+
+*/
