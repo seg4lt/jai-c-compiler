@@ -63,7 +63,7 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
 Stmt :: struct {
     parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
         if peek(parser).type == .RETURN {
-            return Stmt.parse_return_stmt(parser);
+            return parse_return_stmt(parser);
         }
         assert(false, "This kind of statemnt is not know to me at the moment %", peek(parser).*);
         return null;
