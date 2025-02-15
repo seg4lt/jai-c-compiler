@@ -31,7 +31,12 @@ asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
     print_asm(pasm_st_1, 1);
     stack_size := asm_gen_stage_2(pasm_st_1.fn.instructions);
+    print("\n Stack Size: %\n", stack_size);
     print_asm(pasm_st_1, 2);
+
+    new_insts := asm_gen_stage_3(pasm_st_1.fn.instructions, stack_size);
+    pasm_st_1.fn.instructions = new_insts;
+    print_asm(pasm_st_1, 3);
     return pasm_st_1;
 }
 
@@ -74,6 +79,30 @@ asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> O
     offset := (table.count + 1) * -4;
     Hash_Table.table_add(table, op.as.pseudo, offset);
     return .{.STACK,  .{stack=offset}};
+}
+
+// 1. Add number of bytes a stack needs to store all variable
+// 2. If any instructions have two address pointer, dividing them in two to use R10 register.
+asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
+    insts : [..]Instruction_Asm;
+    array_add(*insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_size}});
+
+    for oi: old_insts {
+        if #complete oi.type == {
+            case .MOV;
+                if oi.as.mov.src.type == .STACK && oi.as.mov.dst.type == .STACK {
+                    array_add(*insts, .{.MOV, .{mov = .{src = oi.as.mov.src, dst = .{.REG,.{reg = .R10}}}}});
+                    array_add(*insts, .{.MOV, .{mov = .{src= .{.REG,.{reg = .R10}}, dst = oi.as.mov.dst}}});
+                } else {
+                    array_add(*insts, oi);
+                }
+            case .UNARY; #through;
+            case .ALLOCATE_STACK; #through;
+            case .RET;
+                array_add(*insts, oi);
+        }
+    }
+    return insts;
 }
 
 
@@ -141,7 +170,8 @@ print_asm_inst :: (inst: Instruction_Asm) {
             print("%",inst.type);
             print("\n");
         case .ALLOCATE_STACK;
-            assert(false, "not implemented yet");
+            print("ASTK %", inst.as.allocate_stack);
+            print("\n");
     }
 }
 print_asm_operand :: (operand: Operand_Asm) {
