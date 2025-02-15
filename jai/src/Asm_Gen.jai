@@ -42,7 +42,7 @@ asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
 
 asm_gen_state_1 :: (pgt: *Program_Tacky) -> *Program_Asm {
     pg := New(Program_Asm);
-    fn := asm_gen_fn(pgt.fn);
+    fn := asm_gen_fn(*pgt.fn);
     pg.* = .{fn};
     return pg;
 }
@@ -108,20 +108,20 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
 
 asm_gen_fn :: (fnt: *Fn_Tacky) -> Fn_Asm {
     instructions : [..]Instruction_Asm;
-    for fnt.instructions asm_gen_inst(*instructions, it);
+    for fnt.instructions asm_gen_inst(*instructions, *it);
     return .{fnt.ident, instructions};
 }
 
 asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
         case .RETURN;
-            src := asm_gen_val_to_operand(instt.as.ret);
+            src := asm_gen_val_to_operand(*instt.as.ret);
             dst := Operand_Asm.{.REG, .{ reg = .AX}};
             array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
             array_add(insts, .{ .RET, .{} }); 
         case .UNARY;
-            src := asm_gen_val_to_operand(instt.as.unary.src);
-            dst := asm_gen_val_to_operand(instt.as.unary.dst);
+            src := asm_gen_val_to_operand(*instt.as.unary.src);
+            dst := asm_gen_val_to_operand(*instt.as.unary.dst);
             array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
             op: Unary_Op_Asm = ---;
             if #complete instt.as.unary.op == {
