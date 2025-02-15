@@ -4,13 +4,14 @@ main :: () {
     defer { report_memory_leaks(); };
 
     args := get_cli_args();
+    print("%\n", args);
 
     lexer := ifx args.flags & .LEX lex(args);
-    ast := ifx args.flags & .PARSE ast_parse(*lexer);
-    tacky := ifx args.flags & .TACKY gen_program_tacky(ast);
-    asm_construct := ifx args.flags & .CODE_GEN asm_gen(tacky);
-    if args.flags & .CODE_GEN code_emm(args, asm_construct); 
-    if args.flags & .ALL assember_and_linker(args);
+    // ast := ifx args.flags & .PARSE ast_parse(*lexer);
+    // tacky := ifx args.flags & .TACKY gen_program_tacky(ast);
+    // asm_construct := ifx args.flags & .CODE_GEN asm_gen(tacky);
+    // if args.flags & .CODE_GEN code_emm(args, asm_construct); 
+    // if args.flags & .ALL assember_and_linker(args);
 }
 
 

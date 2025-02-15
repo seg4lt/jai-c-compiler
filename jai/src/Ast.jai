@@ -183,49 +183,6 @@ print_space :: (depth: int = 0) {
     for 0..depth-1 print("┊−");
 }
 
-#scope_file
-
-#run run_test();
-run_test :: () {
-    #import "Compiler";
-    options := get_build_options();
-    args := options.compile_time_command_line;
-    for arg: args {
-        if arg == {
-            case "test";  
-            test_simple();
-        }
-    }
-}
-
-test_bitwise_not_and_minus :: () {
-    src := #string done
-        int main () {
-            return ~(-2);
-        }
-    done
-    lexer := Lexer.{src = src};
-    l_success, msg := scan(*lexer);
-
-    parser := Parser.{tokens = lexer.tokens};
-    program := parse_program_ast_node(*parser);
-}
-
-test_simple :: () {
-    src := #string done
-        int main () {
-            return 2;
-        }
-    done
-    lexer := Lexer.{src = src};
-    l_success, msg := scan(*lexer);
-
-    parser := Parser.{tokens = lexer.tokens};
-    program := parse_program_ast_node(*parser);
-}
-
-#scope_export
-
 /* -- ADSL AST -- 
 
 program              = Program(function_definition)

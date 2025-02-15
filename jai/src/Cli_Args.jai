@@ -20,7 +20,7 @@ get_cli_args :: () -> Cli_Args {
 
     for args {
         if it == {
-            case "--lex"; flags &= ~(.PARSE | .CODE_GEN | .ALL);
+            case "--lex"; flags &= ~(.PARSE | .CODE_GEN | .TACKY | .ALL);
             case "--parse"; flags &= ~(.TACKY | .CODE_GEN | .ALL);
             case "--tacky"; flags &= ~(.CODE_GEN | .ALL);
             case "--code-gen"; flags &= ~.ALL;

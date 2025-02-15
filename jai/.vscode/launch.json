@@ -6,7 +6,7 @@
         "type": "lldb",
         "request": "launch",
         "program": "./out/target",
-        "args": ["./C_testfiles/02_unary/neg_bitwise.c"],
+        "args": ["./C_testfiles/03_binary/binary.c"],
         "preLaunchTask": "Compile Current Jai File",
         // "cwd": "${fileDirname}",
         "console": "integratedTerminal"
