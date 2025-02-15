@@ -25,7 +25,7 @@ Operand_Asm :: struct {
     }; 
 };
 Unary_Op_Asm :: enum { NEG; NOT; }
-Reg_Asm :: enum { AX; R10; }
+Reg_Asm :: enum { AX; R10; RSP; RBP; }
 
 asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
@@ -66,8 +66,9 @@ asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
            inst.* = .{.UNARY,.{unary=un}};
         }
     }
-    final_offset := (table.count * -4);
-    return final_offset;
+    stack_size := (table.count * -4);
+    // making it positive as this is size of stack
+    return -1 * stack_size;
 }
 
 asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> Operand_Asm {
