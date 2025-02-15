@@ -8,7 +8,7 @@ main :: () {
     lexer := ifx args.flags & .LEX lex(args);
     ast := ifx args.flags & .PARSE ast_parse(*lexer);
     tacky := ifx args.flags & .TACKY gen_program_tacky(ast);
-    asm_construct := ifx args.flags & .TACKY asm_gen_state_1(tacky);
+    asm_construct := ifx args.flags & .TACKY asm_gen(tacky);
     // if args.flags & .CODE_GEN start_code_emission(args, asm_construct); 
     // if args.flags & .ALL assember_and_linker(args);
 }

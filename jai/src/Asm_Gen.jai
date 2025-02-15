@@ -4,7 +4,7 @@ Program_Asm :: struct {
 }
 Fn_Asm :: struct {
     ident: string;
-    instructions: []Instruction_Asm;
+    instructions: [..]Instruction_Asm;
 }
 Instruction_Asm :: struct {
     type : enum {MOV; UNARY; ALLOCATE_STACK; RET;};
@@ -29,24 +29,57 @@ Reg_Asm :: enum { AX; R10; }
 
 asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
+    print_asm(pasm_st_1, 1);
+    stack_size := asm_gen_stage_2(pasm_st_1.fn.instructions);
+    print_asm(pasm_st_1, 2);
+    return pasm_st_1;
 }
 
 asm_gen_state_1 :: (pgt: *Program_Tacky) -> *Program_Asm {
     pg := New(Program_Asm);
     fn := asm_gen_fn(pgt.fn);
     pg.* = .{fn};
-    print_asm(pg, 1);
     return pg;
 }
 
+// replace pseudo register, with offset relative to stack
+asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
+    table : Hash_Table.Table(string, int);
+    Hash_Table.init(*table);
+    defer Hash_Table.deinit(*table);
+
+    for *inst: insts {
+        if inst.type == {
+        case .MOV;
+           mov := inst.as.mov;
+           mov.src = asm_gen_stage_2_stack_offset(*table, mov.src);
+           mov.dst = asm_gen_stage_2_stack_offset(*table, mov.dst);
+           inst.* = .{.MOV,.{mov = mov}};
+        case .UNARY;
+           un := inst.as.unary;
+           un.operand = asm_gen_stage_2_stack_offset(*table, un.operand);
+           inst.* = .{.UNARY,.{unary=un}};
+        }
+    }
+    final_offset := (table.count * -4);
+    return final_offset;
+}
+
+asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> Operand_Asm {
+    if op.type != .PSEUDO return op;
+
+    saved_offset, success := Hash_Table.table_find(table, op.as.pseudo);
+    if success return .{.STACK, .{ stack = saved_offset }};
+
+    offset := (table.count + 1) * -4;
+    Hash_Table.table_add(table, op.as.pseudo, offset);
+    return .{.STACK,  .{stack=offset}};
+}
+
+
 asm_gen_fn :: (fnt: *Fn_Tacky) -> Fn_Asm {
     instructions : [..]Instruction_Asm;
-
     for fnt.instructions asm_gen_inst(*instructions, it);
-
-    // fn := New(Fn_Asm);
-    // fn.* = .{fnt.ident, instructions};
-    // return fn;
     return .{fnt.ident, instructions};
 }
 
@@ -120,7 +153,7 @@ print_asm_operand :: (operand: Operand_Asm) {
         case .PSEUDO;
             print("pseudo(%)",operand.as.pseudo);
         case .STACK;
-            assert(false, "not implemented");
+            print("stack(%)", operand.as.stack);
     }
 }
 
@@ -136,3 +169,7 @@ operand              = Imm(int) | Reg(reg) | Pseudo(identifier) | Stack(int)
 reg                  = AX | R10
 
 */
+
+#scope_file
+Hash_Table :: #import "Hash_Table";
+#scope_export
