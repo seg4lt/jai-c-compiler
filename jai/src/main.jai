@@ -7,7 +7,7 @@ main :: () {
     print("%\n", args);
 
     lexer := ifx args.flags & .LEX lex(args);
-    // ast := ifx args.flags & .PARSE ast_parse(*lexer);
+    ast := ifx args.flags & .PARSE ast_parse(*lexer);
     // tacky := ifx args.flags & .TACKY gen_program_tacky(ast);
     // asm_construct := ifx args.flags & .CODE_GEN asm_gen(tacky);
     // if args.flags & .CODE_GEN code_emm(args, asm_construct); 
@@ -22,10 +22,10 @@ Process :: #import "Process";
 #load "Lexer.jai";
 #load "Cli_Args.jai";
 #load "Ast.jai";
-#load "Tacky_IR.jai";
-#load "Asm_Gen.jai";
-#load "Code_Emission.jai";
-#load "Compiler_Util.jai";
+// #load "Tacky_IR.jai";
+// #load "Asm_Gen.jai";
+// #load "Code_Emission.jai";
+// #load "Compiler_Util.jai";
 
 
 
