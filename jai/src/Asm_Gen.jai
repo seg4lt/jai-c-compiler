@@ -13,8 +13,8 @@ Instruction_Asm :: struct {
         unary: struct {op: Unary_Op_Asm; operand: Operand_Asm; }
         binary: struct {op: enum {ADD;SUB;MUL;}; src1: Operand_Asm; src2: Operand_Asm; } // src2 = src2 + src1 is what will happen
         idiv: Operand_Asm; // DIV and MOD handled here because it involves more work
-        // cdq: no value needed
         allocate_stack: int;
+        // cdq: no value needed
         // ret : no value needed
     };
 }
@@ -57,16 +57,27 @@ asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
     defer Hash_Table.deinit(*table);
 
     for *inst: insts {
-        if inst.type == {
-        case .MOV;
-           mov := inst.as.mov;
-           mov.src = asm_gen_stage_2_stack_offset(*table, mov.src);
-           mov.dst = asm_gen_stage_2_stack_offset(*table, mov.dst);
-           inst.* = .{.MOV,.{mov = mov}};
-        case .UNARY;
-           un := inst.as.unary;
-           un.operand = asm_gen_stage_2_stack_offset(*table, un.operand);
-           inst.* = .{.UNARY,.{unary=un}};
+        if #complete inst.type == {
+            case .MOV;
+                mov := inst.as.mov;
+                mov.src = asm_gen_stage_2_stack_offset(*table, mov.src);
+                mov.dst = asm_gen_stage_2_stack_offset(*table, mov.dst);
+                inst.* = .{.MOV,.{mov = mov}};
+            case .UNARY;
+                un := inst.as.unary;
+                un.operand = asm_gen_stage_2_stack_offset(*table, un.operand);
+                inst.* = .{.UNARY,.{unary=un}};
+            case .BINARY;
+                bin := inst.as.binary;
+                bin.src1 = asm_gen_stage_2_stack_offset(*table, bin.src1);
+                bin.src2 = asm_gen_stage_2_stack_offset(*table, bin.src2);
+                inst.* = .{.BINARY, .{binary=bin}};
+            case .IDIV;
+                div := asm_gen_stage_2_stack_offset(*table, inst.as.idiv);
+                inst.* = .{.IDIV, .{idiv=div}};
+            case .CDQ; #through;
+            case .RET; #through;
+            case .ALLOCATE_STACK; continue;
         }
     }
     stack_size := (table.count * -4);
@@ -85,8 +96,7 @@ asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> O
     return .{.STACK,  .{stack=offset}};
 }
 
-// 1. Add number of bytes a stack needs to store all variable
-// 2. If any instructions have two address pointer, dividing them in two to use R10 register.
+// Fix assembly instruction
 asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
     array_add(*insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_size}});
@@ -95,18 +105,54 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
         if #complete oi.type == {
             case .MOV;
                 if oi.as.mov.src.type == .STACK && oi.as.mov.dst.type == .STACK {
-                    array_add(*insts, .{.MOV, .{mov = .{src = oi.as.mov.src, dst = .{.REG,.{reg = .R10}}}}});
-                    array_add(*insts, .{.MOV, .{mov = .{src= .{.REG,.{reg = .R10}}, dst = oi.as.mov.dst}}});
+                    // both src and dst can't be memory address
+                    ireg := Operand_Asm.{.REG,.{reg = .R10}};
+                    array_add(*insts, .{.MOV, .{mov = .{src = oi.as.mov.src, dst = ireg }}});
+                    array_add(*insts, .{.MOV, .{mov = .{src= ireg, dst = oi.as.mov.dst}}});
                 } else {
                     array_add(*insts, oi);
                 }
+            case .IDIV;
+                if oi.as.idiv.type == .IMM {
+                    // idivl  $3
+                    // -- to --
+                    // movl   $3, %r10d
+                    // idivl  %r10d
+                    // idiv divisor can't be constant
+                    intermediate_reg := Operand_Asm.{.REG,.{reg = .R10}};
+                    array_add(*insts, .{.MOV, .{mov = .{oi.as.idiv, intermediate_reg}}});
+                    array_add(*insts, .{.IDIV, .{idiv = intermediate_reg}});
+                } else {
+                    array_add(*insts, oi);
+                }
+            case .BINARY;
+                if #complete oi.as.binary.op == {
+                    case .ADD; #through;
+                    case .SUB;
+                        // both src and dst can't be memory address
+                        // addl   -4(%rbp), -8(%rbp)
+                        // -- to -- 
+                        // movl   -4(%rbp), %r10d
+                        // addl   %r10d, -8(%rbp)
+                        ireg := Operand_Asm.{.REG,.{reg = .R10}};
+                        array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src1, ireg }}});
+                        array_add(*insts, .{.BINARY, .{binary = .{ oi.as.binary.op, ireg, oi.as.binary.src2}}});
+                    case .MUL;
+                        // imull  $3, -4(%rbp) // imull can't use memory address as its destination
+                        // -- to --
+                        // movl   -4(%rbp), %r11d
+                        // imull  $3, %r11d
+                        // movl   %r11d, -4(%rbp)
+                        ireg := Operand_Asm.{.REG,.{reg = .R11}};
+                        array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src2, ireg }}});
+                        array_add(*insts, .{.BINARY, .{binary = .{oi.as.binary.op, oi.as.binary.src1, ireg }}});
+                        array_add(*insts, .{.MOV, .{mov = .{ ireg, oi.as.binary.src2 }}});
+                }
             case .UNARY; #through;
             case .ALLOCATE_STACK; #through;
+            case .CDQ; #through;
             case .RET;
                 array_add(*insts, oi);
-            case .CDQ; #through;
-            case .BINARY; #through;
-            case .IDIV; assert(false, "Not supported");
         }
     }
     return insts;
