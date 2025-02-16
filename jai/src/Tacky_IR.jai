@@ -9,10 +9,11 @@ Fn_Tacky :: struct {
 }
 
 Instruction_Tacky :: struct {
-    type: enum { RETURN; UNARY;};
+    type: enum { RETURN; UNARY; BINARY;};
     as : union {
         ret: Val_Tacky;
         unary: struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky;}
+        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;}; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; }
     };
 }
 
@@ -67,11 +68,31 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             }; 
             array_add(instructions, .{.UNARY, .{unary = .{op, src, dst}}});
             return dst;
+        case .BINARY;
+            bin_ast := expr_ast.as.binary;
+            src1 := gen_instructions(tc, instructions, bin_ast.left);
+            src2 := gen_instructions(tc, instructions, bin_ast.right);
+            dst := make_var(tc);
+            op := from_ast_binop_to_tacky(bin_ast.op);
+            array_add(instructions, .{.BINARY, .{binary= .{op, src1, src2, dst}}});
+            return dst;
         case .GROUP;
             return gen_instructions(tc, instructions, expr_ast.as.group);
         case .CONSTANT;
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
     }
+}
+
+from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type_of(Instruction_Tacky.as.binary.op) {
+    if #complete ast_op == {
+        case .ADD; return .ADD;
+        case .SUB; return .SUB; 
+        case .MUL; return .MUL;
+        case .DIV; return .DIV;
+        case .MOD; return .MOD;
+    }
+    assert(false, "There are not other binary operator. What is this %", ast_op);
+    return .MOD; // unreachable
 }
 
 make_var :: (tc : *Tacky_Ctx) -> Val_Tacky {
@@ -105,6 +126,15 @@ print_tacky_inst :: (inst: *Instruction_Tacky) {
             print(", dst: ");
             print_tacky_val(*inst.as.unary.dst);
             print(")");
+        case .BINARY;
+            print("Binary(op: %", inst.as.binary.op);
+            print(", src1: ");
+            print_tacky_val(*inst.as.binary.src1);
+            print(", src2: ");
+            print_tacky_val(*inst.as.binary.src2);
+            print(", dst: ");
+            print_tacky_val(*inst.as.binary.dst);
+            print(")");
     }
 }
 
@@ -119,9 +149,12 @@ print_tacky_val :: (val: *Val_Tacky) {
 
 program             = Program(function_definition)
 function_definition = Function(identifier, instruction* body)
-instruction         = Return(val) | Unary(unary_operator, val src, val dst)
+instruction         = Return(val) 
+                    | Unary(unary_operator, val src, val dst)
+                    | Binary(binary_operator, val src1, val src2, val dst)
 val                 = Constant(int) | Var(identifier)
 unary_operator      = Complement | Negate
+binary_operator     = Add | Subtract | Multiply | Divide | Remainder 
 
 */
 
