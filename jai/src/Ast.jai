@@ -18,10 +18,11 @@ Stmt_Ast_Node :: struct {
     };
 }
 Expr_Ast_Node :: struct {
-    type: enum { CONSTANT; UNARY; GROUP; }
+    type: enum { CONSTANT; UNARY; BINARY; GROUP; }
     as: union {
         constant: int;
         unary: struct { op: enum {BITWISE_NOT; NEGATE;}; expr: *Expr_Ast_Node; };
+        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;}; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
     };
 }
@@ -70,54 +71,112 @@ Stmt :: struct {
     }
     parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
         consume(parser, .RETURN);
-        expr := Expr.parse_expr_ast_node(parser);
+        expr := Expr.parse_expr(parser, 0);
         stmt := New(Stmt_Ast_Node);
         stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
         return stmt;
     }
 }
 
+is_binary_operator :: (tt: Token_Type) -> bool {
+    if tt == {
+        case .MINUS; #through;
+        case .PLUS; #through;
+        case .DIVIDE; #through;
+        case .MULTIPLY; #through;
+        case .MOD; return true;
+        case; return false;
+    }
+}
+
+precedence :: (tt: Token_Type) -> int {
+    if tt == {
+        case .MINUS; #through;
+        case .PLUS; 45;
+        case .DIVIDE; #through;
+        case .MULTIPLY; #through;
+        case .MOD; return 50;
+        case; assert(false, "precendence calc for any other token is currently not supported: %", tt);
+    }
+    return 0; // unreachable
+}
+
 Expr :: struct {
-    parse_expr_ast_node :: (parser: *Parser) -> *Expr_Ast_Node {
+     parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
+        left := parse_factor(parser);
+        next_token := peek(parser);
+      
+        while is_binary_operator(next_token.type) && precedence(next_token.type) >= min_prec {
+            op := parse_binary_op(consume(parser).type);
+            right := parse_expr(parser, precedence(next_token.type) + 1);
+            binary := New(Expr_Ast_Node);
+            binary.* = .{.BINARY, .{binary=.{op,left,right}}};
+            left = binary;
+            next_token = peek(parser);
+        }
+        return left;
+    }
+
+    parse_factor :: (parser: *Parser) -> *Expr_Ast_Node {
         if peek(parser).*.type ==  {
             case .INT_LITERAL;
                 int_literal := consume(parser, .INT_LITERAL);
                 int_value, success := string_to_int(int_literal.value);
                 if !success {
                     assert(false, "Expected int found %", int_literal.value);
-                    exit(1);
+                    return null; // unreachable
                 }
                 expr := New(Expr_Ast_Node);
                 expr.* = .{ type = .CONSTANT, as = .{ constant = int_value }};
                 return expr;
-            // Note: MINUS and BITWISE NOT are unary
-            // and can be moved to parse_unary_expr maybe to make this code reusable
-            case .MINUS;
-                consume(parser, .MINUS);
-                inner_expr := parse_expr_ast_node(parser);
-                expr := New(Expr_Ast_Node);
-                expr.* = .{ type = .UNARY, as = .{ unary = .{ op =  .NEGATE, expr = inner_expr} }};
-                return expr;
+            case .MINUS; #through;
             case .BITWISE_NOT;
-                consume(parser, .BITWISE_NOT);
-                inner_expr := parse_expr_ast_node(parser);
+                op := parse_unary_op(consume(parser).type);
+                inner_expr := parse_factor(parser);
                 expr := New(Expr_Ast_Node);
-                expr.* = .{ type = .UNARY, as = .{ unary = .{ op =  .BITWISE_NOT, expr = inner_expr} }};
+                expr.* = .{.UNARY,.{unary=.{op,inner_expr}}};
                 return expr;
             case .LPAREN;
                 consume(parser, .LPAREN);
-                inner_expr := parse_expr_ast_node(parser);
+                inner_expr := parse_expr(parser, 0); // grp resets precedence level for its internal expr
                 expr := New(Expr_Ast_Node);
                 expr.* = .{ type = .GROUP , as = .{ group = inner_expr }};
                 consume(parser, .RPAREN);
                 return expr;
             case;
                 assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
-                exit(1);
-                return null;
+                return null; // unreachable
 
         }
     }
+}
+
+parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
+    if tt == {
+        case .BITWISE_NOT; return .BITWISE_NOT;
+        case .MINUS; return .NEGATE;
+        case; assert(false, "Wanted unary operator found %", tt);
+    }
+    // unreachable 
+    return .NEGATE;
+}
+
+parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
+    if tt == {
+        case .PLUS; return .ADD;
+        case .MINUS; return .SUB;
+        case .MULTIPLY; return .MUL;
+        case .DIVIDE; return .DIV;
+        case .MOD; return .MOD;
+        case; assert(false, "Wanted binary operator found %", tt);
+    }
+    // unreachable 
+    return .ADD;
+}
+
+consume :: (using parser: *Parser) -> Token {
+    defer current += 1;
+    return peek(parser);
 }
 
 consume:: (parser: *Parser, token_type: Token_Type) -> Token {
@@ -171,6 +230,13 @@ print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
             print("%", expr.as.unary.op);
             print_space(depth + 1);
             print_expr_ast(expr.as.unary.expr, depth + 1);
+        case .BINARY;
+            print("[BINARY] ");
+            print("%", expr.as.binary.op);
+            print_space(depth + 1);
+            print_expr_ast(expr.as.binary.left, depth + 1);
+            print_space(depth + 1);
+            print_expr_ast(expr.as.binary.right, depth + 1);
         case .GROUP;
             print("[GROUP] ");
             print_space(depth + 1);
@@ -188,8 +254,11 @@ print_space :: (depth: int = 0) {
 program              = Program(function_definition)
 function_definition  = Function(identifier name, statement body)
 statement            = Return(exp)
-exp                  = Constant(int) | Unary(unary_operator, exp)
+exp                  = Constant(int) 
+                     | Unary(unary_operator, exp)
+                     | Binary(binary_operator, exp, exp)
 unary_operator       = Complement | Negate
+binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 
 */
 
@@ -198,8 +267,10 @@ unary_operator       = Complement | Negate
 <program>         ::= <function>
 <function>        ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
 <statement>       ::= "return" <exp> ";"
-<exp>             ::= <int> | <unop> <exp> | "(" <exp> ")"
+<exp>             ::= <factor> | <exp> <binop> <exp>
+<factor>          ::= <int> | <unop> <factor> | "(" <exp> ")"
 <unop>            ::= "-" | "~"
+<binop>           ::= "-" | "+" | "*" | "/" | "%"
 <identifier>      ::= ? An identifier token ?
 <int>             ::= ? A constant token ?
 

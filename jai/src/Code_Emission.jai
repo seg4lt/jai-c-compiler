@@ -32,15 +32,29 @@ ce_inst :: (f: *File, using inst: Instruction_Asm) {
         case .MOV;
             file_write(f, tprint("\tmovl\t%, %\n", ce_fmt_operand(as.mov.src), ce_fmt_operand(as.mov.dst)));
         case .RET;
-            { // epilogue
+            {   // epilogue
+                file_write(f, "\t;˯˯˯\tEpilogue\n");
                 file_write(f, tprint("\tmovq\t%, %\n", ce_fmt_reg(.RBP), ce_fmt_reg(.RSP)));
                 file_write(f, tprint("\tpopq\t%\n", ce_fmt_reg(.RBP)));
             }
             file_write(f, tprint("\tret\n"));
         case .UNARY;
             file_write(f, tprint("\t%\t%\n",ce_fmt_unary_op(as.unary.op), ce_fmt_operand(as.unary.operand)));
+        case .BINARY;
+            ins :=  ce_fmt_binary_op(as.binary.op);
+            src1 := ce_fmt_operand(as.binary.src1);
+            src2 := ce_fmt_operand(as.binary.src2);
+            file_write(f, tprint("\t%\t%, %\n", ins, src1, src2));
+        case .IDIV;
+            ins := "idivl";
+            divider := ce_fmt_operand(as.idiv);
+            file_write(f, tprint("\t%\t%", ins, divider));
+        case .CDQ;
+            file_write(f, "cdq");
         case .ALLOCATE_STACK;
-           file_write(f, tprint("\tsubq\t%, %\n", as.allocate_stack, ce_fmt_reg(.RSP)));
+            file_write(f, tprint("\tsubq\t%, %\n", as.allocate_stack, ce_fmt_reg(.RSP)));
+            file_write(f, "\t;˄˄˄\tPrologue\n");
+
     }
 }
 
@@ -48,6 +62,13 @@ ce_fmt_unary_op :: (op: Unary_Op_Asm) -> string {
     if #complete op == {
         case .NEG; return "negl";
         case .NOT; return "notl";
+    }
+}
+ce_fmt_binary_op :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
+    if #complete op == {
+        case .ADD; return "addl";
+        case .SUB; return "subl";
+        case .MUL; return "imull";
     }
 }
 
@@ -64,7 +85,9 @@ ce_fmt_reg :: (r: Reg_Asm) -> string {
     // TODO: Figure out register size??
     if #complete r == {
         case .AX; return "%eax"; 
+        case .DX; return "%edx"; 
         case .R10; return "%r10d"; 
+        case .R11; return "%r11d"; 
         case .RSP; return "%rsp";
         case .RBP; return "%rbp";
     }
