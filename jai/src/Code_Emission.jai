@@ -69,6 +69,11 @@ ce_fmt_binary_op :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
         case .ADD; return "addl";
         case .SUB; return "subl";
         case .MUL; return "imull";
+        case .BITWISE_AND; return "andl";
+        case .BITWISE_OR; return "orl";
+        case .BITWISE_XOR; return "xorl";
+        case .LEFT_SHIFT; return "sall"; // doing arithmetic shift - shll for logical shift
+        case .RIGHT_SHIFT; return "sarl"; // shrl
     }
 }
 

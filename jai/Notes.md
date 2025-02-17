@@ -1,33 +1,7 @@
-# Formal grammer
-
-```
-<program> ::= <function>
-<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
-<statement> ::= "return" <exp> ";"
-<exp> ::= <int>
-<identifier> ::= ? An identifier token ?
-<int> ::= ? A constant token ?
-```
-
-
-# ADSL
-
-```
-program = Program(function_definition)
-function_definition = Function(identifier name, statement body)
-statement = Return(exp)
-exp = Constant(int)
-```
-
-
-## ASM ADSL
-```
-program = Program(function_definition)
-function_definition = Function(identifier name, instruction* instructions)
-instruction = Mov(operand src, operand dst) | Ret
-operand = Imm(int) | Register
-```
-
+References;
+- https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
+- https://web.stanford.edu/class/cs107/resources/x86-64-reference.pdf
+- https://docs.oracle.com/cd/E19253-01/817-5477/index.html
 
 # Notes
 `arch -x86_64` - run x86_64 binaries on M1 mac
@@ -38,4 +12,10 @@ Chap 1:
 - Parse: `./test_compiler /path/to/your_compiler --chapter 1 --stage parse`
 - Asm Gen: `./test_compiler /path/to/your_compiler --chapter 1 --stage codegen`
 - Full: `./test_compiler /path/to/your_compiler --chapter 1`
+
+Chap 2:
+- `--stage tacky for tacky IR test`
+
+Chap 3:
+- Bitwise: `./test_compiler /path/to/your_compiler --chapter 3 --stage bitwise`
 
