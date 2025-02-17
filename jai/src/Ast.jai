@@ -22,7 +22,7 @@ Expr_Ast_Node :: struct {
     as: union {
         constant: int;
         unary: struct { op: enum {BITWISE_NOT; NEGATE;}; expr: *Expr_Ast_Node; };
-        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;}; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
+        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;BITWISE_AND;BITWISE_OR;BITWISE_XOR;LEFT_SHIFT;RIGHT_SHIFT;}; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
     };
 }
@@ -84,20 +84,35 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .PLUS; #through;
         case .DIVIDE; #through;
         case .MULTIPLY; #through;
-        case .MOD; return true;
+        case .MOD; #through;
+        case .LEFT_SHIFT; #through;
+        case .RIGHT_SHIFT; #through; 
+        case .BITWISE_AND; #through;
+        case .BITWISE_XOR; #through;
+        case .BITWISE_OR; return true;
+
         case; return false;
     }
 }
 
 precedence :: (tt: Token_Type) -> int {
+    // https://en.cppreference.com/w/c/language/operator_precedence
     if tt == {
-        case .MINUS; #through;
-        case .PLUS; 45;
         case .DIVIDE; #through;
         case .MULTIPLY; #through;
         case .MOD; return 50;
-        case; assert(false, "precendence calc for any other token is currently not supported: %", tt);
+
+        case .MINUS; #through;
+        case .PLUS; return 45;
+
+        case .LEFT_SHIFT; #through;
+        case .RIGHT_SHIFT; return 40; 
+
+        case .BITWISE_AND; return 35;
+        case .BITWISE_XOR; return 34;
+        case .BITWISE_OR; return 33;
     }
+    assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
 }
 
@@ -146,7 +161,6 @@ Expr :: struct {
             case;
                 assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
                 return null; // unreachable
-
         }
     }
 }
@@ -168,9 +182,15 @@ parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
         case .MULTIPLY; return .MUL;
         case .DIVIDE; return .DIV;
         case .MOD; return .MOD;
-        case; assert(false, "Wanted binary operator found %", tt);
+
+        case .LEFT_SHIFT; return .LEFT_SHIFT;
+        case .RIGHT_SHIFT; return .RIGHT_SHIFT;
+        case .BITWISE_AND; return .BITWISE_AND;
+        case .BITWISE_OR; return .BITWISE_OR;
+        case .BITWISE_XOR; return .BITWISE_XOR;
     }
     // unreachable 
+    assert(false, "Wanted binary operator found %", tt);
     return .ADD;
 }
 
@@ -273,5 +293,4 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <binop>           ::= "-" | "+" | "*" | "/" | "%"
 <identifier>      ::= ? An identifier token ?
 <int>             ::= ? A constant token ?
-
 */

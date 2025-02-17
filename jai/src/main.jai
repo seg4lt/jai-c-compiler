@@ -5,6 +5,7 @@ main :: () {
 
     args := get_cli_args();
     print("%\n", args);
+    preprocessor(args);
 
     lexer := ifx args.flags & .LEX lex(args);
     ast := ifx args.flags & .PARSE ast_parse(*lexer);
@@ -19,13 +20,13 @@ main :: () {
 String :: #import "String";
 Process :: #import "Process";
 #import "File";
-#load "Lexer.jai";
 #load "Cli_Args.jai";
+#load "Compiler_Util.jai";
+#load "Lexer.jai";
 #load "Ast.jai";
 #load "Tacky_IR.jai";
 #load "Asm_Gen.jai";
 #load "Code_Emission.jai";
-#load "Compiler_Util.jai";
 
 
 

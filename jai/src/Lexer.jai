@@ -1,5 +1,6 @@
 Lexer :: struct {
     line: int = 1;
+    line_start: int = 0;
     src: string;
     start: int = 0; // current token start position
     current: int = 0; // where is cursor right now
@@ -21,6 +22,11 @@ Token_Type :: enum {
     RETURN;
     // OPERATOR
     BITWISE_NOT;
+    BITWISE_AND;
+    BITWISE_OR;
+    BITWISE_XOR;
+    LEFT_SHIFT;
+    RIGHT_SHIFT;
     UNARY_MINUS;
     MINUS;
     PLUS;
@@ -36,7 +42,7 @@ Token :: struct {
 }
 
 lex :: (args: Cli_Args) -> Lexer {
-    src, r_success := read_entire_file(args.source_file_path);
+    src, r_success := read_entire_file(tprint("%.i", args.source_file_path_without_ext));
     if !r_success {
         log_error("Unable to read file -- '%'", args.source_file_path);
         exit(1);
@@ -87,6 +93,34 @@ scan :: (using lexer: *Lexer) {
             case #char "+"; array_add(*tokens, .{.PLUS, "+", line});
             case #char "*"; array_add(*tokens, .{.MULTIPLY, "*", line});
             case #char "%"; array_add(*tokens, .{.MOD, "%", line});
+            case #char "&"; 
+                if peek(lexer) == #char "&" {
+                    assert(false, "&& -- is not supported yet");
+                    continue;
+                }
+                array_add(*tokens, .{.BITWISE_AND, "&", line});
+            case #char "|"; 
+                if peek(lexer) == #char "|" {
+                    assert(false, "|| -- is not supported yet");
+                    continue;
+                }
+                array_add(*tokens, .{.BITWISE_OR, "|", line});
+            case #char "^"; 
+                array_add(*tokens, .{.BITWISE_XOR, "^", line});
+            case #char ">";
+                if peek(lexer) == #char ">" {
+                    consume(lexer);
+                    array_add(*tokens, .{.RIGHT_SHIFT, ">>", line});
+                    continue;
+                }
+                assert(false, "> not supported yet");
+            case #char "<";
+                if peek(lexer) == #char "<" {
+                    consume(lexer);
+                    array_add(*tokens, .{.LEFT_SHIFT, "<<", line});
+                    continue;
+                }
+                assert(false, "< not supported yet");
             case #char "/"; 
                 if peek(lexer) == #char "/" || peek(lexer) == #char "*" {
                     comment(lexer);
@@ -101,9 +135,21 @@ scan :: (using lexer: *Lexer) {
                     continue;
                 }
                 array_add(*tokens, .{.MINUS, "-", line});
-            case; assert(false, "Unexpected character %", String.to_string(*current_char, 1));
+            case; 
+                print_line(lexer);
+                assert(false, "Unexpected character %\n", String.to_string(*current_char, 1));
         }
     }
+}
+
+print_line :: (using lexer: *Lexer) {
+    new_line_index := current;
+    while (src.data + new_line_index).* != #char "\n" && new_line_index < src.count {
+        new_line_index += 1;
+    }
+    print("%\n", String.slice(src, line_start, new_line_index-line_start));
+    for 0..current-line_start-2 print(" ");
+    print("^---");
 }
 
 comment :: (using lexer: *Lexer) {
@@ -113,9 +159,14 @@ comment :: (using lexer: *Lexer) {
                 consume(lexer);
             }
             line += 1;
+            line_start = current;
         case #char "*";
             consume(lexer);
-            while !is_at_end(lexer) && consume(lexer) != #char "*" && peek(lexer) != #char "/" {}
+            while !is_at_end(lexer) {
+                c := consume(lexer);
+                if c == #char "\n"  { line += 1; line_start = current; }
+                if c == #char "*" && peek(lexer) == #char "/" break;
+            }
             consume(lexer); // consume closing /, if not found, this is an error
         case; assert(false, "unable to parse comment");
     }
@@ -156,14 +207,17 @@ find_token_type :: (str: string) -> Token_Type {
 }
 
 consume :: (using lexer: *Lexer) -> u8 {
+    defer current += 1;
     c := peek(lexer);
-    if c == #char "\n" line += 1;
-    current += 1;
+    if c == #char "\n" {
+        line += 1;
+        line_start = current;
+    }
     return c;
 }
 
-peek :: (using lexer: *Lexer) -> u8 {
-    return src.data[current];
+peek :: (using lexer: *Lexer, offset: int = 0) -> u8 {
+    return src.data[current + offset];
 }
 
 is_at_end :: (using lexer: *Lexer) -> bool {
