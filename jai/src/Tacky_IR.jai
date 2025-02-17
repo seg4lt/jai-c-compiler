@@ -13,7 +13,7 @@ Instruction_Tacky :: struct {
     as : union {
         ret: Val_Tacky;
         unary: struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky;}
-        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;}; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; }
+        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;BITWISE_AND;BITWISE_OR;BITWISE_XOR;LEFT_SHIFT;RIGHT_SHIFT;}; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; }
     };
 }
 
@@ -90,6 +90,11 @@ from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type
         case .MUL; return .MUL;
         case .DIV; return .DIV;
         case .MOD; return .MOD;
+        case .BITWISE_AND; return .BITWISE_AND;
+        case .BITWISE_OR; return .BITWISE_OR;
+        case .BITWISE_XOR; return .BITWISE_XOR;
+        case .LEFT_SHIFT; return .LEFT_SHIFT;
+        case .RIGHT_SHIFT; return .RIGHT_SHIFT;
     }
     assert(false, "There are not other binary operator. What is this %", ast_op);
     return .MOD; // unreachable

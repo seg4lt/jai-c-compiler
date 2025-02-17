@@ -11,7 +11,7 @@ Instruction_Asm :: struct {
     as: union {
         mov: struct {src: Operand_Asm; dst: Operand_Asm; };
         unary: struct {op: Unary_Op_Asm; operand: Operand_Asm; }
-        binary: struct {op: enum {ADD;SUB;MUL;}; src1: Operand_Asm; src2: Operand_Asm; } // src2 = src2 + src1 is what will happen
+        binary: struct {op: enum {ADD;SUB;MUL;BITWISE_OR; BITWISE_AND; BITWISE_XOR; LEFT_SHIFT; RIGHT_SHIFT;}; src1: Operand_Asm; src2: Operand_Asm; } // src2 = src2 + src1 is what will happen
         idiv: Operand_Asm; // DIV and MOD handled here because it involves more work
         allocate_stack: int;
         // cdq: no value needed
@@ -127,6 +127,11 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                 }
             case .BINARY;
                 if #complete oi.as.binary.op == {
+                    case .BITWISE_AND; #through;
+                    case .BITWISE_OR; #through;
+                    case .BITWISE_XOR; #through;
+                    case .LEFT_SHIFT; #through;
+                    case .RIGHT_SHIFT; #through;
                     case .ADD; #through;
                     case .SUB;
                         // both src and dst can't be memory address
@@ -187,7 +192,12 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             if #complete basm.op == {
                 case .ADD; #through;
                 case .SUB; #through;
-                case .MUL;
+                case .MUL; #through;
+                case .BITWISE_AND; #through;
+                case .BITWISE_OR; #through;
+                case .BITWISE_XOR; #through;
+                case .LEFT_SHIFT; #through;
+                case .RIGHT_SHIFT;
                     src1 := asm_gen_val_to_operand(*basm.src1);
                     dst := asm_gen_val_to_operand(*basm.dst);
                     array_add(insts, .{.MOV,.{ mov = .{ src1, dst }}});
@@ -227,6 +237,11 @@ from_tacky_to_asm_binop :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -
         case .ADD; return .ADD;
         case .SUB; return .SUB;
         case .MUL; return .MUL;
+        case .BITWISE_OR; return .BITWISE_OR;
+        case .BITWISE_XOR; return .BITWISE_XOR;
+        case .BITWISE_AND; return .BITWISE_AND;
+        case .LEFT_SHIFT; return .LEFT_SHIFT;
+        case .RIGHT_SHIFT; return .RIGHT_SHIFT;
         case .DIV; #through;
         case .MOD; 
             assert(false, "Other binary operator are either handled differently, or not supported: %", tacky_op);
