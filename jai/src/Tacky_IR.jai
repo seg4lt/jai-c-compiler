@@ -8,17 +8,50 @@ Fn_Tacky :: struct {
     instructions: []Instruction_Tacky;
 }
 
+Instruction_Type_Tacky :: enum {
+    RETURN; 
+    UNARY; 
+    BINARY;
+    COPY;
+    JUMP;
+    JUMP_IF_ZERO;
+    JUMP_IF_NOT_ZERO;
+    LABEL;
+}
+
 Instruction_Tacky :: struct {
-    type: enum { RETURN; UNARY; BINARY;};
+    type: Instruction_Type_Tacky;
     as : union {
         ret: Val_Tacky;
-        unary: struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky;}
-        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;BITWISE_AND;BITWISE_OR;BITWISE_XOR;LEFT_SHIFT;RIGHT_SHIFT;}; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; }
+        unary: struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky;};
+        binary: struct { op: Bin_Op_Type_Tacky; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; };
+        copy: struct {src: Val_Tacky; dst: Val_Tacky;};
+        jump: string;
+        jump_if_zero: struct {condition: Val_Tacky; ident: string;};
+        jump_if_not_zero: struct {condition: Val_Tacky; ident: string;};
+        label: string;
     };
 }
 
 Unary_Op_Type_Tacky :: enum {
-  BITWISE_NOT; NEGATE;
+  BITWISE_NOT; NEGATE; NOT;
+}
+
+Bin_Op_Type_Tacky ::enum {
+    ADD;
+    SUB;
+    MUL;
+    DIV;
+    MOD;
+    BITWISE_AND;
+    BITWISE_OR;
+    BITWISE_XOR;
+    LEFT_SHIFT;
+    RIGHT_SHIFT;
+
+    EQUAL_EQUAL; NOT_EQUAL;
+    LESS; LESS_EQUAL;
+    GREATER; GREATER_EQUAL;
 }
 
 Val_Tacky :: struct {
@@ -30,7 +63,8 @@ Val_Tacky :: struct {
 }
 
 Tacky_Ctx :: struct {
-    temp_var_index : int = 0;
+    temp_var_index: int = 0;
+    label_index: int = 0;
 }
 
 gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
@@ -44,7 +78,14 @@ gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
 
 gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
-    gen_instructions(tc, *instructions, fn_ast.body);
+    for fn_ast.body {
+        if #complete it.type == {
+            case .STMT;
+                gen_instructions(tc, *instructions, it.as.stmt);
+            case .DECL;
+                assert(false, "not implemented");
+        }
+    }
     return .{ fn_ast.ident, instructions };
 }
 
@@ -53,6 +94,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
+        case .NULL; #through;
+        case .EXPR; assert(false, "not implemented");
     }
 }
 
@@ -65,22 +108,89 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             if #complete expr_ast.as.unary.op == {
                 case .BITWISE_NOT; op = .BITWISE_NOT;
                 case .NEGATE ; op = .NEGATE;
+                case .NOT; op = .NOT; 
             }; 
             array_add(instructions, .{.UNARY, .{unary = .{op, src, dst}}});
             return dst;
         case .BINARY;
             bin_ast := expr_ast.as.binary;
-            src1 := gen_instructions(tc, instructions, bin_ast.left);
-            src2 := gen_instructions(tc, instructions, bin_ast.right);
-            dst := make_var(tc);
-            op := from_ast_binop_to_tacky(bin_ast.op);
-            array_add(instructions, .{.BINARY, .{binary= .{op, src1, src2, dst}}});
-            return dst;
+            if bin_ast.op == {
+                case .AND; 
+                    return gen_logical_and_instruction(tc, instructions, bin_ast);
+                case .OR;
+                    return gen_logical_or_instruction(tc, instructions, bin_ast);
+                case;
+                    src1 := gen_instructions(tc, instructions, bin_ast.left);
+                    src2 := gen_instructions(tc, instructions, bin_ast.right);
+                    dst := make_var(tc);
+                    op := from_ast_binop_to_tacky(bin_ast.op);
+                    array_add(instructions, .{.BINARY, .{binary= .{op, src1, src2, dst}}});
+                    return dst;
+            }
         case .GROUP;
             return gen_instructions(tc, instructions, expr_ast.as.group);
         case .CONSTANT;
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
+        case .VAR; #through;
+        case .ASSIGNMENT; 
+            assert(false, "not implemented");
+            // unreachable
+            return .{.CONSTANT, .{constant = expr_ast.as.constant}};
     }
+}
+
+gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast_Node.as.binary)) -> Val_Tacky {
+    label_false := make_label(tc, tprint("cond_%", "false"));
+
+    src1 := gen_instructions(tc, instructions, bin_ast.left);
+    array_add(instructions, .{.JUMP_IF_ZERO, .{jump_if_zero = .{src1, label_false.as.label}}});
+
+    src2 := gen_instructions(tc, instructions, bin_ast.right);
+    array_add(instructions, .{.JUMP_IF_ZERO, .{jump_if_zero = .{src2,label_false.as.label}}});
+
+    result_var := make_var(tc);
+    one := Val_Tacky.{.CONSTANT, .{constant = 1 }};
+    array_add(instructions, .{.COPY, .{copy = .{one, result_var}}});
+
+    label_end := make_label(tc, "logical_cmp_end");
+
+    array_add(instructions,.{.JUMP, .{jump = label_end.as.label}});
+
+    array_add(instructions, label_false);
+
+    zero := Val_Tacky.{.CONSTANT, .{constant = 0 }};
+    array_add(instructions, .{.COPY, .{copy = .{zero, result_var}}});
+
+    array_add(instructions, label_end);
+
+    return result_var;
+}
+
+gen_logical_or_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast_Node.as.binary)) -> Val_Tacky {
+    label_false := make_label(tc, tprint("cond_%", "true"));
+
+    src1 := gen_instructions(tc, instructions, bin_ast.left);
+    array_add(instructions, .{.JUMP_IF_NOT_ZERO, .{jump_if_not_zero = .{src1, label_false.as.label}}});
+
+    src2 := gen_instructions(tc, instructions, bin_ast.right);
+    array_add(instructions, .{.JUMP_IF_NOT_ZERO, .{jump_if_not_zero = .{src2,label_false.as.label}}});
+
+    result_var := make_var(tc);
+    one := Val_Tacky.{.CONSTANT, .{constant = 1 }};
+    zero := Val_Tacky.{.CONSTANT, .{constant = 0 }};
+    array_add(instructions, .{.COPY, .{copy = .{zero, result_var}}});
+
+    label_end := make_label(tc, "logical_cmp_end");
+
+    array_add(instructions,.{.JUMP, .{jump = label_end.as.label}});
+
+    array_add(instructions, label_false);
+
+    array_add(instructions, .{.COPY, .{copy = .{one, result_var}}});
+
+    array_add(instructions, label_end);
+
+    return result_var;
 }
 
 from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type_of(Instruction_Tacky.as.binary.op) {
@@ -95,6 +205,15 @@ from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type
         case .BITWISE_XOR; return .BITWISE_XOR;
         case .LEFT_SHIFT; return .LEFT_SHIFT;
         case .RIGHT_SHIFT; return .RIGHT_SHIFT;
+        case .LESS_EQUAL; return .LESS_EQUAL;
+        case .LESS; return .LESS;
+        case .GREATER_EQUAL; return .GREATER_EQUAL;
+        case .GREATER; return .GREATER;
+        case .EQUAL_EQUAL; return .EQUAL_EQUAL;
+        case .NOT_EQUAL; return .NOT_EQUAL;
+        case .AND; #through;
+        case .OR; 
+            assert(false, "And and OR are not handled this way");
     }
     assert(false, "There are not other binary operator. What is this %", ast_op);
     return .MOD; // unreachable
@@ -103,6 +222,11 @@ from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type
 make_var :: (tc : *Tacky_Ctx) -> Val_Tacky {
     defer tc.temp_var_index += 1;
     return .{.VARIABLE, .{variable = tprint("tmp.%",tc.temp_var_index) }};
+}
+
+make_label :: (tc : *Tacky_Ctx, label: string) -> Instruction_Tacky {
+    defer tc.label_index += 1;
+    return .{.LABEL, .{label = tprint("L_%.%",label, tc.label_index) }};
 }
 
 print_tacky :: (program: *Program_Tacky) {
@@ -140,6 +264,26 @@ print_tacky_inst :: (inst: *Instruction_Tacky) {
             print(", dst: ");
             print_tacky_val(*inst.as.binary.dst);
             print(")");
+        case .LABEL;
+            print("Label(%)", inst.as.label);
+        case .JUMP_IF_NOT_ZERO; 
+            print("JumpIfNotZero(condition: ");
+            print_tacky_val(*inst.as.jump_if_zero.condition);
+            print(", label: %", inst.as.jump_if_zero.ident);
+            print(")");
+        case .JUMP_IF_ZERO; 
+            print("JumpIfZero(condition: ");
+            print_tacky_val(*inst.as.jump_if_zero.condition);
+            print(", label: %", inst.as.jump_if_zero.ident);
+            print(")");
+        case .COPY; 
+            print("Copy(src: ");
+            print_tacky_val(*inst.as.copy.src);
+            print(", dst: ");
+            print_tacky_val(*inst.as.copy.dst);
+            print(")");
+        case .JUMP;
+            print("Jump(%)", inst.as.jump);
     }
 }
 
@@ -157,8 +301,17 @@ function_definition = Function(identifier, instruction* body)
 instruction         = Return(val) 
                     | Unary(unary_operator, val src, val dst)
                     | Binary(binary_operator, val src1, val src2, val dst)
+                    | Copy(val src, val dst)
+                    | Jump(identifier target)
+                    | JumpIfZero(val condition, identifier target)
+                    | JumpIfNotZero(val condition, identifier target)
+                    | Label(identifier)
 val                 = Constant(int) | Var(identifier)
-unary_operator      = Complement | Negate
+unary_operator      = Complement | Negate | Not
 binary_operator     = Add | Subtract | Multiply | Divide | Remainder 
+                    | And | Or
+                    | Equal | Not Equal
+                    | LessThan | LessOrEqual 
+                    | GreaterThan | GreaterOrEqual 
 
 */
