@@ -1,6 +1,8 @@
 Lexer :: struct {
     line: int = 1;
     line_start: int = 0;
+    previous_line_start: int = 0;
+    previous_line_end: int = 0;
     src: string;
     start: int = 0; // current token start position
     current: int = 0; // where is cursor right now
@@ -42,6 +44,7 @@ Token_Type :: enum {
     LESS_EQUAL;
     GREATER;
     GREATER_EQUAL;
+    ASSIGN;
 }
 
 Token :: struct {
@@ -58,50 +61,35 @@ lex :: (args: Cli_Args) -> Lexer {
     }
     lexer := Lexer.{src = src};
     scan(*lexer);
-
-    print("\n -- Lexer -- \n");
-    for lexer.tokens {
-        print("%\n", it);
-    }
-    print("\n");
-
+    print_tokens(lexer.tokens);
     return lexer;
 }
 
+print_tokens :: (tokens: []Token) {
+    print("\n -- Lexer -- \n");
+    for tokens print("%\n", it); 
+    print("\n");
+}
+
 scan :: (using lexer: *Lexer) {
-    c := 0;
     while !is_at_end(lexer) {
-        c += 1;
-        if c > 100000 {
-            log_error("Force lexer scan exit");
-            exit(1);
-        } 
         start = current;
         current_char := consume(lexer);
 
-        if String.is_space(current_char) {
-            continue;
-        }
-
-        if String.is_alpha(current_char) {
-            ident_or_keyword(lexer);
-            continue;
-        }
-        if String.is_digit(current_char) {
-            number(lexer);
-            continue;
-        }
+        if String.is_space(current_char) continue;
+        if String.is_alpha(current_char) { ident_or_keyword(lexer); continue; }
+        if String.is_digit(current_char) { number(lexer); continue; }
 
         if current_char == {
-            case #char "("; array_add(*tokens, .{.LPAREN, "(", line});
-            case #char ")"; array_add(*tokens, .{.RPAREN, ")", line});
-            case #char "{"; array_add(*tokens, .{.LCURLY, "{", line});
-            case #char "}"; array_add(*tokens, .{.RCURLY, "}", line});
-            case #char ";"; array_add(*tokens, .{.SEMICOLON, ";", line});
+            case #char "("; array_add(*tokens, .{.LPAREN,      "(", line});
+            case #char ")"; array_add(*tokens, .{.RPAREN,      ")", line});
+            case #char "{"; array_add(*tokens, .{.LCURLY,      "{", line});
+            case #char "}"; array_add(*tokens, .{.RCURLY,      "}", line});
+            case #char ";"; array_add(*tokens, .{.SEMICOLON,   ";", line});
             case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
-            case #char "+"; array_add(*tokens, .{.PLUS, "+", line});
-            case #char "*"; array_add(*tokens, .{.MULTIPLY, "*", line});
-            case #char "%"; array_add(*tokens, .{.MOD, "%", line});
+            case #char "+"; array_add(*tokens, .{.PLUS,        "+", line});
+            case #char "*"; array_add(*tokens, .{.MULTIPLY,    "*", line});
+            case #char "%"; array_add(*tokens, .{.MOD,         "%", line});
             case #char "&"; 
                 if peek(lexer) == #char "&" {
                     consume(lexer);
@@ -162,8 +150,7 @@ scan :: (using lexer: *Lexer) {
                     array_add(*tokens, .{.EQUAL_EQUAL, "==", line});
                     continue;
                 }
-                print_err_line(lexer);
-                assert(false, "ASSIGN is not implemented");
+                array_add(*tokens, .{.ASSIGN, "=", line});
             case #char "!";
                 if peek(lexer) == #char "=" {
                     consume(lexer);
@@ -178,14 +165,16 @@ scan :: (using lexer: *Lexer) {
     }
 }
 
-print_err_line :: (using lexer: *Lexer) {
+print_err_line :: (using lexer: *Lexer, msg: string = "") {
     new_line_index := current;
     while (src.data + new_line_index).* != #char "\n" && new_line_index < src.count {
         new_line_index += 1;
     }
+    print("%\n", String.slice(src, previous_line_start, previous_line_end - previous_line_start));
     print("%\n", String.slice(src, line_start, new_line_index-line_start));
     for 0..current-line_start-2 print(" ");
     print("^---");
+    assert(false, "%", msg);
 }
 
 comment :: (using lexer: *Lexer) {
@@ -194,46 +183,49 @@ comment :: (using lexer: *Lexer) {
             while !is_at_end(lexer) && peek(lexer) != #char "\n" {
                 consume(lexer);
             }
-            line += 1;
-            line_start = current;
+            increment_line(lexer);
         case #char "*";
             consume(lexer);
             while !is_at_end(lexer) {
                 c := consume(lexer);
-                if c == #char "\n"  { line += 1; line_start = current; }
+                if c == #char "\n"  { 
+                    increment_line(lexer);
+                }
                 if c == #char "*" && peek(lexer) == #char "/" break;
             }
             consume(lexer); // consume closing /, if not found, this is an error
-        case; assert(false, "unable to parse comment");
+        case; print_err_line(lexer, "unable to parse comment");
     }
+}
+
+increment_line :: (using lexer: *Lexer) {
+    previous_line_start = line_start;
+    previous_line_end = current - 1;
+    line += 1;
+    line_start = current;
 }
 
 number :: (using lexer: *Lexer) {
     found_alpha := false;
     while !is_at_end(lexer) && (String.is_digit(peek(lexer)) || String.is_alpha(peek(lexer))) {
-        if String.is_alpha(peek(lexer)) {
-            found_alpha = true;
-        }
+        if String.is_alpha(peek(lexer)) found_alpha = true;
         consume(lexer);
     }
     str := String.slice(src, start, current-start);
-    if found_alpha {
-        assert(false, "Invalid identifier found: %", str);
-    }
+    if found_alpha print_err_line(lexer, tprint("Invalid identifier found %s", str));
+
     token := Token.{ .INT_LITERAL, str, line};
     array_add(*tokens, token); 
 }
 
 ident_or_keyword :: (using lexer: *Lexer) {
-    while !is_at_end(lexer) && String.is_alnum(peek(lexer)) {
-        consume(lexer);
-    }
+    while !is_at_end(lexer) && String.is_alnum(peek(lexer)) consume(lexer);
     str := String.slice(src, start, current-start);
-    token := Token.{ find_token_type(str), str, line};
+    token := Token.{ find_keyword_or_ident(str), str, line};
     array_add(*tokens, token);
 }
 
-find_token_type :: (str: string) -> Token_Type {
+find_keyword_or_ident :: (str: string) -> Token_Type {
     if str == {
         case "int"; return .INT;
         case "void"; return .VOID;
@@ -246,8 +238,7 @@ consume :: (using lexer: *Lexer) -> u8 {
     defer current += 1;
     c := peek(lexer);
     if c == #char "\n" {
-        line += 1;
-        line_start = current;
+        increment_line(lexer);
     }
     return c;
 }

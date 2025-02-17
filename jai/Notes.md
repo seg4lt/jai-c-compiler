@@ -2,6 +2,7 @@ References;
 - https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 - https://web.stanford.edu/class/cs107/resources/x86-64-reference.pdf
 - https://docs.oracle.com/cd/E19253-01/817-5477/index.html
+- https://www.jdoodle.com/compile-assembler-gcc-online
 
 # Notes
 `arch -x86_64` - run x86_64 binaries on M1 mac

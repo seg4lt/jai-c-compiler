@@ -48,9 +48,37 @@ ce_inst :: (f: *File, using inst: Instruction_Asm) {
         case .IDIV;
             ins := "idivl";
             divider := ce_fmt_operand(as.idiv);
-            file_write(f, tprint("\t%\t%", ins, divider));
+            file_write(f, tprint("\t%\t%\n", ins, divider));
         case .CDQ;
-            file_write(f, "cdq");
+            file_write(f, "\tcdq\n");
+        case .LABEL;
+            file_write(f, tprint("%:\n", as.label));
+        case .JMP;
+            file_write(f, tprint("\tjmp\t%\n", as.jmp));
+        case .JMP_CC;
+            cmd : string = ---;
+            if #complete as.jmp_cc.cond_code == {
+                case .EE; cmd = "je";
+                case .NE; cmd = "jne";
+                case .G; cmd = "jg";
+                case .GE; cmd = "jge";
+                case .L; cmd = "jl";
+                case .LE; cmd = "jle";
+            }
+            file_write(f, tprint("\t%\t%\n", cmd, as.jmp_cc.ident));
+        case .CMP;
+            file_write(f, tprint("\tcmpl\t%, %\n", ce_fmt_operand(as.cmp.op1), ce_fmt_operand(as.cmp.op2)));
+        case .SET_CC;
+            cmd : string = ---;
+            if #complete as.set_cc.cond_code == {
+                case .EE; cmd = "sete";
+                case .NE; cmd = "setne";
+                case .G; cmd = "setg";
+                case .GE; cmd = "setge";
+                case .L; cmd = "setl";
+                case .LE; cmd = "setle";
+            }
+            file_write(f, tprint("\t%\t%\n", cmd, ce_fmt_operand(as.set_cc.operand)));
         case .ALLOCATE_STACK;
             file_write(f, tprint("\tsubq\t%, %\n", as.allocate_stack, ce_fmt_reg(.RSP)));
             file_write(f, "\t;˄˄˄\tPrologue\n");
@@ -61,7 +89,8 @@ ce_inst :: (f: *File, using inst: Instruction_Asm) {
 ce_fmt_unary_op :: (op: Unary_Op_Asm) -> string {
     if #complete op == {
         case .NEG; return "negl";
-        case .NOT; return "notl";
+        case .BITWISE_NOT; return "notl";
+        case .NNOT; assert(false, "not implemented"); return "asdf";
     }
 }
 ce_fmt_binary_op :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
@@ -74,7 +103,14 @@ ce_fmt_binary_op :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
         case .BITWISE_XOR; return "xorl";
         case .LEFT_SHIFT; return "sall"; // doing arithmetic shift - shll for logical shift
         case .RIGHT_SHIFT; return "sarl"; // shrl
+        case .LESS_EQUAL; #through;
+        case .LESS; #through;
+        case .GREATER_EQUAL; #through;
+        case .NOT_EQUAL; #through;
+        case .GREATER; #through;
+        case .EQUAL_EQUAL; assert(false, "unreachable"); return "";
     }
+
 }
 
 ce_fmt_operand :: (operand: Operand_Asm) -> string {
