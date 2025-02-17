@@ -21,11 +21,31 @@ Expr_Ast_Node :: struct {
     type: enum { CONSTANT; UNARY; BINARY; GROUP; }
     as: union {
         constant: int;
-        unary: struct { op: enum {BITWISE_NOT; NEGATE;}; expr: *Expr_Ast_Node; };
-        binary: struct { op: enum {ADD;SUB;MUL;DIV;MOD;BITWISE_AND;BITWISE_OR;BITWISE_XOR;LEFT_SHIFT;RIGHT_SHIFT;}; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
+        unary: struct { op: enum {BITWISE_NOT; NEGATE; NOT;}; expr: *Expr_Ast_Node; };
+        binary: struct { op: Bin_Op_Ast; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
     };
 }
+Bin_Op_Ast :: enum {
+    ADD;
+    SUB;
+    MUL;
+    DIV;
+    MOD;
+    BITWISE_AND;
+    BITWISE_OR;
+    BITWISE_XOR;
+    LEFT_SHIFT;
+    RIGHT_SHIFT;
+    AND;
+    OR;
+    NOT_EQUAL;
+    EQUAL_EQUAL;
+    GREATER;
+    GREATER_EQUAL;
+    LESS;
+    LESS_EQUAL;
+};
 
 ast_parse :: (lexer: *Lexer) -> *Program_Ast_Node {
     parser := Parser.{ tokens = lexer.tokens };
@@ -89,7 +109,16 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .RIGHT_SHIFT; #through; 
         case .BITWISE_AND; #through;
         case .BITWISE_XOR; #through;
-        case .BITWISE_OR; return true;
+        case .BITWISE_OR; #through;
+        case .AND; #through;
+        case .OR; #through;
+        case .NOT_EQUAL; #through;
+        case .EQUAL_EQUAL; #through;
+        case .GREATER; #through;
+        case .GREATER_EQUAL; #through;
+        case .LESS; #through;
+        case .LESS_EQUAL;
+        return true;
 
         case; return false;
     }
@@ -98,6 +127,9 @@ is_binary_operator :: (tt: Token_Type) -> bool {
 precedence :: (tt: Token_Type) -> int {
     // https://en.cppreference.com/w/c/language/operator_precedence
     if tt == {
+        case .BITWISE_NOT; #through;
+        case .NOT; return 70;
+
         case .DIVIDE; #through;
         case .MULTIPLY; #through;
         case .MOD; return 50;
@@ -108,9 +140,20 @@ precedence :: (tt: Token_Type) -> int {
         case .LEFT_SHIFT; #through;
         case .RIGHT_SHIFT; return 40; 
 
-        case .BITWISE_AND; return 35;
-        case .BITWISE_XOR; return 34;
-        case .BITWISE_OR; return 33;
+        case .LESS; #through;
+        case .LESS_EQUAL; #through;
+        case .GREATER; #through;
+        case .GREATER_EQUAL; return 35;
+
+        case .EQUAL_EQUAL; #through;
+        case .NOT_EQUAL; return 30;
+
+        case .BITWISE_AND; return 25;
+        case .BITWISE_XOR; return 24;
+        case .BITWISE_OR; return 23;
+
+        case .AND; return 10;
+        case .OR; return 5;
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
@@ -145,6 +188,7 @@ Expr :: struct {
                 expr.* = .{ type = .CONSTANT, as = .{ constant = int_value }};
                 return expr;
             case .MINUS; #through;
+            case .NOT; #through;
             case .BITWISE_NOT;
                 op := parse_unary_op(consume(parser).type);
                 inner_expr := parse_factor(parser);
@@ -169,6 +213,7 @@ parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
     if tt == {
         case .BITWISE_NOT; return .BITWISE_NOT;
         case .MINUS; return .NEGATE;
+        case .NOT; return .NOT;
         case; assert(false, "Wanted unary operator found %", tt);
     }
     // unreachable 
@@ -188,6 +233,15 @@ parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
         case .BITWISE_AND; return .BITWISE_AND;
         case .BITWISE_OR; return .BITWISE_OR;
         case .BITWISE_XOR; return .BITWISE_XOR;
+
+        case .NOT_EQUAL; return .NOT_EQUAL;
+        case .EQUAL_EQUAL; return .EQUAL_EQUAL;
+        case .GREATER; return .GREATER;
+        case .GREATER_EQUAL; return .GREATER_EQUAL;
+        case .LESS; return .LESS;
+        case .LESS_EQUAL; return .LESS_EQUAL;
+        case .AND; return .AND;
+        case .OR; return .OR;
     }
     // unreachable 
     assert(false, "Wanted binary operator found %", tt);
@@ -277,8 +331,12 @@ statement            = Return(exp)
 exp                  = Constant(int) 
                      | Unary(unary_operator, exp)
                      | Binary(binary_operator, exp, exp)
-unary_operator       = Complement | Negate
+unary_operator       = Complement | Negate | Not
 binary_operator      = Add | Subtract | Multiply | Divide | Remainder
+                     | And | Or
+                     | Less | LessOrEqual
+                     | Greater | GreaterOrEqual
+                     | Not | NotEqual
 
 */
 
@@ -289,8 +347,10 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <statement>       ::= "return" <exp> ";"
 <exp>             ::= <factor> | <exp> <binop> <exp>
 <factor>          ::= <int> | <unop> <factor> | "(" <exp> ")"
-<unop>            ::= "-" | "~"
-<binop>           ::= "-" | "+" | "*" | "/" | "%"
+<unop>            ::= "-" | "~" | "!"
+<binop>           ::= "-" | "+" | "*" | "/" | "%" 
+                    | "&&" | "||" | "==" | "!="
+                    | ">" | ">=" | "<" | "<=" 
 <identifier>      ::= ? An identifier token ?
 <int>             ::= ? A constant token ?
 */
