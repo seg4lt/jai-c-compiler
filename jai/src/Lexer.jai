@@ -20,19 +20,28 @@ Token_Type :: enum {
     INT;
     VOID;
     RETURN;
-    // OPERATOR
+    // Operator
     BITWISE_NOT;
     BITWISE_AND;
     BITWISE_OR;
     BITWISE_XOR;
     LEFT_SHIFT;
     RIGHT_SHIFT;
-    UNARY_MINUS;
     MINUS;
     PLUS;
     DIVIDE;
     MULTIPLY;
     MOD;
+    UNARY_MINUS;
+    NOT;
+    AND;
+    OR;
+    EQUAL_EQUAL;
+    NOT_EQUAL;
+    LESS;
+    LESS_EQUAL;
+    GREATER;
+    GREATER_EQUAL;
 }
 
 Token :: struct {
@@ -95,13 +104,15 @@ scan :: (using lexer: *Lexer) {
             case #char "%"; array_add(*tokens, .{.MOD, "%", line});
             case #char "&"; 
                 if peek(lexer) == #char "&" {
-                    assert(false, "&& -- is not supported yet");
+                    consume(lexer);
+                    array_add(*tokens, .{.AND, "&&", line});
                     continue;
                 }
                 array_add(*tokens, .{.BITWISE_AND, "&", line});
             case #char "|"; 
                 if peek(lexer) == #char "|" {
-                    assert(false, "|| -- is not supported yet");
+                    consume(lexer);
+                    array_add(*tokens, .{.OR, "&&", line});
                     continue;
                 }
                 array_add(*tokens, .{.BITWISE_OR, "|", line});
@@ -113,14 +124,24 @@ scan :: (using lexer: *Lexer) {
                     array_add(*tokens, .{.RIGHT_SHIFT, ">>", line});
                     continue;
                 }
-                assert(false, "> not supported yet");
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.GREATER_EQUAL, ">=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.GREATER, ">", line});
             case #char "<";
                 if peek(lexer) == #char "<" {
                     consume(lexer);
                     array_add(*tokens, .{.LEFT_SHIFT, "<<", line});
                     continue;
                 }
-                assert(false, "< not supported yet");
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.LESS_EQUAL, "<=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.LESS, "<", line});
             case #char "/"; 
                 if peek(lexer) == #char "/" || peek(lexer) == #char "*" {
                     comment(lexer);
@@ -135,14 +156,29 @@ scan :: (using lexer: *Lexer) {
                     continue;
                 }
                 array_add(*tokens, .{.MINUS, "-", line});
+            case #char "=";
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.EQUAL_EQUAL, "==", line});
+                    continue;
+                }
+                print_err_line(lexer);
+                assert(false, "ASSIGN is not implemented");
+            case #char "!";
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.NOT_EQUAL, "!=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.NOT, "!", line});
             case; 
-                print_line(lexer);
+                print_err_line(lexer);
                 assert(false, "Unexpected character %\n", String.to_string(*current_char, 1));
         }
     }
 }
 
-print_line :: (using lexer: *Lexer) {
+print_err_line :: (using lexer: *Lexer) {
     new_line_index := current;
     while (src.data + new_line_index).* != #char "\n" && new_line_index < src.count {
         new_line_index += 1;
