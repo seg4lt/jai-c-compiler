@@ -212,7 +212,7 @@ make_var :: (tc : *Tacky_Ctx) -> Val_Tacky {
 
 make_label :: (tc : *Tacky_Ctx, label: string) -> Instruction_Tacky {
     defer tc.label_index += 1;
-    return .{.LABEL, .{label = tprint("label_%.%",label, tc.label_index) }};
+    return .{.LABEL, .{label = tprint("L_%.%",label, tc.label_index) }};
 }
 
 print_tacky :: (program: *Program_Tacky) {
