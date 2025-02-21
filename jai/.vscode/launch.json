@@ -6,7 +6,7 @@
         "type": "lldb",
         "request": "launch",
         "program": "./out/target",
-        "args": ["./C_testfiles/03_binary/shift.c"],
+        "args": ["./c/main.c"],
         "preLaunchTask": "Compile Current Jai File",
         // "cwd": "${fileDirname}",
         "console": "integratedTerminal"
