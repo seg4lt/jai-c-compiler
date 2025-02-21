@@ -9,21 +9,39 @@ Program_Ast_Node :: struct {
 }
 Fn_Ast_Node :: struct {
     ident: string;
-    body: *Stmt_Ast_Node;
+    body: [..]Block_Item_Ast_Node;
 }
+
+Block_Item_Ast_Node :: struct {
+    type: enum { STMT; DECL; };
+    as: union {
+        stmt: *Stmt_Ast_Node;
+        decl: *Decl_Ast_Node;
+    };
+}
+
+Decl_Ast_Node :: struct {
+    ident: string;
+    init: *Expr_Ast_Node; // optional
+}
+
 Stmt_Ast_Node :: struct {
-    type: enum { RETURN; };
+    type: enum { RETURN; EXPR; NULL;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast_Node; };
+        expr: *Expr_Ast_Node;
+        // null : doesn't need value
     };
 }
 Expr_Ast_Node :: struct {
-    type: enum { CONSTANT; UNARY; BINARY; GROUP; }
+    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; }
     as: union {
         constant: int;
         unary: struct { op: enum {BITWISE_NOT; NEGATE; NOT;}; expr: *Expr_Ast_Node; };
         binary: struct { op: Bin_Op_Ast; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
+        var: string;
+        assignment: struct { dst: *Expr_Ast_Node; src: *Expr_Ast_Node;};
     };
 }
 Bin_Op_Ast :: enum {
@@ -71,31 +89,55 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
     consume(parser, .RPAREN);
 
     consume(parser, .LCURLY);
-    stmt := Stmt.parse_stmt_ast_node(parser);
-    consume(parser, .SEMICOLON);
-    consume(parser, .RCURLY);
 
+    body: [..]Block_Item_Ast_Node;
+
+    while peek(parser).type != .RCURLY {
+        b_item := Block_Item.parse_block_item(parser);
+        array_add(*body, b_item);
+    }
+    consume(parser, .RCURLY);
     fn := New(Fn_Ast_Node);
-    fn.* = .{ident_token.value, stmt};
+    fn.* = .{ident_token.value, body};
     return fn;
+}
+
+Block_Item :: struct {
+
+parse_block_item :: (parser: *Parser) -> *Block_Item_Ast_Node {
+    if peek(parser).type == .RETURN {
+        return_stmt := Stmt.parse_return_stmt(parser);
+        block := New(Block_Item_Ast_Node);
+        block.* = .{.STMT, .{stmt = return_stmt}};
+        return block;
+    }
+    assert(false, "This kind of statement is not know to me at the moment %", peek(parser).*);
+    return null;
+}
+
 }
 
 // ??? Maybe using it as name space to make things more clearer
 Stmt :: struct {
-    parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
-        if peek(parser).type == .RETURN {
-            return parse_return_stmt(parser);
-        }
-        assert(false, "This kind of statemnt is not know to me at the moment %", peek(parser).*);
-        return null;
-    }
-    parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
-        consume(parser, .RETURN);
-        expr := Expr.parse_expr(parser, 0);
-        stmt := New(Stmt_Ast_Node);
-        stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
-        return stmt;
-    }
+
+
+
+// parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
+//     if peek(parser).type == .RETURN {
+//         return parse_return_stmt(parser);
+//     }
+//     assert(false, "This kind of statemnt is not know to me at the moment %", peek(parser).*);
+//     return null;
+// }
+
+parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
+    consume(parser, .RETURN);
+    expr := Expr.parse_expr(parser, 0);
+    consume(parser, .SEMICOLON);
+    stmt := New(Stmt_Ast_Node);
+    stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
+    return stmt;
+}
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
@@ -283,7 +325,15 @@ print_fn_ast :: (fn: *Fn_Ast_Node, depth: int = 0) {
     print_space(depth);
     print("[FN] %", fn.ident);
     print_space(depth+1);
-    print_stmt_ast(fn.body, depth + 1);
+
+    for fn.body {
+        if #complete it.type == {
+            case .STMT;
+                print_stmt_ast(it.as.stmt, depth + 1);
+            case .DECL;
+                assert(false, "not implemented");
+        }
+    }
 }
 
 print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
@@ -292,6 +342,8 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print("[RETURN] ");
             print_space(depth+1);
             print_expr_ast(stmt.as.return_stmt.expr, depth+1);
+        case .NULL; #through;
+        case .EXPR; assert(false, "not implemented");
     }
 }
 
@@ -315,6 +367,9 @@ print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
             print("[GROUP] ");
             print_space(depth + 1);
             print_expr_ast(expr.as.group, depth + 1);
+        case .ASSIGNMENT; #through;
+        case .VAR;
+            assert(false, "not implemented");
     }
 }
 
@@ -326,11 +381,17 @@ print_space :: (depth: int = 0) {
 /* -- ADSL AST -- 
 
 program              = Program(function_definition)
-function_definition  = Function(identifier name, statement body)
+function_definition  = Function(identifier name, block_item* body)
+block_item           = S(stmt) | D(decleration)
+declaration          = Declaration(identifier name, exp? init)
 statement            = Return(exp)
+                     | Expression(exp)
+                     | Null                 # like ";" on while and for which signifies empty body
 exp                  = Constant(int) 
+                     | Var(identifier)
                      | Unary(unary_operator, exp)
                      | Binary(binary_operator, exp, exp)
+                     | Assignment(exp, exp)
 unary_operator       = Complement | Negate | Not
 binary_operator      = Add | Subtract | Multiply | Divide | Remainder
                      | And | Or
@@ -340,13 +401,15 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 
 */
 
-/* E-BNF
+/* E-BNF production rule
 
 <program>         ::= <function>
-<function>        ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
-<statement>       ::= "return" <exp> ";"
+<function>        ::= "int" <identifier> "(" "void" ")" "{" <block-item> "}"
+<block-item>      ::= <statement> | <decleration>
+<decleration>     ::= "int" <identifier> [ "=" <exp> ] ";"
+<statement>       ::= "return" <exp> ";" | <exp> ";" | ";"
 <exp>             ::= <factor> | <exp> <binop> <exp>
-<factor>          ::= <int> | <unop> <factor> | "(" <exp> ")"
+<factor>          ::= <int> | <identifier> | <unop> <factor> | "(" <exp> ")"
 <unop>            ::= "-" | "~" | "!"
 <binop>           ::= "-" | "+" | "*" | "/" | "%" 
                     | "&&" | "||" | "==" | "!="

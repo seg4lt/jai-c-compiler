@@ -78,7 +78,14 @@ gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
 
 gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
-    gen_instructions(tc, *instructions, fn_ast.body);
+    for fn_ast.body {
+        if #complete it.type == {
+            case .STMT;
+                gen_instructions(tc, *instructions, it.as.stmt);
+            case .DECL;
+                assert(false, "not implemented");
+        }
+    }
     return .{ fn_ast.ident, instructions };
 }
 
@@ -87,6 +94,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
+        case .NULL; #through;
+        case .EXPR; assert(false, "not implemented");
     }
 }
 
@@ -121,6 +130,11 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
         case .GROUP;
             return gen_instructions(tc, instructions, expr_ast.as.group);
         case .CONSTANT;
+            return .{.CONSTANT, .{constant = expr_ast.as.constant}};
+        case .VAR; #through;
+        case .ASSIGNMENT; 
+            assert(false, "not implemented");
+            // unreachable
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
     }
 }
