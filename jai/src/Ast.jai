@@ -11,7 +11,6 @@ Fn_Ast_Node :: struct {
     ident: string;
     body: [..]Block_Item_Ast_Node;
 }
-
 Block_Item_Ast_Node :: struct {
     type: enum { STMT; DECL; };
     as: union {
@@ -105,16 +104,50 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
 Block_Item :: struct {
 
 parse_block_item :: (parser: *Parser) -> *Block_Item_Ast_Node {
-    if peek(parser).type == .RETURN {
-        return_stmt := Stmt.parse_return_stmt(parser);
-        block := New(Block_Item_Ast_Node);
-        block.* = .{.STMT, .{stmt = return_stmt}};
-        return block;
+    cp := peek(parser);
+    cp_type := cp.type;
+    if peek(parser).type == .INT {
+        decl := Decl.parse_decl_ast_node(parser);
+        bi := New(Block_Item_Ast_Node);
+        bi.* = .{.DECL, .{decl = decl}};
+        return bi;
     }
-    assert(false, "This kind of statement is not know to me at the moment %", peek(parser).*);
-    return null;
+    if peek(parser).type == .SEMICOLON {
+        consume(parser);
+        bi := New(Block_Item_Ast_Node);
+        null_stmt := New(Stmt_Ast_Node);
+        null_stmt.* = .{.NULL, .{}};
+        bi.* = .{.STMT, .{stmt = null_stmt}};
+        return bi;
+    }
+    return_stmt := Stmt.parse_stmt_ast_node(parser);
+    block := New(Block_Item_Ast_Node);
+    block.* = .{.STMT, .{stmt = return_stmt}};
+    return block;
 }
 
+}
+
+Decl :: struct {
+parse_decl_ast_node :: (parser: *Parser) -> *Decl_Ast_Node {
+    if peek(parser).type == .INT {
+        consume(parser, .INT);
+        ident := consume(parser).value;
+        if String.is_digit(ident.data.*) assert(false, "identifier should not start with digit");
+
+        expr := ifx peek(parser).type == .ASSIGN {
+            consume(parser);
+            expr := Expr.parse_expr(parser, 0);
+            expr;
+        } else null;
+        consume(parser, .SEMICOLON);
+        decl :=  New(Decl_Ast_Node);
+        decl.* = .{ident, expr};
+        return decl;
+    }
+    assert(false, "not implemented");
+    return null;
+}
 }
 
 // ??? Maybe using it as name space to make things more clearer
@@ -122,13 +155,21 @@ Stmt :: struct {
 
 
 
-// parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
-//     if peek(parser).type == .RETURN {
-//         return parse_return_stmt(parser);
-//     }
-//     assert(false, "This kind of statemnt is not know to me at the moment %", peek(parser).*);
-//     return null;
-// }
+parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
+    if peek(parser).type == .RETURN {
+        return parse_return_stmt(parser);
+    }
+    if peek(parser).type == .SEMICOLON {
+        stmt := New(Stmt_Ast_Node);
+        stmt.* = .{.NULL, .{}};
+        return stmt;
+    }
+    expr := Expr.parse_expr(parser, 0);
+    consume(parser, .SEMICOLON);
+    stmt := New(Stmt_Ast_Node);
+    stmt.* = .{.EXPR, .{expr = expr}};
+    return stmt;
+}
 
 parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
     consume(parser, .RETURN);
@@ -159,7 +200,8 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .GREATER; #through;
         case .GREATER_EQUAL; #through;
         case .LESS; #through;
-        case .LESS_EQUAL;
+        case .LESS_EQUAL; #through;
+        case .ASSIGN;
         return true;
 
         case; return false;
@@ -196,6 +238,7 @@ precedence :: (tt: Token_Type) -> int {
 
         case .AND; return 10;
         case .OR; return 5;
+        case .ASSIGN; return 1;
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
@@ -207,11 +250,19 @@ Expr :: struct {
         next_token := peek(parser);
       
         while is_binary_operator(next_token.type) && precedence(next_token.type) >= min_prec {
-            op := parse_binary_op(consume(parser).type);
-            right := parse_expr(parser, precedence(next_token.type) + 1);
-            binary := New(Expr_Ast_Node);
-            binary.* = .{.BINARY, .{binary=.{op,left,right}}};
-            left = binary;
+            if next_token.type == .ASSIGN {
+                consume(parser);
+                right := parse_expr(parser, precedence(next_token.type));
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{.ASSIGNMENT, .{assignment =.{left, right}}};
+                left = assignment;
+            } else {
+                op := parse_binary_op(consume(parser).type);
+                right := parse_expr(parser, precedence(next_token.type) + 1);
+                binary := New(Expr_Ast_Node);
+                binary.* = .{.BINARY, .{binary=.{op,left,right}}};
+                left = binary;
+            }
             next_token = peek(parser);
         }
         return left;
@@ -244,6 +295,11 @@ Expr :: struct {
                 expr.* = .{ type = .GROUP , as = .{ group = inner_expr }};
                 consume(parser, .RPAREN);
                 return expr;
+            case .IDENT;
+                token := consume(parser);
+                expr := New(Expr_Ast_Node);
+                expr.* = .{ type = .VAR , as = .{ var = token.value }};
+                return expr;
             case;
                 assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
                 return null; // unreachable
@@ -258,8 +314,8 @@ parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
         case .NOT; return .NOT;
         case; assert(false, "Wanted unary operator found %", tt);
     }
-    // unreachable 
-    return .NEGATE;
+    assert(false, "Wanted unary operator found %", tt);
+    return .NEGATE; // unreachable 
 }
 
 parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
@@ -319,20 +375,28 @@ print_program_ast :: (program: *Program_Ast_Node, depth: int = 0) {
     print("\n\n -- AST -- \n");
     print("[PROGRAM] ");
     print_fn_ast(program.fn, depth + 1);
+    print("\n\n");
 }
 
 print_fn_ast :: (fn: *Fn_Ast_Node, depth: int = 0) {
     print_space(depth);
     print("[FN] %", fn.ident);
-    print_space(depth+1);
 
     for fn.body {
+        print_space(depth+1);
         if #complete it.type == {
-            case .STMT;
-                print_stmt_ast(it.as.stmt, depth + 1);
-            case .DECL;
-                assert(false, "not implemented");
+            case .STMT; print_stmt_ast(it.as.stmt, depth + 1);
+            case .DECL; print_decl_ast(it.as.decl, depth + 1);
         }
+    }
+}
+
+print_decl_ast :: (using decl: *Decl_Ast_Node, depth: int = 0)  {
+    print("[DECL] ");
+    print("%", ident);
+    if init != null {
+        print(" = ");
+        print_expr_ast(init, depth + 1);
     }
 }
 
@@ -342,8 +406,12 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print("[RETURN] ");
             print_space(depth+1);
             print_expr_ast(stmt.as.return_stmt.expr, depth+1);
-        case .NULL; #through;
-        case .EXPR; assert(false, "not implemented");
+        case .EXPR;
+            print("[EXPR] ");
+            print_space(depth + 1);
+            print_expr_ast(stmt.as.return_stmt.expr, depth+1);
+        case .NULL; 
+            print("[NULL_STMT]");
     }
 }
 
@@ -367,9 +435,13 @@ print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
             print("[GROUP] ");
             print_space(depth + 1);
             print_expr_ast(expr.as.group, depth + 1);
-        case .ASSIGNMENT; #through;
         case .VAR;
-            assert(false, "not implemented");
+            print("[VAR] % ", expr.as.var);
+        case .ASSIGNMENT;
+            print("[ASSIGNMENT] ");
+            print_expr_ast(expr.as.assignment.dst, depth);
+            print(" = ");
+            print_expr_ast(expr.as.assignment.src, depth);
     }
 }
 

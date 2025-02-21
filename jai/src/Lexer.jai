@@ -159,8 +159,7 @@ scan :: (using lexer: *Lexer) {
                 }
                 array_add(*tokens, .{.NOT, "!", line});
             case; 
-                print_err_line(lexer);
-                assert(false, "Unexpected character %\n", String.to_string(*current_char, 1));
+                print_err_line(lexer, tprint("Unexpected character %\n", String.to_string(*current_char, 1)));
         }
     }
 }
