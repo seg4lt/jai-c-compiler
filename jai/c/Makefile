@@ -1,5 +1,5 @@
 UNAME_S := $(shell uname -s)
-FILE_NAME := return_2
+FILE_NAME := main
 
 ifeq ($(UNAME_S),Darwin)
     CC = clang
@@ -16,6 +16,6 @@ link: asm
 	$(CC) $(FILE_NAME).s -o $(FILE_NAME)
 	
 clean:
-	rm -f $(FILE_NAME).o $(FILE_NAME).s $(FILE_NAME).i
+	rm -f $(FILE_NAME).o $(FILE_NAME).s $(FILE_NAME).i $(FILE_NAME)
 
 .PHONY: pp asm link clean

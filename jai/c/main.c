@@ -1,5 +1,7 @@
 int main(void)
 {
-    int 10 = 0;
-    return 10;
+    int x = 10;
+    int y;
+    y = 20 + x;
+    return x && y;
 }

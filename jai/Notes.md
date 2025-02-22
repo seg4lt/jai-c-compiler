@@ -1,3 +1,8 @@
+# TODO
+- [ ] SETCC needs only 1 byte, but today we are using 4 bytes. Need to fix this
+- [ ] Parse typedef - Read more on context sentitive grammer.
+
+
 References;
 - https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 - https://web.stanford.edu/class/cs107/resources/x86-64-reference.pdf
@@ -19,4 +24,7 @@ Chap 2:
 
 Chap 3:
 - Bitwise: `./test_compiler /path/to/your_compiler --chapter 3 --stage bitwise`
+
+Chap 5:
+- Tacky: `./test_compiler /path/to/your_compiler --chapter 1 --stage tacky`
 
