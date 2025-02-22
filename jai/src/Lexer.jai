@@ -45,6 +45,8 @@ Token_Type :: enum {
     GREATER;
     GREATER_EQUAL;
     ASSIGN;
+
+    PLUS_EQUAL;
 }
 
 Token :: struct {
@@ -87,7 +89,13 @@ scan :: (using lexer: *Lexer) {
             case #char "}"; array_add(*tokens, .{.RCURLY,      "}", line});
             case #char ";"; array_add(*tokens, .{.SEMICOLON,   ";", line});
             case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
-            case #char "+"; array_add(*tokens, .{.PLUS,        "+", line});
+            case #char "+";
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.PLUS_EQUAL, "+=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.PLUS,        "+", line});
             case #char "*"; array_add(*tokens, .{.MULTIPLY,    "*", line});
             case #char "%"; array_add(*tokens, .{.MOD,         "%", line});
             case #char "&"; 

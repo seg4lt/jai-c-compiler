@@ -153,8 +153,6 @@ parse_decl_ast_node :: (parser: *Parser) -> *Decl_Ast_Node {
 // ??? Maybe using it as name space to make things more clearer
 Stmt :: struct {
 
-
-
 parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
     if peek(parser).type == .RETURN {
         return parse_return_stmt(parser);
@@ -179,6 +177,7 @@ parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
     stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
     return stmt;
 }
+
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
@@ -201,8 +200,9 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .GREATER_EQUAL; #through;
         case .LESS; #through;
         case .LESS_EQUAL; #through;
-        case .ASSIGN;
-        return true;
+        case .ASSIGN; #through;
+        case .PLUS_EQUAL;
+            return true;
 
         case; return false;
     }
@@ -238,14 +238,16 @@ precedence :: (tt: Token_Type) -> int {
 
         case .AND; return 10;
         case .OR; return 5;
-        case .ASSIGN; return 1;
+        case .ASSIGN; #through;
+        case .PLUS_EQUAL;
+            return 1;
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
 }
 
 Expr :: struct {
-     parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
+    parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
         left := parse_factor(parser);
         next_token := peek(parser);
       
@@ -255,6 +257,19 @@ Expr :: struct {
                 right := parse_expr(parser, precedence(next_token.type));
                 assignment := New(Expr_Ast_Node);
                 assignment.* = .{.ASSIGNMENT, .{assignment =.{left, right}}};
+                left = assignment;
+            } else if is_compound_assignment_operator(next_token.type) {
+                op := parse_binary_op(consume(parser).type);
+                right := parse_expr(parser, precedence(next_token.type));
+
+                left_clone := New(Expr_Ast_Node);
+                left_clone.* = left.*;
+
+                binary := New(Expr_Ast_Node);
+                binary.* = .{.BINARY, .{binary=.{op, left_clone, right}}};
+
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{.ASSIGNMENT, .{assignment =.{left, binary}}};
                 left = assignment;
             } else {
                 op := parse_binary_op(consume(parser).type);
@@ -266,6 +281,14 @@ Expr :: struct {
             next_token = peek(parser);
         }
         return left;
+    }
+
+    is_compound_assignment_operator:: (token_type: Token_Type) -> bool {
+        if token_type == {
+            case .PLUS_EQUAL;
+                return true;
+            case; return false;
+        }
     }
 
     parse_factor :: (parser: *Parser) -> *Expr_Ast_Node {
@@ -320,7 +343,8 @@ parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
 
 parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
     if tt == {
-        case .PLUS; return .ADD;
+        case .PLUS; #through;
+        case .PLUS_EQUAL; return .ADD;
         case .MINUS; return .SUB;
         case .MULTIPLY; return .MUL;
         case .DIVIDE; return .DIV;
