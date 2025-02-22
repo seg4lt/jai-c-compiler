@@ -51,6 +51,8 @@ Token_Type :: enum {
     MULTIPLY_EQUAL;
     DIVIDE_EQUAL;
     MOD_EQUAL;
+    LEFT_SHIFT_EQUAL;
+    RIGHT_SHIFT_EQUAL;
 }
 
 Token :: struct {
@@ -133,6 +135,13 @@ scan :: (using lexer: *Lexer) {
             case #char ">";
                 if peek(lexer) == #char ">" {
                     consume(lexer);
+
+                    if peek(lexer) == #char "=" {
+                        consume(lexer);
+                        array_add(*tokens, .{.RIGHT_SHIFT_EQUAL, ">>=", line});
+                        continue;
+                    }
+
                     array_add(*tokens, .{.RIGHT_SHIFT, ">>", line});
                     continue;
                 }
@@ -145,6 +154,11 @@ scan :: (using lexer: *Lexer) {
             case #char "<";
                 if peek(lexer) == #char "<" {
                     consume(lexer);
+                    if peek(lexer) == #char "=" {
+                        consume(lexer);
+                        array_add(*tokens, .{.LEFT_SHIFT_EQUAL, "<<=", line});
+                        continue;
+                    }
                     array_add(*tokens, .{.LEFT_SHIFT, "<<", line});
                     continue;
                 }
