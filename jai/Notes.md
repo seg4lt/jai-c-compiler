@@ -28,3 +28,8 @@ Chap 3:
 Chap 5:
 - Tacky: `./test_compiler /path/to/your_compiler --chapter 1 --stage tacky`
 
+- $ ./test_compiler /path/to/your_compiler --chapter 5 --extra-credit
+- $ ./test_compiler /path/to/your_compiler --chapter 5 --bitwise --compound --increment
+
+
+

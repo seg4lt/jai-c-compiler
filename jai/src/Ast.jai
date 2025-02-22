@@ -153,8 +153,6 @@ parse_decl_ast_node :: (parser: *Parser) -> *Decl_Ast_Node {
 // ??? Maybe using it as name space to make things more clearer
 Stmt :: struct {
 
-
-
 parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
     if peek(parser).type == .RETURN {
         return parse_return_stmt(parser);
@@ -179,6 +177,7 @@ parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
     stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
     return stmt;
 }
+
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
@@ -201,8 +200,18 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .GREATER_EQUAL; #through;
         case .LESS; #through;
         case .LESS_EQUAL; #through;
-        case .ASSIGN;
-        return true;
+        case .ASSIGN; #through;
+        case .BITWISE_AND_EQUAL; #through;
+        case .BITWISE_XOR_EQUAL; #through;
+        case .BITWISE_OR_EQUAL; #through;
+        case .LEFT_SHIFT_EQUAL; #through;
+        case .RIGHT_SHIFT_EQUAL; #through; 
+        case .PLUS_EQUAL; #through;
+        case .MINUS_EQUAL; #through;
+        case .MULTIPLY_EQUAL; #through;
+        case .DIVIDE_EQUAL; #through;
+        case .MOD_EQUAL;
+            return true;
 
         case; return false;
     }
@@ -238,14 +247,25 @@ precedence :: (tt: Token_Type) -> int {
 
         case .AND; return 10;
         case .OR; return 5;
-        case .ASSIGN; return 1;
+        case .ASSIGN; #through;
+        case .PLUS_EQUAL; #through;
+        case .MINUS_EQUAL; #through;
+        case .MULTIPLY_EQUAL; #through;
+        case .DIVIDE_EQUAL; #through;
+        case .LEFT_SHIFT_EQUAL; #through;
+        case .RIGHT_SHIFT_EQUAL; #through; 
+        case .BITWISE_AND_EQUAL; #through;
+        case .BITWISE_XOR_EQUAL; #through;
+        case .BITWISE_OR_EQUAL; #through; 
+        case .MOD_EQUAL;
+            return 1;
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
 }
 
 Expr :: struct {
-     parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
+    parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
         left := parse_factor(parser);
         next_token := peek(parser);
       
@@ -255,6 +275,21 @@ Expr :: struct {
                 right := parse_expr(parser, precedence(next_token.type));
                 assignment := New(Expr_Ast_Node);
                 assignment.* = .{.ASSIGNMENT, .{assignment =.{left, right}}};
+                left = assignment;
+            } else if is_compound_assignment_operator(next_token.type) {
+                op := parse_binary_op(consume(parser).type);
+                right := parse_expr(parser, precedence(next_token.type));
+
+                // cloning here because on sema phase we replace variable identifier
+                // if we use same pointer, it will look for updated name on our map which is wrong
+                left_clone := New(Expr_Ast_Node);
+                left_clone.* = left.*;
+
+                binary := New(Expr_Ast_Node);
+                binary.* = .{.BINARY, .{binary=.{op, left_clone, right}}};
+
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{.ASSIGNMENT, .{assignment =.{left, binary}}};
                 left = assignment;
             } else {
                 op := parse_binary_op(consume(parser).type);
@@ -266,6 +301,23 @@ Expr :: struct {
             next_token = peek(parser);
         }
         return left;
+    }
+
+    is_compound_assignment_operator:: (token_type: Token_Type) -> bool {
+        if token_type == {
+            case .PLUS_EQUAL; #through;
+            case .MINUS_EQUAL; #through;
+            case .MULTIPLY_EQUAL; #through;
+            case .DIVIDE_EQUAL; #through;
+            case .MOD_EQUAL; #through;
+            case .LEFT_SHIFT_EQUAL; #through;
+            case .RIGHT_SHIFT_EQUAL; #through;
+            case .BITWISE_AND_EQUAL; #through;
+            case .BITWISE_OR_EQUAL; #through;
+            case .BITWISE_XOR_EQUAL; 
+                return true;
+            case; return false;
+        }
     }
 
     parse_factor :: (parser: *Parser) -> *Expr_Ast_Node {
@@ -320,16 +372,34 @@ parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
 
 parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
     if tt == {
-        case .PLUS; return .ADD;
-        case .MINUS; return .SUB;
-        case .MULTIPLY; return .MUL;
-        case .DIVIDE; return .DIV;
-        case .MOD; return .MOD;
+        case .PLUS; #through;
+        case .PLUS_EQUAL; return .ADD;
 
+        case .MINUS; #through;
+        case .MINUS_EQUAL; return .SUB;
+
+        case .MULTIPLY; #through;
+        case .MULTIPLY_EQUAL; return .MUL;
+
+        case .DIVIDE; #through;
+        case .DIVIDE_EQUAL; return .DIV;
+
+        case .MOD; #through;
+        case .MOD_EQUAL; return .MOD;
+
+        case .LEFT_SHIFT_EQUAL; #through;
         case .LEFT_SHIFT; return .LEFT_SHIFT;
+
+        case .RIGHT_SHIFT_EQUAL; #through;
         case .RIGHT_SHIFT; return .RIGHT_SHIFT;
+
+        case .BITWISE_AND_EQUAL; #through;
         case .BITWISE_AND; return .BITWISE_AND;
+
+        case .BITWISE_OR_EQUAL; #through;
         case .BITWISE_OR; return .BITWISE_OR;
+
+        case .BITWISE_XOR_EQUAL; #through;
         case .BITWISE_XOR; return .BITWISE_XOR;
 
         case .NOT_EQUAL; return .NOT_EQUAL;
@@ -470,6 +540,10 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
                      | Less | LessOrEqual
                      | Greater | GreaterOrEqual
                      | Not | NotEqual
+                     | BitwiseAnd | BitwiseOr | BitwiseXor
+                     | BitwiseAndEqual | BitwiseOrEqual | BitwiseXorEqual
+                     | AddEqual | SubtractEqual | MultiplyEqual | DivideEqual | RemainderEqual
+
 
 */
 
@@ -486,6 +560,9 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <binop>           ::= "-" | "+" | "*" | "/" | "%" 
                     | "&&" | "||" | "==" | "!="
                     | ">" | ">=" | "<" | "<=" 
+                    | "+=" | "-=" | "/=" | "%=" | "*="
+                    | "&"  | "|" | "^"
+                    | "&=" | "|=" | "^=" 
 <identifier>      ::= ? An identifier token ?
 <int>             ::= ? A constant token ?
 */

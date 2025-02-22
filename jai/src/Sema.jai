@@ -62,7 +62,10 @@ sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(stri
             assignment := expr.as.assignment;
             // verify dst is valid lvalue
             if assignment.dst.type != .VAR {
-                assert(false, "expected variable (invalid lvalue) found: %", expr.as.assignment.dst);
+                print("\n-- DEBUG -- \n");
+                print_expr_ast(expr);
+                print("\n-- DEBUG -- \n");
+                assert(false, "expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
             }
             sema_var_resolution_expr(assignment.dst, table);
             sema_var_resolution_expr(assignment.src, table);

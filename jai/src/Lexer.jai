@@ -45,6 +45,17 @@ Token_Type :: enum {
     GREATER;
     GREATER_EQUAL;
     ASSIGN;
+
+    PLUS_EQUAL;
+    MINUS_EQUAL;
+    MULTIPLY_EQUAL;
+    DIVIDE_EQUAL;
+    MOD_EQUAL;
+    LEFT_SHIFT_EQUAL;
+    RIGHT_SHIFT_EQUAL;
+    BITWISE_AND_EQUAL;
+    BITWISE_OR_EQUAL;
+    BITWISE_XOR_EQUAL;
 }
 
 Token :: struct {
@@ -87,13 +98,35 @@ scan :: (using lexer: *Lexer) {
             case #char "}"; array_add(*tokens, .{.RCURLY,      "}", line});
             case #char ";"; array_add(*tokens, .{.SEMICOLON,   ";", line});
             case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
-            case #char "+"; array_add(*tokens, .{.PLUS,        "+", line});
-            case #char "*"; array_add(*tokens, .{.MULTIPLY,    "*", line});
-            case #char "%"; array_add(*tokens, .{.MOD,         "%", line});
+            case #char "+"; if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.PLUS_EQUAL, "+=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.PLUS,        "+", line});
+            case #char "*"; 
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.MULTIPLY_EQUAL, "*=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.MULTIPLY, "*", line});
+            case #char "%"; 
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.MOD_EQUAL, "%=", line});
+                    continue;
+                }
+                array_add(*tokens, .{.MOD,"%", line});
             case #char "&"; 
                 if peek(lexer) == #char "&" {
                     consume(lexer);
                     array_add(*tokens, .{.AND, "&&", line});
+                    continue;
+                }
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_AND_EQUAL, "&=", line});
                     continue;
                 }
                 array_add(*tokens, .{.BITWISE_AND, "&", line});
@@ -103,12 +136,29 @@ scan :: (using lexer: *Lexer) {
                     array_add(*tokens, .{.OR, "&&", line});
                     continue;
                 }
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_OR_EQUAL, "|=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.BITWISE_OR, "|", line});
             case #char "^"; 
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_XOR_EQUAL, "^=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.BITWISE_XOR, "^", line});
             case #char ">";
                 if peek(lexer) == #char ">" {
                     consume(lexer);
+
+                    if peek(lexer) == #char "=" {
+                        consume(lexer);
+                        array_add(*tokens, .{.RIGHT_SHIFT_EQUAL, ">>=", line});
+                        continue;
+                    }
+
                     array_add(*tokens, .{.RIGHT_SHIFT, ">>", line});
                     continue;
                 }
@@ -121,6 +171,11 @@ scan :: (using lexer: *Lexer) {
             case #char "<";
                 if peek(lexer) == #char "<" {
                     consume(lexer);
+                    if peek(lexer) == #char "=" {
+                        consume(lexer);
+                        array_add(*tokens, .{.LEFT_SHIFT_EQUAL, "<<=", line});
+                        continue;
+                    }
                     array_add(*tokens, .{.LEFT_SHIFT, "<<", line});
                     continue;
                 }
@@ -135,8 +190,18 @@ scan :: (using lexer: *Lexer) {
                     comment(lexer);
                     continue;
                 }
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.DIVIDE_EQUAL, "/=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.DIVIDE, "+", line});
             case #char "-"; 
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.MINUS_EQUAL, "-=", line});
+                    continue;
+                }
                 if peek(lexer) == #char "-" {
                     assert(false, "infix -- is not supported yet");
                     consume(lexer);
