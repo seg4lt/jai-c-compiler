@@ -10,6 +10,8 @@ out/
 .build/
 *.symlink
 
+modules # symlinking moduels directory locally for faster search
+
 #
 !*.c
 !Makefile
