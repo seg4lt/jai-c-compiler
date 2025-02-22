@@ -20,3 +20,6 @@ Chap 2:
 Chap 3:
 - Bitwise: `./test_compiler /path/to/your_compiler --chapter 3 --stage bitwise`
 
+Chap 5:
+- Tacky: `./test_compiler /path/to/your_compiler --chapter 1 --stage tacky`
+

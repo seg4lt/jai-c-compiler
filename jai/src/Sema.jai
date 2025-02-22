@@ -44,7 +44,7 @@ sema_var_resolution_decl:: (decl: *Decl_Ast_Node, table: *Hash_Table.Table(strin
 
 sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(string, string)) {
     if #complete expr.type == {
-        case .CONSTANT;
+        case .CONSTANT; // noop
         case .UNARY; 
             sema_var_resolution_expr(expr.as.unary.expr, table);
         case .BINARY;
