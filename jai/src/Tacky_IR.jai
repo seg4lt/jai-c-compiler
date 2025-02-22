@@ -83,9 +83,25 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
             case .STMT;
                 gen_instructions(tc, *instructions, it.as.stmt);
             case .DECL;
-                assert(false, "not implemented");
+                if (it.as.decl.init == null) {
+                    // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
+                    continue;
+                }
+                result := gen_instructions(tc, *instructions, it.as.decl.init);
+                dst := Val_Tacky.{.VARIABLE, .{ variable = it.as.decl.ident}};
+                array_add(*instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
         }
     }
+
+    has_return := false;
+    for instructions  {
+        if (it.type == .RETURN) { 
+            has_return = true; 
+            break;
+        }
+    }
+    if !has_return array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
+
     return .{ fn_ast.ident, instructions };
 }
 
@@ -94,8 +110,10 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
-        case .NULL; #through;
-        case .EXPR; assert(false, "not implemented");
+        case .EXPR;
+            gen_instructions(tc, instructions, stmt_ast.as.expr);
+        case .NULL;
+                // pass through - nothing to do when null stmt is received
     }
 }
 
@@ -131,11 +149,16 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             return gen_instructions(tc, instructions, expr_ast.as.group);
         case .CONSTANT;
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
-        case .VAR; #through;
+        case .VAR;
+            return .{.VARIABLE, .{variable = expr_ast.as.var}};
         case .ASSIGNMENT; 
-            assert(false, "not implemented");
-            // unreachable
-            return .{.CONSTANT, .{constant = expr_ast.as.constant}};
+            result := gen_instructions(tc, instructions, expr_ast.as.assignment.src);
+
+            if expr_ast.as.assignment.dst.type != .VAR assert(false, "What!! dst has to be variable. sema didn't catch this!!! : %", expr_ast.as.assignment.dst);
+
+            dst := Val_Tacky.{.VARIABLE, .{ variable = expr_ast.as.assignment.dst.as.var}};
+            array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+            return dst;
     }
 }
 

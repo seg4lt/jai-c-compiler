@@ -1,12 +1,13 @@
 Cli_Args :: struct {
     source_file_path: string;
     source_file_path_without_ext: string;
-    flags: Cli_Args_Flags = .LEX | .PARSE | .TACKY | .CODE_GEN | .ALL;
+    flags: Cli_Args_Flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
 }
 
 Cli_Args_Flags :: enum_flags {
     LEX;
     PARSE;
+    SEMA;
     TACKY;
     CODE_GEN;
     ALL;
@@ -20,10 +21,11 @@ get_cli_args :: () -> Cli_Args {
 
     for args {
         if it == {
-            case "--lex"; flags &= ~(.PARSE | .CODE_GEN | .TACKY | .ALL);
-            case "--parse"; flags &= ~(.TACKY | .CODE_GEN | .ALL);
-            case "--tacky"; flags &= ~(.CODE_GEN | .ALL);
-            case "--code-gen"; flags &= ~.ALL;
+            case "--lex";          flags &= ~(.PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL);
+            case "--parse";        flags &= ~(         .SEMA | .TACKY | .CODE_GEN | .ALL);
+            case "--validate";     flags &= ~(                 .TACKY | .CODE_GEN | .ALL);
+            case "--tacky";        flags &= ~(                          .CODE_GEN | .ALL);
+            case "--code-gen";     flags &= ~                                       .ALL;
             case; source_file_path = it;
         }
     }

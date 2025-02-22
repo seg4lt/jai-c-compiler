@@ -39,7 +39,7 @@ Expr_Ast_Node :: struct {
         unary: struct { op: enum {BITWISE_NOT; NEGATE; NOT;}; expr: *Expr_Ast_Node; };
         binary: struct { op: Bin_Op_Ast; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
-        var: string;
+        var: string; // this is when we use a variable
         assignment: struct { dst: *Expr_Ast_Node; src: *Expr_Ast_Node;};
     };
 }
