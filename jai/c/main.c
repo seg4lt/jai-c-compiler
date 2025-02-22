@@ -1,5 +1,5 @@
 int main(void) {
-    int x = 1;
-    x += 5;
+    int x = 11;
+    x %= 2;
     return x;
 }

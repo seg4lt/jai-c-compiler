@@ -201,7 +201,11 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .LESS; #through;
         case .LESS_EQUAL; #through;
         case .ASSIGN; #through;
-        case .PLUS_EQUAL;
+        case .PLUS_EQUAL; #through;
+        case .MINUS_EQUAL; #through;
+        case .MULTIPLY_EQUAL; #through;
+        case .DIVIDE_EQUAL; #through;
+        case .MOD_EQUAL;
             return true;
 
         case; return false;
@@ -239,7 +243,11 @@ precedence :: (tt: Token_Type) -> int {
         case .AND; return 10;
         case .OR; return 5;
         case .ASSIGN; #through;
-        case .PLUS_EQUAL;
+        case .PLUS_EQUAL; #through;
+        case .MINUS_EQUAL; #through;
+        case .MULTIPLY_EQUAL; #through;
+        case .DIVIDE_EQUAL; #through;
+        case .MOD_EQUAL;
             return 1;
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
@@ -262,6 +270,8 @@ Expr :: struct {
                 op := parse_binary_op(consume(parser).type);
                 right := parse_expr(parser, precedence(next_token.type));
 
+                // cloning here because on sema phase we replace variable identifier
+                // if we use same pointer, it will look for updated name on our map which is wrong
                 left_clone := New(Expr_Ast_Node);
                 left_clone.* = left.*;
 
@@ -345,10 +355,18 @@ parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
     if tt == {
         case .PLUS; #through;
         case .PLUS_EQUAL; return .ADD;
-        case .MINUS; return .SUB;
-        case .MULTIPLY; return .MUL;
-        case .DIVIDE; return .DIV;
-        case .MOD; return .MOD;
+
+        case .MINUS; #through;
+        case .MINUS_EQUAL; return .SUB;
+
+        case .MULTIPLY; #through;
+        case .MULTIPLY_EQUAL; return .MUL;
+
+        case .DIVIDE; #through;
+        case .DIVIDE_EQUAL; return .DIV;
+
+        case .MOD; #through;
+        case .MOD_EQUAL; return .MOD;
 
         case .LEFT_SHIFT; return .LEFT_SHIFT;
         case .RIGHT_SHIFT; return .RIGHT_SHIFT;
