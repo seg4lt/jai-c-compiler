@@ -540,6 +540,10 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
                      | Less | LessOrEqual
                      | Greater | GreaterOrEqual
                      | Not | NotEqual
+                     | BitwiseAnd | BitwiseOr | BitwiseXor
+                     | BitwiseAndEqual | BitwiseOrEqual | BitwiseXorEqual
+                     | AddEqual | SubtractEqual | MultiplyEqual | DivideEqual | RemainderEqual
+
 
 */
 
@@ -556,6 +560,9 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <binop>           ::= "-" | "+" | "*" | "/" | "%" 
                     | "&&" | "||" | "==" | "!="
                     | ">" | ">=" | "<" | "<=" 
+                    | "+=" | "-=" | "/=" | "%=" | "*="
+                    | "&"  | "|" | "^"
+                    | "&=" | "|=" | "^=" 
 <identifier>      ::= ? An identifier token ?
 <int>             ::= ? A constant token ?
 */
