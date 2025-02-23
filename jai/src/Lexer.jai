@@ -53,6 +53,9 @@ Token_Type :: enum {
     MOD_EQUAL;
     LEFT_SHIFT_EQUAL;
     RIGHT_SHIFT_EQUAL;
+    BITWISE_AND_EQUAL;
+    BITWISE_OR_EQUAL;
+    BITWISE_XOR_EQUAL;
 }
 
 Token :: struct {
@@ -95,8 +98,7 @@ scan :: (using lexer: *Lexer) {
             case #char "}"; array_add(*tokens, .{.RCURLY,      "}", line});
             case #char ";"; array_add(*tokens, .{.SEMICOLON,   ";", line});
             case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
-            case #char "+";
-                if peek(lexer) == #char "=" {
+            case #char "+"; if peek(lexer) == #char "=" {
                     consume(lexer);
                     array_add(*tokens, .{.PLUS_EQUAL, "+=", line});
                     continue;
@@ -122,6 +124,11 @@ scan :: (using lexer: *Lexer) {
                     array_add(*tokens, .{.AND, "&&", line});
                     continue;
                 }
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_AND_EQUAL, "&=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.BITWISE_AND, "&", line});
             case #char "|"; 
                 if peek(lexer) == #char "|" {
@@ -129,8 +136,18 @@ scan :: (using lexer: *Lexer) {
                     array_add(*tokens, .{.OR, "&&", line});
                     continue;
                 }
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_OR_EQUAL, "|=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.BITWISE_OR, "|", line});
             case #char "^"; 
+                if peek(lexer) == #char "=" {
+                    consume(lexer);
+                    array_add(*tokens, .{.BITWISE_XOR_EQUAL, "^=", line});
+                    continue;
+                }
                 array_add(*tokens, .{.BITWISE_XOR, "^", line});
             case #char ">";
                 if peek(lexer) == #char ">" {

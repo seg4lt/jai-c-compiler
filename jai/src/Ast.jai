@@ -201,6 +201,9 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .LESS; #through;
         case .LESS_EQUAL; #through;
         case .ASSIGN; #through;
+        case .BITWISE_AND_EQUAL; #through;
+        case .BITWISE_XOR_EQUAL; #through;
+        case .BITWISE_OR_EQUAL; #through;
         case .LEFT_SHIFT_EQUAL; #through;
         case .RIGHT_SHIFT_EQUAL; #through; 
         case .PLUS_EQUAL; #through;
@@ -251,6 +254,9 @@ precedence :: (tt: Token_Type) -> int {
         case .DIVIDE_EQUAL; #through;
         case .LEFT_SHIFT_EQUAL; #through;
         case .RIGHT_SHIFT_EQUAL; #through; 
+        case .BITWISE_AND_EQUAL; #through;
+        case .BITWISE_XOR_EQUAL; #through;
+        case .BITWISE_OR_EQUAL; #through; 
         case .MOD_EQUAL;
             return 1;
     }
@@ -299,7 +305,16 @@ Expr :: struct {
 
     is_compound_assignment_operator:: (token_type: Token_Type) -> bool {
         if token_type == {
-            case .PLUS_EQUAL;
+            case .PLUS_EQUAL; #through;
+            case .MINUS_EQUAL; #through;
+            case .MULTIPLY_EQUAL; #through;
+            case .DIVIDE_EQUAL; #through;
+            case .MOD_EQUAL; #through;
+            case .LEFT_SHIFT_EQUAL; #through;
+            case .RIGHT_SHIFT_EQUAL; #through;
+            case .BITWISE_AND_EQUAL; #through;
+            case .BITWISE_OR_EQUAL; #through;
+            case .BITWISE_XOR_EQUAL; 
                 return true;
             case; return false;
         }
@@ -378,8 +393,13 @@ parse_binary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
         case .RIGHT_SHIFT_EQUAL; #through;
         case .RIGHT_SHIFT; return .RIGHT_SHIFT;
 
+        case .BITWISE_AND_EQUAL; #through;
         case .BITWISE_AND; return .BITWISE_AND;
+
+        case .BITWISE_OR_EQUAL; #through;
         case .BITWISE_OR; return .BITWISE_OR;
+
+        case .BITWISE_XOR_EQUAL; #through;
         case .BITWISE_XOR; return .BITWISE_XOR;
 
         case .NOT_EQUAL; return .NOT_EQUAL;
