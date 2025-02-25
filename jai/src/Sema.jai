@@ -38,8 +38,8 @@ sema_var_resolution_decl:: (decl: *Decl_Ast_Node, table: *Hash_Table.Table(strin
     new_ident := make_variable(decl.ident, table.count);
     Hash_Table.table_set(table, decl.ident, new_ident);
 
-    decl.ident = new_ident;
-    if decl.init sema_var_resolution_expr(decl.init, table);
+    ifx decl.init sema_var_resolution_expr(decl.init, table);
+    decl.* = .{ new_ident, decl.init};
 }
 
 sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(string, string)) {
@@ -61,13 +61,15 @@ sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(stri
         case .ASSIGNMENT;
             assignment := expr.as.assignment;
             // verify dst is valid lvalue
-            if assignment.dst.type != .VAR {
+
+            if !(assignment.dst.type == .VAR || (assignment.dst.type == .GROUP && assignment.dst.as.group.type == .VAR)) {
                 print("\n-- DEBUG -- \n");
                 print_expr_ast(expr);
                 print("\n-- DEBUG -- \n");
                 assert(false, "expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
             }
-            sema_var_resolution_expr(assignment.dst, table);
+            dst := ifx assignment.dst.type == .VAR then assignment.dst else assignment.dst.as.group;
+            sema_var_resolution_expr(dst, table);
             sema_var_resolution_expr(assignment.src, table);
     }
 }
