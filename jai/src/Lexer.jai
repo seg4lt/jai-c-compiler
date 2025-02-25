@@ -34,7 +34,6 @@ Token_Type :: enum {
     DIVIDE;
     MULTIPLY;
     MOD;
-    UNARY_MINUS;
     NOT;
     AND;
     OR;
@@ -56,6 +55,9 @@ Token_Type :: enum {
     BITWISE_AND_EQUAL;
     BITWISE_OR_EQUAL;
     BITWISE_XOR_EQUAL;
+
+    MINUS_MINUS;
+    PLUS_PLUS;
 }
 
 Token :: struct {
@@ -98,9 +100,15 @@ scan :: (using lexer: *Lexer) {
             case #char "}"; array_add(*tokens, .{.RCURLY,      "}", line});
             case #char ";"; array_add(*tokens, .{.SEMICOLON,   ";", line});
             case #char "~"; array_add(*tokens, .{.BITWISE_NOT, "~", line});
-            case #char "+"; if peek(lexer) == #char "=" {
+            case #char "+"; 
+                if peek(lexer) == #char "=" {
                     consume(lexer);
                     array_add(*tokens, .{.PLUS_EQUAL, "+=", line});
+                    continue;
+                }
+                if peek(lexer) == #char "+" {
+                    consume(lexer);
+                    array_add(*tokens, .{.PLUS_PLUS, "++", line});
                     continue;
                 }
                 array_add(*tokens, .{.PLUS,        "+", line});
@@ -203,9 +211,8 @@ scan :: (using lexer: *Lexer) {
                     continue;
                 }
                 if peek(lexer) == #char "-" {
-                    assert(false, "infix -- is not supported yet");
                     consume(lexer);
-                    array_add(*tokens, .{.UNARY_MINUS, "--", line});
+                    array_add(*tokens, .{.MINUS_MINUS, "--", line});
                     continue;
                 }
                 array_add(*tokens, .{.MINUS, "-", line});

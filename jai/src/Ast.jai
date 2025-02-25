@@ -18,12 +18,10 @@ Block_Item_Ast_Node :: struct {
         decl: *Decl_Ast_Node;
     };
 }
-
 Decl_Ast_Node :: struct {
     ident: string;
     init: *Expr_Ast_Node; // optional
 }
-
 Stmt_Ast_Node :: struct {
     type: enum { RETURN; EXPR; NULL;};
     as: union {
@@ -40,28 +38,17 @@ Expr_Ast_Node :: struct {
         binary: struct { op: Bin_Op_Ast; left: *Expr_Ast_Node; right: *Expr_Ast_Node;};
         group: *Expr_Ast_Node;
         var: string; // this is when we use a variable
-        assignment: struct { dst: *Expr_Ast_Node; src: *Expr_Ast_Node;};
+        assignment: struct { dst: *Expr_Ast_Node; src: *Expr_Ast_Node; };
     };
 }
 Bin_Op_Ast :: enum {
-    ADD;
-    SUB;
-    MUL;
-    DIV;
-    MOD;
-    BITWISE_AND;
-    BITWISE_OR;
-    BITWISE_XOR;
-    LEFT_SHIFT;
-    RIGHT_SHIFT;
-    AND;
-    OR;
-    NOT_EQUAL;
-    EQUAL_EQUAL;
-    GREATER;
-    GREATER_EQUAL;
-    LESS;
-    LESS_EQUAL;
+    ADD; SUB; MUL; DIV; MOD;
+    BITWISE_AND; BITWISE_OR; BITWISE_XOR;
+    LEFT_SHIFT; RIGHT_SHIFT;
+    AND; OR;
+    NOT_EQUAL; EQUAL_EQUAL;
+    GREATER; GREATER_EQUAL;
+    LESS; LESS_EQUAL;
 };
 
 ast_parse :: (lexer: *Lexer) -> *Program_Ast_Node {
@@ -92,8 +79,20 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
     body: [..]Block_Item_Ast_Node;
 
     while peek(parser).type != .RCURLY {
-        b_item := Block_Item.parse_block_item(parser);
+        side_effects : [..]*Expr_Ast_Node;
+
+        b_item := Block_Item.parse_block_item(parser, *side_effects);
         array_add(*body, b_item);
+
+        if side_effects.count > 0 {
+            for side_effects  {
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.EXPR, .{ expr = it }};
+                item: Block_Item_Ast_Node = .{ .STMT, .{stmt = stmt}};
+                array_add(*body, item);
+            }
+        } 
+
     }
     consume(parser, .RCURLY);
     fn := New(Fn_Ast_Node);
@@ -103,81 +102,249 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
 
 Block_Item :: struct {
 
-parse_block_item :: (parser: *Parser) -> *Block_Item_Ast_Node {
-    cp := peek(parser);
-    cp_type := cp.type;
-    if peek(parser).type == .INT {
-        decl := Decl.parse_decl_ast_node(parser);
-        bi := New(Block_Item_Ast_Node);
-        bi.* = .{.DECL, .{decl = decl}};
-        return bi;
+    parse_block_item :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Block_Item_Ast_Node {
+        cp := peek(parser);
+        cp_type := cp.type;
+        if peek(parser).type == .INT {
+            decl := Decl.parse_decl_ast_node(parser, side_effects);
+            bi := New(Block_Item_Ast_Node);
+            bi.* = .{.DECL, .{decl = decl}};
+            return bi;
+        }
+        if peek(parser).type == .SEMICOLON {
+            consume(parser);
+            bi := New(Block_Item_Ast_Node);
+            null_stmt := New(Stmt_Ast_Node);
+            null_stmt.* = .{.NULL, .{}};
+            bi.* = .{.STMT, .{stmt = null_stmt}};
+            return bi;
+        }
+        stmt := Stmt.parse_stmt_ast_node(parser, side_effects);
+        block := New(Block_Item_Ast_Node);
+        block.* = .{.STMT, .{stmt = stmt}};
+        return block;
     }
-    if peek(parser).type == .SEMICOLON {
-        consume(parser);
-        bi := New(Block_Item_Ast_Node);
-        null_stmt := New(Stmt_Ast_Node);
-        null_stmt.* = .{.NULL, .{}};
-        bi.* = .{.STMT, .{stmt = null_stmt}};
-        return bi;
-    }
-    return_stmt := Stmt.parse_stmt_ast_node(parser);
-    block := New(Block_Item_Ast_Node);
-    block.* = .{.STMT, .{stmt = return_stmt}};
-    return block;
-}
 
 }
 
 Decl :: struct {
-parse_decl_ast_node :: (parser: *Parser) -> *Decl_Ast_Node {
-    if peek(parser).type == .INT {
-        consume(parser, .INT);
-        ident := consume(parser).value;
-        if String.is_digit(ident.data.*) assert(false, "identifier should not start with digit");
+    parse_decl_ast_node :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Decl_Ast_Node {
+        if peek(parser).type == .INT {
+            consume(parser, .INT);
+            ident := consume(parser).value;
+            if String.is_digit(ident.data.*) assert(false, "identifier should not start with digit");
 
-        expr := ifx peek(parser).type == .ASSIGN {
-            consume(parser);
-            expr := Expr.parse_expr(parser, 0);
-            expr;
-        } else null;
-        consume(parser, .SEMICOLON);
-        decl :=  New(Decl_Ast_Node);
-        decl.* = .{ident, expr};
-        return decl;
+            expr := ifx peek(parser).type == .ASSIGN {
+                consume(parser);
+                expr := Expr.parse_expr(parser, 0, side_effects);
+                expr;
+            } else null;
+            parse_postfix_expr_ast(parser, expr, side_effects);
+            consume(parser, .SEMICOLON);
+            decl :=  New(Decl_Ast_Node);
+            decl.* = .{ident, expr};
+            return decl;
+        }
+        assert(false, "not implemented");
+        return null;
     }
-    assert(false, "not implemented");
-    return null;
-}
 }
 
-// ??? Maybe using it as name space to make things more clearer
 Stmt :: struct {
 
-parse_stmt_ast_node :: (parser: *Parser) -> *Stmt_Ast_Node {
-    if peek(parser).type == .RETURN {
-        return parse_return_stmt(parser);
-    }
-    if peek(parser).type == .SEMICOLON {
+    parse_stmt_ast_node :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Stmt_Ast_Node {
+        if peek(parser).type == .RETURN {
+            return parse_return_stmt(parser);
+        }
+        if peek(parser).type == .SEMICOLON {
+            stmt := New(Stmt_Ast_Node);
+            stmt.* = .{.NULL, .{}};
+            return stmt;
+        }
+        expr := Expr.parse_expr(parser, 0, side_effects);
+        consume(parser, .SEMICOLON);
         stmt := New(Stmt_Ast_Node);
-        stmt.* = .{.NULL, .{}};
+        stmt.* = .{.EXPR, .{expr = expr}};
         return stmt;
     }
-    expr := Expr.parse_expr(parser, 0);
-    consume(parser, .SEMICOLON);
-    stmt := New(Stmt_Ast_Node);
-    stmt.* = .{.EXPR, .{expr = expr}};
-    return stmt;
+
+    parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
+        consume(parser, .RETURN);
+        expr := Expr.parse_expr(parser, 0, null);
+        consume(parser, .SEMICOLON);
+        stmt := New(Stmt_Ast_Node);
+        stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
+        return stmt;
+    }
+
 }
 
-parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
-    consume(parser, .RETURN);
-    expr := Expr.parse_expr(parser, 0);
-    consume(parser, .SEMICOLON);
-    stmt := New(Stmt_Ast_Node);
-    stmt.* = .{type = .RETURN, as = .{return_stmt =  .{expr = expr}}};
-    return stmt;
+Expr :: struct {
+    parse_expr :: (parser: *Parser, min_prec: int, side_effects: *[..]*Expr_Ast_Node )  -> *Expr_Ast_Node {
+        left := parse_factor(parser, side_effects);
+        next_token := peek(parser);
+      
+        while is_binary_operator(next_token.type) && precedence(next_token.type) >= min_prec {
+            if next_token.type == .ASSIGN {
+                consume(parser);
+                right := parse_expr(parser, precedence(next_token.type), side_effects);
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{ .ASSIGNMENT, .{ assignment = .{ left, right}}};
+                left = assignment;
+            } else if is_compound_assignment_operator(next_token.type) {
+                op := parse_binary_op(consume(parser).type);
+                right := parse_expr(parser, precedence(next_token.type), side_effects);
+
+                // cloning here because on sema phase we replace variable identifier
+                // if we use same pointer, it will look for updated name on our map which is wrong
+                left_clone := New(Expr_Ast_Node);
+                left_clone.* = left.*;
+
+                binary := New(Expr_Ast_Node);
+                binary.* = .{ .BINARY, .{ binary =.{ op, left_clone, right }}};
+ 
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{ .ASSIGNMENT, .{ assignment = .{ left, binary }}};
+                left = assignment;
+            } else {
+                op := parse_binary_op(consume(parser).type);
+                right := parse_expr(parser, precedence(next_token.type) + 1, side_effects);
+                binary := New(Expr_Ast_Node);
+                binary.* = .{ .BINARY, .{ binary = .{ op, left, right }}};
+                left = binary;
+            }
+            next_token = peek(parser);
+        }
+        return left;
+    }
+
+    parse_factor :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Expr_Ast_Node {
+        if peek(parser).*.type ==  {
+            case .INT_LITERAL;
+                int_literal := consume(parser, .INT_LITERAL);
+                int_value, success := string_to_int(int_literal.value);
+                if !success {
+                    assert(false, "Expected int found %", int_literal.value);
+                    return null; // unreachable
+                }
+                expr := New(Expr_Ast_Node);
+                expr.* = .{ type = .CONSTANT, as = .{ constant = int_value }};
+                return expr;
+            case .MINUS; #through;
+            case .NOT; #through;
+            case .BITWISE_NOT;
+                op := parse_unary_op(consume(parser).type);
+                inner_expr := parse_factor(parser, side_effects);
+                expr := New(Expr_Ast_Node);
+                expr.* = .{ .UNARY, .{ unary = .{ op, inner_expr }}};
+                return expr;
+            case .MINUS_MINUS; #through;
+            case .PLUS_PLUS;
+                postfix_op_token := consume(parser);
+                ident_expr := parse_factor(parser, null); // null this is already prefix operator
+                if !(ident_expr.type == .VAR || (ident_expr.type == .GROUP && ident_expr.as.group.type == .VAR)) {
+                    assert(false, "expected var identifier");
+                }
+                ident := ifx ident_expr.type == .VAR ident_expr.as.var else ident_expr.as.group.as.var;
+
+                var := New(Expr_Ast_Node);
+                var.* = .{ .VAR, .{ var = ident }};
+
+                one := New(Expr_Ast_Node);
+                one.* = .{ .CONSTANT, .{ constant = 1 }};
+
+                op := parse_binary_op_from_postfix(postfix_op_token.type); 
+                binary := New(Expr_Ast_Node);
+                binary.* = .{ .BINARY, .{ binary = .{ op, var, one }}};
+
+                assignment_dst := New(Expr_Ast_Node);
+                assignment_dst.* = var.*;
+
+                assignment := New(Expr_Ast_Node);
+                assignment.* = .{ .ASSIGNMENT, .{ assignment = .{ assignment_dst, binary }}};
+                return assignment;
+            case .LPAREN;
+                consume(parser, .LPAREN);
+                inner_expr := parse_expr(parser, 0, side_effects); // grp resets precedence level for its internal expr
+                expr := New(Expr_Ast_Node);
+                expr.* = .{ type = .GROUP , as = .{ group = inner_expr }};
+                consume(parser, .RPAREN);
+                parse_postfix_expr_ast(parser, expr, side_effects);
+                return expr;
+            case .IDENT;
+                ident := consume(parser);
+                var_expr := New(Expr_Ast_Node);
+                var_expr.* = .{ type = .VAR , as = .{ var = ident.value }};
+
+                parse_postfix_expr_ast(parser, var_expr, side_effects);
+
+                return var_expr;
+            case;
+                assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
+                return null; // unreachable
+        }
+    }
 }
 
+parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast_Node, side_effects: *[..]*Expr_Ast_Node) {
+    if peek(parser).type != .MINUS_MINUS && peek(parser).type != .PLUS_PLUS {
+        return;
+    }
+
+    if (side_effects == null) {
+        assert(false, "postfix operator has a side-effect, but I received null");
+    }
+
+    // TODO: this doesn't handle if we have multiple groups so probably need to find different way to solve this later
+    var_expr := ifx expr.type == .GROUP expr.as.group else expr;
+
+    postfix_op_token := consume(parser);
+    op := parse_binary_op_from_postfix(postfix_op_token.type); 
+
+    assignment_dst := New(Expr_Ast_Node);
+    assignment_dst.* = var_expr.*; 
+
+    bin_op_dst := New(Expr_Ast_Node);
+    bin_op_dst.* = var_expr.*; 
+
+    one := New(Expr_Ast_Node);
+    one.* = .{ .CONSTANT, .{ constant = 1 }};
+    binary := New(Expr_Ast_Node);
+    binary.* = .{ .BINARY, .{ binary = .{ op, bin_op_dst, one }}};
+
+    assignment_expr := New(Expr_Ast_Node);
+    assignment_expr.* = .{ .ASSIGNMENT, .{ assignment = .{ assignment_dst, binary }}}; 
+
+
+    array_add(side_effects, assignment_expr);
+    // return true, assignment_expr; 
+}
+
+is_compound_assignment_operator :: (token_type: Token_Type) -> bool {
+    if token_type == {
+        case .PLUS_EQUAL; #through;
+        case .MINUS_EQUAL; #through;
+        case .MULTIPLY_EQUAL; #through;
+        case .DIVIDE_EQUAL; #through;
+        case .MOD_EQUAL; #through;
+        case .LEFT_SHIFT_EQUAL; #through;
+        case .RIGHT_SHIFT_EQUAL; #through;
+        case .BITWISE_AND_EQUAL; #through;
+        case .BITWISE_OR_EQUAL; #through;
+        case .BITWISE_XOR_EQUAL; 
+            return true;
+        case; return false;
+    }
+}
+
+parse_binary_op_from_postfix :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.binary.op) {
+    if tt == {
+        case .PLUS_PLUS; return .ADD;
+        case .MINUS_MINUS; return .SUB;
+        case; assert(false, "Wanted postfix unary operator found %", tt);
+    }
+    assert(false, "Wanted postfix unary operator found %", tt);
+    return .ADD; // unreachable
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
@@ -262,101 +429,6 @@ precedence :: (tt: Token_Type) -> int {
     }
     assert(false, "precendence calc for any other token is currently not supported: %", tt);
     return 0; // unreachable
-}
-
-Expr :: struct {
-    parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
-        left := parse_factor(parser);
-        next_token := peek(parser);
-      
-        while is_binary_operator(next_token.type) && precedence(next_token.type) >= min_prec {
-            if next_token.type == .ASSIGN {
-                consume(parser);
-                right := parse_expr(parser, precedence(next_token.type));
-                assignment := New(Expr_Ast_Node);
-                assignment.* = .{.ASSIGNMENT, .{assignment =.{left, right}}};
-                left = assignment;
-            } else if is_compound_assignment_operator(next_token.type) {
-                op := parse_binary_op(consume(parser).type);
-                right := parse_expr(parser, precedence(next_token.type));
-
-                // cloning here because on sema phase we replace variable identifier
-                // if we use same pointer, it will look for updated name on our map which is wrong
-                left_clone := New(Expr_Ast_Node);
-                left_clone.* = left.*;
-
-                binary := New(Expr_Ast_Node);
-                binary.* = .{.BINARY, .{binary=.{op, left_clone, right}}};
-
-                assignment := New(Expr_Ast_Node);
-                assignment.* = .{.ASSIGNMENT, .{assignment =.{left, binary}}};
-                left = assignment;
-            } else {
-                op := parse_binary_op(consume(parser).type);
-                right := parse_expr(parser, precedence(next_token.type) + 1);
-                binary := New(Expr_Ast_Node);
-                binary.* = .{.BINARY, .{binary=.{op,left,right}}};
-                left = binary;
-            }
-            next_token = peek(parser);
-        }
-        return left;
-    }
-
-    is_compound_assignment_operator:: (token_type: Token_Type) -> bool {
-        if token_type == {
-            case .PLUS_EQUAL; #through;
-            case .MINUS_EQUAL; #through;
-            case .MULTIPLY_EQUAL; #through;
-            case .DIVIDE_EQUAL; #through;
-            case .MOD_EQUAL; #through;
-            case .LEFT_SHIFT_EQUAL; #through;
-            case .RIGHT_SHIFT_EQUAL; #through;
-            case .BITWISE_AND_EQUAL; #through;
-            case .BITWISE_OR_EQUAL; #through;
-            case .BITWISE_XOR_EQUAL; 
-                return true;
-            case; return false;
-        }
-    }
-
-    parse_factor :: (parser: *Parser) -> *Expr_Ast_Node {
-        if peek(parser).*.type ==  {
-            case .INT_LITERAL;
-                int_literal := consume(parser, .INT_LITERAL);
-                int_value, success := string_to_int(int_literal.value);
-                if !success {
-                    assert(false, "Expected int found %", int_literal.value);
-                    return null; // unreachable
-                }
-                expr := New(Expr_Ast_Node);
-                expr.* = .{ type = .CONSTANT, as = .{ constant = int_value }};
-                return expr;
-            case .MINUS; #through;
-            case .NOT; #through;
-            case .BITWISE_NOT;
-                op := parse_unary_op(consume(parser).type);
-                inner_expr := parse_factor(parser);
-                expr := New(Expr_Ast_Node);
-                expr.* = .{.UNARY,.{unary=.{op,inner_expr}}};
-                return expr;
-            case .LPAREN;
-                consume(parser, .LPAREN);
-                inner_expr := parse_expr(parser, 0); // grp resets precedence level for its internal expr
-                expr := New(Expr_Ast_Node);
-                expr.* = .{ type = .GROUP , as = .{ group = inner_expr }};
-                consume(parser, .RPAREN);
-                return expr;
-            case .IDENT;
-                token := consume(parser);
-                expr := New(Expr_Ast_Node);
-                expr.* = .{ type = .VAR , as = .{ var = token.value }};
-                return expr;
-            case;
-                assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
-                return null; // unreachable
-        }
-    }
 }
 
 parse_unary_op :: (tt: Token_Type) -> type_of(Expr_Ast_Node.as.unary.op) {
@@ -519,6 +591,9 @@ print_space :: (depth: int = 0) {
     print("\n");
     for 0..depth-1 print("┊−");
 }
+
+#scope_file
+#import "Memory";
 
 /* -- ADSL AST -- 
 
