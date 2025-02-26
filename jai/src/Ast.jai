@@ -139,7 +139,9 @@ Decl :: struct {
                 expr := Expr.parse_expr(parser, 0, side_effects);
                 expr;
             } else null;
+
             parse_postfix_expr_ast(parser, expr, side_effects);
+
             consume(parser, .SEMICOLON);
             decl :=  New(Decl_Ast_Node);
             decl.* = .{ident, expr};
@@ -317,7 +319,6 @@ parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast_Node, side_effects: 
 
 
     array_add(side_effects, assignment_expr);
-    // return true, assignment_expr; 
 }
 
 is_compound_assignment_operator :: (token_type: Token_Type) -> bool {
