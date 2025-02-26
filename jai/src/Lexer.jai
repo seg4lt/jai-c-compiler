@@ -58,6 +58,11 @@ Token_Type :: enum {
 
     MINUS_MINUS;
     PLUS_PLUS;
+
+    IF;
+    ELSE;
+    QUESTION_MARK;
+    COLON;
 }
 
 Token :: struct {
@@ -230,6 +235,8 @@ scan :: (using lexer: *Lexer) {
                     continue;
                 }
                 array_add(*tokens, .{.NOT, "!", line});
+            case #char "?"; array_add(*tokens, .{.QUESTION_MARK, "?", line});
+            case #char ":"; array_add(*tokens, .{.QUESTION_MARK, ":", line});
             case; 
                 print_err_line(lexer, tprint("Unexpected character %\n", String.to_string(*current_char, 1)));
         }
@@ -301,6 +308,8 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
         case "int"; return .INT;
         case "void"; return .VOID;
         case "return"; return .RETURN;
+        case "if"; return .IF;
+        case "else"; return .ELSE;
         case; return .IDENT;
     }
 }
@@ -326,6 +335,5 @@ is_at_end :: (using lexer: *Lexer) -> bool {
 
 #import "Basic";
 String :: #import "String";
-
 
 #scope_export
