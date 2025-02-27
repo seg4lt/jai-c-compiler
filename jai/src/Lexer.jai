@@ -74,7 +74,7 @@ Token :: struct {
 lex :: (args: Cli_Args) -> Lexer {
     src, r_success := read_entire_file(tprint("%.i", args.source_file_path_without_ext));
     if !r_success {
-        log_error("Unable to read file -- '%'", args.source_file_path);
+        assert(false, "Unable to read file -- '%'", args.source_file_path);
         exit(1);
     }
     lexer := Lexer.{src = src};
@@ -236,7 +236,7 @@ scan :: (using lexer: *Lexer) {
                 }
                 array_add(*tokens, .{.NOT, "!", line});
             case #char "?"; array_add(*tokens, .{.QUESTION_MARK, "?", line});
-            case #char ":"; array_add(*tokens, .{.QUESTION_MARK, ":", line});
+            case #char ":"; array_add(*tokens, .{.COLON, ":", line});
             case; 
                 print_err_line(lexer, tprint("Unexpected character %\n", String.to_string(*current_char, 1)));
         }
