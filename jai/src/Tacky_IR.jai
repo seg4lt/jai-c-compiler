@@ -140,6 +140,13 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
 
                 array_add(instructions, if_end_label);
             }
+        case .LABEL;
+            label := stmt_ast.as.label;
+            goto_label := Instruction_Tacky.{.LABEL, .{label = label }};
+            array_add(instructions, goto_label);
+        case .GOTO;
+            goto := stmt_ast.as.goto;
+            array_add(instructions, .{.JUMP, .{ jump = goto }});
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }
