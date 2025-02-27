@@ -113,7 +113,33 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .EXPR;
             gen_instructions(tc, instructions, stmt_ast.as.expr);
         case .IF;
-            assert(false, "NOT IMPLEMENTED");
+            if_stmt := stmt_ast.as.if_stmt;
+
+            if if_stmt.else_block == null {
+                if_end_label := make_label(tc, "if_end");
+                condition := gen_instructions(tc, instructions, if_stmt.condition);
+
+                array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, if_end_label.as.label } } });
+
+                gen_instructions(tc, instructions, if_stmt.if_block);
+
+                array_add(instructions, if_end_label);
+            } else {
+                if_end_label := make_label(tc, "if_end");
+                else_label := make_label(tc, "else");
+
+                condition := gen_instructions(tc, instructions, if_stmt.condition);
+
+                array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, else_label.as.label } } });
+
+                gen_instructions(tc, instructions, if_stmt.if_block);
+                array_add(instructions, .{.JUMP, .{jump = if_end_label.as.label}});
+
+                array_add(instructions, else_label);
+                gen_instructions(tc, instructions, if_stmt.else_block);
+
+                array_add(instructions, if_end_label);
+            }
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }
@@ -182,7 +208,6 @@ gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_T
     label_end := make_label(tc, "logical_cmp_end");
 
     array_add(instructions,.{.JUMP, .{jump = label_end.as.label}});
-
     array_add(instructions, label_false);
 
     zero := Val_Tacky.{.CONSTANT, .{constant = 0 }};
