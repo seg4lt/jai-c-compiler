@@ -27,7 +27,9 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, table: *Hash_Table.Table(stri
         case .EXPR;
             sema_var_resolution_expr(stmt.as.expr, table);
         case .IF;
-            assert(false, "NOT IMPLEMENTED");
+            sema_var_resolution_expr(stmt.as.if_stmt.condition, table);
+            sema_var_resolution_stmt(stmt.as.if_stmt.if_block, table);
+            if stmt.as.if_stmt.else_block != null sema_var_resolution_stmt(stmt.as.if_stmt.else_block, table);
         case .NULL;
             // noop
     }
@@ -74,7 +76,10 @@ sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(stri
             sema_var_resolution_expr(dst, table);
             sema_var_resolution_expr(assignment.src, table);
         case .CONDITIONAL;
-            assert(false, "NOT IMPLEMENTED");
+            conditional := expr.as.conditional;
+            sema_var_resolution_expr(conditional.condition, table);
+            sema_var_resolution_expr(conditional.true_block, table);
+            sema_var_resolution_expr(conditional.false_block, table);
     }
 }
 
