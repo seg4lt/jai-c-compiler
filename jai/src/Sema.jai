@@ -26,6 +26,8 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, table: *Hash_Table.Table(stri
             sema_var_resolution_expr(stmt.as.return_stmt.expr, table);
         case .EXPR;
             sema_var_resolution_expr(stmt.as.expr, table);
+        case .IF;
+            assert(false, "NOT IMPLEMENTED");
         case .NULL;
             // noop
     }
@@ -71,6 +73,8 @@ sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Hash_Table.Table(stri
             dst := ifx assignment.dst.type == .VAR then assignment.dst else assignment.dst.as.group;
             sema_var_resolution_expr(dst, table);
             sema_var_resolution_expr(assignment.src, table);
+        case .CONDITIONAL;
+            assert(false, "NOT IMPLEMENTED");
     }
 }
 

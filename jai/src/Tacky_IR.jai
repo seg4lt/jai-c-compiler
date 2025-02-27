@@ -112,6 +112,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, .{.RETURN, .{ret = src}});
         case .EXPR;
             gen_instructions(tc, instructions, stmt_ast.as.expr);
+        case .IF;
+            assert(false, "NOT IMPLEMENTED");
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }
@@ -159,6 +161,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             dst := Val_Tacky.{.VARIABLE, .{ variable = expr_ast.as.assignment.dst.as.var}};
             array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             return dst;
+        case .CONDITIONAL;
+            assert(false,  "NOT IMPLEMENTED");
     }
 }
 
