@@ -3,7 +3,6 @@ Parser :: struct {
     start: int = 0;
     current: int = 0;
 }
-
 Program_Ast_Node :: struct {
     fn: *Fn_Ast_Node;
 }
@@ -23,15 +22,16 @@ Decl_Ast_Node :: struct {
     init: *Expr_Ast_Node; // optional
 }
 Stmt_Ast_Node :: struct {
-    type: enum { RETURN; EXPR; NULL;};
+    type: enum { RETURN; EXPR; IF; NULL;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast_Node; };
         expr: *Expr_Ast_Node;
+        if_stmt: struct { condition: *Expr_Ast_Node; if_block: *Stmt_Ast_Node; else_block: *Stmt_Ast_Node; /* Optional */ } 
         // null : doesn't need value
     };
 }
 Expr_Ast_Node :: struct {
-    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; }
+    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; CONDITIONAL;}
     as: union {
         constant: int;
         unary: struct { op: enum {BITWISE_NOT; NEGATE; NOT;}; expr: *Expr_Ast_Node; };
@@ -39,6 +39,7 @@ Expr_Ast_Node :: struct {
         group: *Expr_Ast_Node;
         var: string; // this is when we use a variable
         assignment: struct { dst: *Expr_Ast_Node; src: *Expr_Ast_Node; };
+        conditional: struct {condition: *Expr_Ast_Node; true_block: *Expr_Ast_Node; false_block: *Expr_Ast_Node;};
     };
 }
 Bin_Op_Ast :: enum {
@@ -91,6 +92,7 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
                 item: Block_Item_Ast_Node = .{ .STMT, .{stmt = stmt}};
                 array_add(*body, item);
             }
+            array_reset(*side_effects);
         } 
 
     }
@@ -158,7 +160,11 @@ Stmt :: struct {
         if peek(parser).type == .RETURN {
             return parse_return_stmt(parser);
         }
+        if peek(parser).type == .IF {
+            return parse_if_stmt(parser, side_effects);
+        }
         if peek(parser).type == .SEMICOLON {
+            consume(parser, .SEMICOLON);
             stmt := New(Stmt_Ast_Node);
             stmt.* = .{.NULL, .{}};
             return stmt;
@@ -168,6 +174,24 @@ Stmt :: struct {
         stmt := New(Stmt_Ast_Node);
         stmt.* = .{.EXPR, .{expr = expr}};
         return stmt;
+    }
+
+    parse_if_stmt :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Stmt_Ast_Node {
+        consume(parser, .IF);
+        consume(parser, .LPAREN);
+        condition := Expr.parse_expr(parser, 0, side_effects);
+        consume(parser, .RPAREN);
+
+        if_block := parse_stmt_ast_node(parser, side_effects);
+
+        else_block := ifx peek(parser).type == .ELSE {
+            consume(parser, .ELSE);
+            parse_stmt_ast_node(parser, side_effects);
+        } else null;
+
+        if_stmt := New(Stmt_Ast_Node);
+        if_stmt.* = .{ .IF, .{ if_stmt = .{condition, if_block, else_block }}};
+        return if_stmt;
     }
 
     parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
@@ -208,6 +232,14 @@ Expr :: struct {
                 assignment := New(Expr_Ast_Node);
                 assignment.* = .{ .ASSIGNMENT, .{ assignment = .{ left, binary }}};
                 left = assignment;
+            } else if next_token.type == .QUESTION_MARK {
+                consume(parser, .QUESTION_MARK);
+                true_block := parse_expr(parser, 0, side_effects);
+                consume(parser, .COLON);
+                false_block := parse_expr(parser, precedence(next_token.type), side_effects);
+                conditional := New(Expr_Ast_Node);
+                conditional.* = .{.CONDITIONAL, .{ conditional = .{left, true_block, false_block }}};
+                left = conditional;
             } else {
                 op := parse_binary_op(consume(parser).type);
                 right := parse_expr(parser, precedence(next_token.type) + 1, side_effects);
@@ -277,9 +309,7 @@ Expr :: struct {
                 ident := consume(parser);
                 var_expr := New(Expr_Ast_Node);
                 var_expr.* = .{ type = .VAR , as = .{ var = ident.value }};
-
                 parse_postfix_expr_ast(parser, var_expr, side_effects);
-
                 return var_expr;
             case;
                 assert(false, "This expression is not something I can handle. Duh!! %", peek(parser).*);
@@ -378,7 +408,8 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .MINUS_EQUAL; #through;
         case .MULTIPLY_EQUAL; #through;
         case .DIVIDE_EQUAL; #through;
-        case .MOD_EQUAL;
+        case .MOD_EQUAL; #through;
+        case .QUESTION_MARK;
             return true;
 
         case; return false;
@@ -415,6 +446,9 @@ precedence :: (tt: Token_Type) -> int {
 
         case .AND; return 10;
         case .OR; return 5;
+
+        case .QUESTION_MARK; return 3;
+
         case .ASSIGN; #through;
         case .PLUS_EQUAL; #through;
         case .MINUS_EQUAL; #through;
@@ -555,6 +589,18 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print_expr_ast(stmt.as.return_stmt.expr, depth+1);
         case .NULL; 
             print("[NULL_STMT]");
+        case .IF;
+            print("[IF]");
+            print_space(depth + 1);
+            print_expr_ast(stmt.as.if_stmt.condition, depth + 1);
+            print_space(depth + 2);
+            print_stmt_ast(stmt.as.if_stmt.if_block, depth + 2);
+            if stmt.as.if_stmt.else_block != null {
+                print_space(depth);
+                print("[ELSE]");
+                print_space(depth + 2);
+                print_stmt_ast(stmt.as.if_stmt.else_block, depth + 2); 
+            }
     }
 }
 
@@ -585,6 +631,16 @@ print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
             print_expr_ast(expr.as.assignment.dst, depth);
             print(" = ");
             print_expr_ast(expr.as.assignment.src, depth);
+        case .CONDITIONAL;
+            print("[TERNARY]");
+            print_space(depth + 1);
+            print_expr_ast(expr.as.conditional.condition, depth);
+            print_space(depth + 1);
+            print(" ? ");
+            print_expr_ast(expr.as.conditional.true_block, depth+2);
+            print_space(depth + 1);
+            print(" : ");
+            print_expr_ast(expr.as.conditional.false_block, depth+2);
     }
 }
 
@@ -604,12 +660,14 @@ block_item           = S(stmt) | D(decleration)
 declaration          = Declaration(identifier name, exp? init)
 statement            = Return(exp)
                      | Expression(exp)
+                     | If(exp condition, statement then, statement? else)
                      | Null                 # like ";" on while and for which signifies empty body
 exp                  = Constant(int) 
                      | Var(identifier)
                      | Unary(unary_operator, exp)
                      | Binary(binary_operator, exp, exp)
                      | Assignment(exp, exp)
+                     | Conditional(exp condition, true_block exp, false_block exp)
 unary_operator       = Complement | Negate | Not
 binary_operator      = Add | Subtract | Multiply | Divide | Remainder
                      | And | Or
@@ -630,7 +688,10 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <block-item>      ::= <statement> | <decleration>
 <decleration>     ::= "int" <identifier> [ "=" <exp> ] ";"
 <statement>       ::= "return" <exp> ";" | <exp> ";" | ";"
-<exp>             ::= <factor> | <exp> <binop> <exp>
+                    | "if" "(" <exp> ")" <statement> ["else" <statement>]
+<exp>             ::= <factor> 
+                    | <exp> <binop> <exp>
+                    | <exp> "?" <exp> ":" <exp>
 <factor>          ::= <int> | <identifier> | <unop> <factor> | "(" <exp> ")"
 <unop>            ::= "-" | "~" | "!"
 <binop>           ::= "-" | "+" | "*" | "/" | "%" 
