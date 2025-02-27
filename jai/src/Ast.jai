@@ -22,11 +22,13 @@ Decl_Ast_Node :: struct {
     init: *Expr_Ast_Node; // optional
 }
 Stmt_Ast_Node :: struct {
-    type: enum { RETURN; EXPR; IF; NULL;};
+    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast_Node; };
         expr: *Expr_Ast_Node;
-        if_stmt: struct { condition: *Expr_Ast_Node; if_block: *Stmt_Ast_Node; else_block: *Stmt_Ast_Node; /* Optional */ } 
+        if_stmt: struct { condition: *Expr_Ast_Node; if_block: *Stmt_Ast_Node; else_block: *Stmt_Ast_Node; /* Optional */ };
+        label: string;
+        goto: string;
         // null : doesn't need value
     };
 }
@@ -162,6 +164,23 @@ Stmt :: struct {
         }
         if peek(parser).type == .IF {
             return parse_if_stmt(parser, side_effects);
+        }
+        if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
+            token := consume(parser, .IDENT);
+            consume(parser, .COLON);
+            stmt := New(Stmt_Ast_Node);
+            stmt.* = .{.LABEL, .{ label = token.value}};
+
+            return stmt;
+        }
+        if peek(parser).type == .GOTO {
+            consume(parser, .GOTO);
+            token := consume(parser, .IDENT);
+            consume(parser, .SEMICOLON);
+
+            stmt := New(Stmt_Ast_Node);
+            stmt.* = .{.GOTO, .{ goto = token.value}};
+            return stmt;
         }
         if peek(parser).type == .SEMICOLON {
             consume(parser, .SEMICOLON);
@@ -601,6 +620,10 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
                 print_space(depth + 2);
                 print_stmt_ast(stmt.as.if_stmt.else_block, depth + 2); 
             }
+        case .LABEL;
+            print("[LABEL] %", stmt.as.label);
+        case .GOTO;
+            print("[GOTO] %", stmt.as.goto);
     }
 }
 
@@ -661,6 +684,8 @@ declaration          = Declaration(identifier name, exp? init)
 statement            = Return(exp)
                      | Expression(exp)
                      | If(exp condition, statement then, statement? else)
+                     | Label(ident)
+                     | Goto(ident)
                      | Null                 # like ";" on while and for which signifies empty body
 exp                  = Constant(int) 
                      | Var(identifier)
@@ -689,6 +714,8 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 <decleration>     ::= "int" <identifier> [ "=" <exp> ] ";"
 <statement>       ::= "return" <exp> ";" | <exp> ";" | ";"
                     | "if" "(" <exp> ")" <statement> ["else" <statement>]
+                    | <identifier> ":"
+                    | "goto" <identifier> ";"
 <exp>             ::= <factor> 
                     | <exp> <binop> <exp>
                     | <exp> "?" <exp> ":" <exp>
