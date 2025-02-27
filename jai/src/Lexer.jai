@@ -63,6 +63,8 @@ Token_Type :: enum {
     ELSE;
     QUESTION_MARK;
     COLON;
+
+    GOTO;
 }
 
 Token :: struct {
@@ -95,7 +97,7 @@ scan :: (using lexer: *Lexer) {
         current_char := consume(lexer);
 
         if String.is_space(current_char) continue;
-        if String.is_alpha(current_char) { ident_or_keyword(lexer); continue; }
+        if String.is_alpha(current_char) || current_char == #char "_" { ident_or_keyword(lexer); continue; }
         if String.is_digit(current_char) { number(lexer); continue; }
 
         if current_char == {
@@ -290,7 +292,7 @@ number :: (using lexer: *Lexer) {
         consume(lexer);
     }
     str := String.slice(src, start, current-start);
-    if found_alpha print_err_line(lexer, tprint("Invalid identifier found %s", str));
+    if found_alpha print_err_line(lexer, tprint("Invalid number found %", str));
 
     token := Token.{ .INT_LITERAL, str, line};
     array_add(*tokens, token); 
@@ -299,8 +301,16 @@ number :: (using lexer: *Lexer) {
 ident_or_keyword :: (using lexer: *Lexer) {
     while !is_at_end(lexer) && String.is_alnum(peek(lexer)) consume(lexer);
     str := String.slice(src, start, current-start);
-    token := Token.{ find_keyword_or_ident(str), str, line};
+    token_type := find_keyword_or_ident(str);
+    token := Token.{ token_type, str, line};
     array_add(*tokens, token);
+}
+
+eat_whitespace :: (lexer: *Lexer) {
+    while String.is_space(peek(lexer)) {
+        token := consume(lexer);
+        if token == #char "\n" increment_line(lexer);
+    }
 }
 
 find_keyword_or_ident :: (str: string) -> Token_Type {
@@ -310,6 +320,7 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
         case "return"; return .RETURN;
         case "if"; return .IF;
         case "else"; return .ELSE;
+        case "goto"; return .GOTO;
         case; return .IDENT;
     }
 }
