@@ -188,7 +188,28 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             return dst;
         case .CONDITIONAL;
-            assert(false,  "NOT IMPLEMENTED");
+            ternary := expr_ast.as.conditional;
+            result : Val_Tacky = ---;
+
+            ternary_end := make_label(tc, "ternary_end");
+            ternary_else := make_label(tc, "ternary_else");
+
+            condition := gen_instructions(tc, instructions, ternary.condition);
+
+            array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, ternary_else.as.label } } });
+
+            { // true
+                result = gen_instructions(tc, instructions, ternary.true_block);
+                array_add(instructions, .{.JUMP, .{jump = ternary_end.as.label}});
+            }
+
+            { // false
+                array_add(instructions, ternary_else);
+                result = gen_instructions(tc, instructions, ternary.false_block);
+            }
+            //  array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+            array_add(instructions, ternary_end); 
+            return result;
     }
 }
 
