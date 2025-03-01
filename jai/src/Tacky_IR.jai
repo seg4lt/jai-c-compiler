@@ -78,20 +78,7 @@ gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
 
 gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
-    for fn_ast.body {
-        if #complete it.type == {
-            case .STMT;
-                gen_instructions(tc, *instructions, it.as.stmt);
-            case .DECL;
-                if (it.as.decl.init == null) {
-                    // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
-                    continue;
-                }
-                result := gen_instructions(tc, *instructions, it.as.decl.init);
-                dst := Val_Tacky.{.VARIABLE, .{ variable = it.as.decl.ident}};
-                array_add(*instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
-        }
-    }
+    gen_instructions(tc, *instructions, fn_ast.block);
 
     has_return := false;
     for instructions  {
@@ -103,6 +90,25 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
     if !has_return array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
 
     return .{ fn_ast.ident, instructions };
+}
+
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast_Node) {
+    for block_ast.items {
+        if #complete it.type == {
+            case .STMT;
+                gen_instructions(tc, instructions, it.as.stmt);
+            case .DECL;
+                if (it.as.decl.init == null) {
+                    // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
+                    continue;
+                }
+                result := gen_instructions(tc, instructions, it.as.decl.init);
+                dst := Val_Tacky.{.VARIABLE, .{ variable = it.as.decl.ident}};
+                array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+        }
+    }
+
+   
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast_Node) {
@@ -147,6 +153,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .GOTO;
             goto := stmt_ast.as.goto;
             array_add(instructions, .{.JUMP, .{ jump = goto }});
+        case .COMPOUND;
+            gen_instructions(tc, instructions, stmt_ast.as.compound);
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }

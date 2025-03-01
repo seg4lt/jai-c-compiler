@@ -90,7 +90,7 @@ ce_fmt_unary_op :: (op: Unary_Op_Asm) -> string {
     if #complete op == {
         case .NEG; return "negl";
         case .BITWISE_NOT; return "notl";
-        case .NNOT; assert(false, "not implemented"); return "asdf";
+        case .NNOT; assert(false, "unreachable"); return "asdf";
     }
 }
 ce_fmt_binary_op :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {

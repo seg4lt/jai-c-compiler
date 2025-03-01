@@ -348,12 +348,12 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src2, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{oi.as.binary.op, oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.MOV, .{mov = .{ ireg, oi.as.binary.src2 }}});
-                        case .EQUAL_EQUAL; assert(false, "not implemented");
-                        case .NOT_EQUAL; assert(false, "not implemented");
-                        case .GREATER; assert(false, "not implemented");
-                        case .LESS; assert(false, "not implemented");
-                        case .LESS_EQUAL; assert(false, "not implemented");
-                        case .GREATER_EQUAL; assert(false, "not implemented");
+                        case .EQUAL_EQUAL; assert(false, "unreachable");
+                        case .NOT_EQUAL; assert(false, "unreachable");
+                        case .GREATER; assert(false, "unreachable");
+                        case .LESS; assert(false, "unreachable");
+                        case .LESS_EQUAL; assert(false, "unreachable");
+                        case .GREATER_EQUAL; assert(false, "unreachable");
                 }
             case .UNARY; #through;
             case .ALLOCATE_STACK; #through;
