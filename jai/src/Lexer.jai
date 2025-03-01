@@ -65,6 +65,12 @@ Token_Type :: enum {
     COLON;
 
     GOTO;
+
+    FOR;
+    DO;
+    WHILE;
+    CONTINUE;
+    BREAK;
 }
 
 Token :: struct {
@@ -321,6 +327,11 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
         case "if"; return .IF;
         case "else"; return .ELSE;
         case "goto"; return .GOTO;
+        case "for"; return .FOR;
+        case "do"; return .DO;
+        case "while"; return .WHILE;
+        case "break"; return .BREAK;
+        case "continue"; return .CONTINUE;
         case; return .IDENT;
     }
 }
