@@ -8,8 +8,13 @@ Program_Ast_Node :: struct {
 }
 Fn_Ast_Node :: struct {
     ident: string;
-    body: [..]Block_Item_Ast_Node;
+    block: *Block_Ast_Node;
 }
+
+Block_Ast_Node :: struct {
+    items: [..]*Block_Item_Ast_Node;
+}
+
 Block_Item_Ast_Node :: struct {
     type: enum { STMT; DECL; };
     as: union {
@@ -22,13 +27,14 @@ Decl_Ast_Node :: struct {
     init: *Expr_Ast_Node; // optional
 }
 Stmt_Ast_Node :: struct {
-    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO;};
+    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO; COMPOUND;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast_Node; };
         expr: *Expr_Ast_Node;
         if_stmt: struct { condition: *Expr_Ast_Node; if_block: *Stmt_Ast_Node; else_block: *Stmt_Ast_Node; /* Optional */ };
         label: string;
         goto: string;
+        compound: *Block_Ast_Node; 
         // null : doesn't need value
     };
 }
@@ -78,30 +84,37 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
     consume(parser, .RPAREN);
 
     consume(parser, .LCURLY);
-
-    body: [..]Block_Item_Ast_Node;
-
-    while peek(parser).type != .RCURLY {
-        side_effects : [..]*Expr_Ast_Node;
-
-        b_item := Block_Item.parse_block_item(parser, *side_effects);
-        array_add(*body, b_item);
-
-        if side_effects.count > 0 {
-            for side_effects  {
-                stmt := New(Stmt_Ast_Node);
-                stmt.* = .{.EXPR, .{ expr = it }};
-                item: Block_Item_Ast_Node = .{ .STMT, .{stmt = stmt}};
-                array_add(*body, item);
-            }
-            array_reset(*side_effects);
-        } 
-
-    }
+    body := Block.parse_block_ast(parser);
     consume(parser, .RCURLY);
     fn := New(Fn_Ast_Node);
     fn.* = .{ident_token.value, body};
     return fn;
+}
+
+Block :: struct {
+    parse_block_ast :: (parser: *Parser) -> *Block_Ast_Node {
+        body: [..]*Block_Item_Ast_Node;
+        while peek(parser).type != .RCURLY {
+            side_effects : [..]*Expr_Ast_Node;
+
+            b_item := Block_Item.parse_block_item(parser, *side_effects);
+            array_add(*body, b_item);
+
+            if side_effects.count > 0 {
+                for side_effects  {
+                    stmt := New(Stmt_Ast_Node);
+                    stmt.* = .{.EXPR, .{ expr = it }};
+                    item :=  New(Block_Item_Ast_Node);
+                    item.* = .{ .STMT, .{stmt = stmt}};
+                    array_add(*body, item);
+                }
+                array_reset(*side_effects);
+            } 
+        }
+        block := New(Block_Ast_Node);
+        block.* = .{body};
+        return block;
+    }
 }
 
 Block_Item :: struct {
@@ -151,7 +164,7 @@ Decl :: struct {
             decl.* = .{ident, expr};
             return decl;
         }
-        assert(false, "not implemented");
+        assert(false, "unreachable");
         return null;
     }
 }
@@ -159,12 +172,23 @@ Decl :: struct {
 Stmt :: struct {
 
     parse_stmt_ast_node :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Stmt_Ast_Node {
+
+        if peek(parser).type == .LCURLY {
+            consume(parser, .LCURLY);
+            body := Block.parse_block_ast(parser);
+            consume(parser, .RCURLY);
+            stmt := New(Stmt_Ast_Node);
+            stmt.* = .{.COMPOUND, .{compound = body }};
+            return stmt;
+        }
+
         if peek(parser).type == .RETURN {
             return parse_return_stmt(parser);
         }
         if peek(parser).type == .IF {
             return parse_if_stmt(parser, side_effects);
         }
+
         if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
             token := consume(parser, .IDENT);
             consume(parser, .COLON);
@@ -577,9 +601,14 @@ print_program_ast :: (program: *Program_Ast_Node, depth: int = 0) {
 print_fn_ast :: (fn: *Fn_Ast_Node, depth: int = 0) {
     print_space(depth);
     print("[FN] %", fn.ident);
+    print_block_ast(fn.block, depth + 1);
+}
 
-    for fn.body {
-        print_space(depth+1);
+print_block_ast :: (block: *Block_Ast_Node, depth: int = 0) {
+    print_space(depth);
+    print("[BLOCK]");
+    for block.items {
+        print_space(depth + 1);
         if #complete it.type == {
             case .STMT; print_stmt_ast(it.as.stmt, depth + 1);
             case .DECL; print_decl_ast(it.as.decl, depth + 1);
@@ -624,6 +653,9 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print("[LABEL] %", stmt.as.label);
         case .GOTO;
             print("[GOTO] %", stmt.as.goto);
+        case .COMPOUND;
+            print("[COMPOUND]");
+            print_block_ast(stmt.as.compound, depth + 2);
     }
 }
 
@@ -678,11 +710,13 @@ print_space :: (depth: int = 0) {
 /* -- ADSL AST -- 
 
 program              = Program(function_definition)
-function_definition  = Function(identifier name, block_item* body)
+function_definition  = Function(identifier name, block body)
+block                = Block(block_item*)
 block_item           = S(stmt) | D(decleration)
 declaration          = Declaration(identifier name, exp? init)
 statement            = Return(exp)
                      | Expression(exp)
+                     | Compound(block)
                      | If(exp condition, statement then, statement? else)
                      | Label(ident)
                      | Goto(ident)
@@ -710,11 +744,13 @@ binary_operator      = Add | Subtract | Multiply | Divide | Remainder
 
 <program>         ::= <function>
 <function>        ::= "int" <identifier> "(" "void" ")" "{" <block-item> "}"
+<block>           ::= "{" { <block_item> } "}"
 <block-item>      ::= <statement> | <decleration>
 <decleration>     ::= "int" <identifier> [ "=" <exp> ] ";"
 <statement>       ::= "return" <exp> ";" | <exp> ";" | ";"
                     | "if" "(" <exp> ")" <statement> ["else" <statement>]
                     | <identifier> ":"
+                    | <block>
                     | "goto" <identifier> ";"
 <exp>             ::= <factor> 
                     | <exp> <binop> <exp>
