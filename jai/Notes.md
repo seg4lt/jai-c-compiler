@@ -1,6 +1,7 @@
 # TODO
 - [ ] SETCC needs only 1 byte, but today we are using 4 bytes. Need to fix this
 - [ ] Parse typedef - Read more on context sentitive grammer.
+- [ ] Postfix unary operator are not working properly. Need to fix this.
 
 
 References;
