@@ -6,6 +6,7 @@ Parser :: struct {
 Program_Ast_Node :: struct {
     fn: *Fn_Ast_Node;
 }
+
 Fn_Ast_Node :: struct {
     ident: string;
     block: *Block_Ast_Node;
@@ -26,8 +27,17 @@ Decl_Ast_Node :: struct {
     ident: string;
     init: *Expr_Ast_Node; // optional
 }
+
+For_Init_Ast_Node :: struct {
+    type: enum { INIT_DECL; INIT_EXP; };
+    as: union {
+        decl: *Decl_Ast_Node;
+        exp: *Expr_Ast_Node;
+    };
+}
+
 Stmt_Ast_Node :: struct {
-    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO; COMPOUND;};
+    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO; COMPOUND; BREAK;CONTINUE;WHILE;DO_WHILE;FOR;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast_Node; };
         expr: *Expr_Ast_Node;
@@ -35,6 +45,11 @@ Stmt_Ast_Node :: struct {
         label: string;
         goto: string;
         compound: *Block_Ast_Node; 
+        break_stmt: string;
+        continue_stmt: string;
+        while_stmt: struct { condition: *Expr_Ast_Node; body: *Stmt_Ast_Node; };
+        do_while: struct {  body: *Stmt_Ast_Node; condition: *Expr_Ast_Node; };
+        for_stmt: struct { init: *For_Init_Ast_Node; condition: /* Optional */ *Expr_Ast_Node; post: /* Optional */ *Expr_Ast_Node; body: *Stmt_Ast_Node; }
         // null : doesn't need value
     };
 }
@@ -91,25 +106,38 @@ parse_fn_ast_node :: (parser: *Parser) -> *Fn_Ast_Node {
     return fn;
 }
 
+append_side_effects :: (body: *[..]*Block_Item_Ast_Node, side_effects: *[..]*Expr_Ast_Node) {
+    if side_effects.count <= 0 return;
+
+    for side_effects.* {
+        stmt := New(Stmt_Ast_Node);
+        stmt.* = .{.EXPR, .{ expr = it }};
+        item :=  New(Block_Item_Ast_Node);
+        item.* = .{ .STMT, .{stmt = stmt}};
+        array_add(body, item);
+    }
+    array_reset(side_effects);
+}
+
 Block :: struct {
     parse_block_ast :: (parser: *Parser) -> *Block_Ast_Node {
         body: [..]*Block_Item_Ast_Node;
         while peek(parser).type != .RCURLY {
             side_effects : [..]*Expr_Ast_Node;
-
             b_item := Block_Item.parse_block_item(parser, *side_effects);
             array_add(*body, b_item);
+            append_side_effects(*body, *side_effects);
 
-            if side_effects.count > 0 {
-                for side_effects  {
-                    stmt := New(Stmt_Ast_Node);
-                    stmt.* = .{.EXPR, .{ expr = it }};
-                    item :=  New(Block_Item_Ast_Node);
-                    item.* = .{ .STMT, .{stmt = stmt}};
-                    array_add(*body, item);
-                }
-                array_reset(*side_effects);
-            } 
+            // if side_effects.count > 0 {
+            //     for side_effects  {
+            //         stmt := New(Stmt_Ast_Node);
+            //         stmt.* = .{.EXPR, .{ expr = it }};
+            //         item :=  New(Block_Item_Ast_Node);
+            //         item.* = .{ .STMT, .{stmt = stmt}};
+            //         array_add(*body, item);
+            //     }
+            //     array_reset(*side_effects);
+            // } 
         }
         block := New(Block_Ast_Node);
         block.* = .{body};
@@ -173,22 +201,42 @@ Stmt :: struct {
 
     parse_stmt_ast_node :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Stmt_Ast_Node {
 
-        if peek(parser).type == .LCURLY {
-            consume(parser, .LCURLY);
-            body := Block.parse_block_ast(parser);
-            consume(parser, .RCURLY);
-            stmt := New(Stmt_Ast_Node);
-            stmt.* = .{.COMPOUND, .{compound = body }};
-            return stmt;
+        if peek(parser).type == {
+            case .LCURLY;
+                consume(parser, .LCURLY);
+                body := Block.parse_block_ast(parser);
+                consume(parser, .RCURLY);
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.COMPOUND, .{compound = body }};
+                return stmt;
+            case .BREAK;
+                consume(parser);
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.BREAK, .{break_stmt = "$$$UNPROCESSED_BREAK_LABEL$$$"}};
+                return stmt;
+            case .CONTINUE;
+                consume(parser);
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.CONTINUE, .{continue_stmt = "$$$UNPROCESSED_CONTINUE_LABEL$$$"}};
+                return stmt;
+            case .WHILE; return parse_while_stmt(parser) ;
+            case .DO; return parse_do_while_stmt(parser);
+            case .FOR; return parse_for_stmt(parser);
+            case .RETURN; return parse_return_stmt(parser);
+            case .IF; return parse_if_stmt(parser, side_effects);
+            case .GOTO; 
+                consume(parser, .GOTO);
+                token := consume(parser, .IDENT);
+                consume(parser, .SEMICOLON);
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.GOTO, .{ goto = token.value}};
+                return stmt;
+            case .SEMICOLON;
+                consume(parser, .SEMICOLON);
+                stmt := New(Stmt_Ast_Node);
+                stmt.* = .{.NULL, .{}};
+                return stmt;
         }
-
-        if peek(parser).type == .RETURN {
-            return parse_return_stmt(parser);
-        }
-        if peek(parser).type == .IF {
-            return parse_if_stmt(parser, side_effects);
-        }
-
         if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
             token := consume(parser, .IDENT);
             consume(parser, .COLON);
@@ -197,26 +245,33 @@ Stmt :: struct {
 
             return stmt;
         }
-        if peek(parser).type == .GOTO {
-            consume(parser, .GOTO);
-            token := consume(parser, .IDENT);
-            consume(parser, .SEMICOLON);
-
-            stmt := New(Stmt_Ast_Node);
-            stmt.* = .{.GOTO, .{ goto = token.value}};
-            return stmt;
-        }
-        if peek(parser).type == .SEMICOLON {
-            consume(parser, .SEMICOLON);
-            stmt := New(Stmt_Ast_Node);
-            stmt.* = .{.NULL, .{}};
-            return stmt;
-        }
         expr := Expr.parse_expr(parser, 0, side_effects);
         consume(parser, .SEMICOLON);
         stmt := New(Stmt_Ast_Node);
         stmt.* = .{.EXPR, .{expr = expr}};
         return stmt;
+    }
+
+    parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
+        consume(parser, .WHILE);
+
+        consume(parser, .LPAREN);
+        condition := Expr.parse_expr(parser, 0, null);
+        consume(parser, .RPAREN);
+
+        body := Stmt.parse_stmt_ast_node(parser, null);
+
+        while_stmt := New(Stmt_Ast_Node);
+        while_stmt.* = .{ .WHILE, .{ while_stmt = .{ condition, body} } };
+        return while_stmt;
+    }
+    parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
+        assert(false, "not implemented");
+        return null;
+    }
+    parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
+        assert(false, "not implemented");
+        return null;
     }
 
     parse_if_stmt :: (parser: *Parser, side_effects: *[..]*Expr_Ast_Node) -> *Stmt_Ast_Node {
@@ -656,6 +711,20 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
         case .COMPOUND;
             print("[COMPOUND]");
             print_block_ast(stmt.as.compound, depth + 2);
+        case .CONTINUE;
+            assert(false, "not implemented");
+        case .BREAK;
+            assert(false, "not implemented");
+        case .FOR;
+            assert(false, "not implemented");
+        case .WHILE;
+            while_stmt := stmt.as.while_stmt;
+            print("[WHILE] ");
+            print_expr_ast(while_stmt.condition, depth);
+            print_space(depth + 1);
+            print_stmt_ast(while_stmt.body, depth + 1);
+        case .DO_WHILE;
+            assert(false, "not implemented");
     }
 }
 
@@ -714,12 +783,18 @@ function_definition  = Function(identifier name, block body)
 block                = Block(block_item*)
 block_item           = S(stmt) | D(decleration)
 declaration          = Declaration(identifier name, exp? init)
+for_init             = InitDecl(declaration) | InitExp(exp?)
 statement            = Return(exp)
                      | Expression(exp)
                      | Compound(block)
                      | If(exp condition, statement then, statement? else)
                      | Label(ident)
                      | Goto(ident)
+                     | Break(ident)
+                     | Continue(ident)
+                     | While(exp condition, statement body)
+                     | DoWhile(statement body, exp condition)
+                     | For(for_init init, exp? condition, exp? post, statement body)
                      | Null                 # like ";" on while and for which signifies empty body
 exp                  = Constant(int) 
                      | Var(identifier)

@@ -348,12 +348,12 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src2, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{oi.as.binary.op, oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.MOV, .{mov = .{ ireg, oi.as.binary.src2 }}});
-                        case .EQUAL_EQUAL; assert(false, "unreachable");
-                        case .NOT_EQUAL; assert(false, "unreachable");
-                        case .GREATER; assert(false, "unreachable");
-                        case .LESS; assert(false, "unreachable");
-                        case .LESS_EQUAL; assert(false, "unreachable");
-                        case .GREATER_EQUAL; assert(false, "unreachable");
+                    case .EQUAL_EQUAL; assert(false, "unreachable");
+                    case .NOT_EQUAL; assert(false, "unreachable");
+                    case .GREATER; assert(false, "unreachable");
+                    case .LESS; assert(false, "unreachable");
+                    case .LESS_EQUAL; assert(false, "unreachable");
+                    case .GREATER_EQUAL; assert(false, "unreachable");
                 }
             case .UNARY; #through;
             case .ALLOCATE_STACK; #through;
@@ -371,10 +371,13 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op1, ireg }}});
                     array_add(*insts, .{.CMP, .{cmp = .{ ireg, oi.as.cmp.op2}}});
                 }
-                if oi.as.cmp.op2.type == .IMM {
+                else if oi.as.cmp.op2.type == .IMM {
                     ireg := Operand_Asm.{.REG,.{reg = .R11}};
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op2, ireg }}});
                     array_add(*insts, .{.CMP, .{cmp = .{ oi.as.cmp.op1, ireg}}});
+                } 
+                else {
+                    array_add(*insts, oi);
                 }
         }
     }

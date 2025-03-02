@@ -29,7 +29,8 @@ sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast_Node, block
 }
 
 sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
-    if #complete stmt.type == { case .RETURN;
+    if #complete stmt.type == {
+        case .RETURN;
             sema_var_resolution_expr(stmt.as.return_stmt.expr, block_store);
         case .EXPR;
             sema_var_resolution_expr(stmt.as.expr, block_store);
@@ -42,6 +43,16 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
         case .COMPOUND;
             compound := stmt.as.compound;
             sema_var_resolution_block(compound, block_store);
+        case .CONTINUE;
+            assert(false, "not implemented");
+        case .BREAK;
+            assert(false, "not implemented");
+        case .FOR;
+            assert(false, "not implemented");
+        case .WHILE;
+            assert(false, "not implemented");
+        case .DO_WHILE;
+            assert(false, "not implemented");
         case .GOTO; #through;
         case .LABEL; #through;
         case .NULL;
