@@ -155,6 +155,16 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, .{.JUMP, .{ jump = goto }});
         case .COMPOUND;
             gen_instructions(tc, instructions, stmt_ast.as.compound);
+        case .FOR;
+            assert(false, "not implemented");
+        case .DO_WHILE;
+            assert(false, "not implemented");
+        case .WHILE;
+            assert(false, "not implemented");
+        case .BREAK;
+            assert(false, "not implemented");
+        case .CONTINUE;
+            assert(false, "not implemented");
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }
