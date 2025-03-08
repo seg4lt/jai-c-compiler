@@ -169,8 +169,12 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
                 // pass through - nothing to do when null stmt is received
     }
 }
-
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node) -> dst: Val_Tacky {
+    val := gen_instructions_expr(tc, instructions, expr_ast);
+    return gen_inst_for_possible_postfix(tc, instructions, expr_ast, val);
+}
+
+gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node) -> dst: Val_Tacky {
     if #complete expr_ast.type == {
         case .UNARY;
             src := gen_instructions(tc, instructions, expr_ast.as.unary.expr);
@@ -203,7 +207,9 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
         case .CONSTANT;
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
         case .VAR;
-            return .{.VARIABLE, .{variable = expr_ast.as.var}};
+            expr_value := Val_Tacky.{.VARIABLE, .{variable = expr_ast.as.var}};
+            // return gen_inst_for_possible_postfix(tc, instructions, expr_ast, expr_value);
+            return expr_value;
         case .ASSIGNMENT; 
             result := gen_instructions(tc, instructions, expr_ast.as.assignment.src);
 
@@ -236,6 +242,27 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
             array_add(instructions, ternary_end); 
             return result;
     }
+}
+
+gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node, expr_val_tacky: Val_Tacky) -> Val_Tacky {
+    if (expr_ast.postfix == .NONE) return expr_val_tacky;
+    old_value_dst := make_var(tc);
+    old_value := Instruction_Tacky.{.COPY, .{copy = .{src = expr_val_tacky, dst = old_value_dst }}};
+    array_add(instructions, old_value);
+
+    one := Val_Tacky.{.CONSTANT, .{constant = 1 }};
+    if #complete expr_ast.postfix == {
+        case .INCR; 
+            dst := make_var(tc);
+            array_add(instructions, .{.BINARY, .{binary= .{ .ADD, expr_val_tacky, one, dst}}});
+            array_add(instructions, .{.COPY, .{copy = .{src = dst, dst = expr_val_tacky}}});
+        case .DECR; 
+            dst := make_var(tc);
+            array_add(instructions, .{.BINARY, .{binary= .{ .SUB, expr_val_tacky, one, dst}}});
+            array_add(instructions, .{.COPY, .{copy = .{src = dst, dst = expr_val_tacky}}});
+        case .NONE; assert(false, "unreachable");
+    }
+    return old_value_dst;
 }
 
 gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast_Node.as.binary)) -> Val_Tacky {
