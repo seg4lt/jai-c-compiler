@@ -158,7 +158,7 @@ Decl :: struct {
             expr := ifx peek(parser).type == .ASSIGN {
                 consume(parser);
                 expr := Expr.parse_expr(parser, 0);
-                parse_postfix_expr_ast(parser, expr);
+                // parse_postfix_expr_ast(parser, expr);
                 expr;
             } else null;
 
