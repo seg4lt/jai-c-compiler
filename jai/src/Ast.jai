@@ -727,6 +727,11 @@ print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
             print(" : ");
             print_expr_ast(expr.as.conditional.false_block, depth+2);
     }
+    if #complete expr.postfix  == {
+        case .INCR; print("[POSTFIX] ++");
+        case .DECR; print("[PREFIX] --");
+        case .NONE;
+    }
 }
 
 print_space :: (depth: int = 0) {
