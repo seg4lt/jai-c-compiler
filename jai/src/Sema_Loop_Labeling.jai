@@ -49,7 +49,11 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast_Node, label_stack: *[..]string) {
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
+            label := tprint("L.dwloop.%", label_stack.count);
+            stmt.as.do_while.label = label;
+            array_add(label_stack, label);
+            sema_loop_labeling_stmt(stmt.as.do_while.body, label_stack);
+            pop(label_stack);
         case .RETURN; #through;
         case .EXPR; #through;
         case .LABEL; #through;

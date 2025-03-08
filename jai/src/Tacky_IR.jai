@@ -158,13 +158,41 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
+            do_while_stmt := stmt_ast.as.do_while;
+            loop_start_label := tprint("%_start", do_while_stmt.label);
+            loop_end_label := tprint("%_end", do_while_stmt.label);
+
+            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+
+            gen_instructions(tc, instructions, do_while_stmt.body);
+
+            condition := gen_instructions(tc, instructions, do_while_stmt.condition);
+            array_add(instructions, .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{ condition, loop_start_label } } });
+
+            array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .WHILE;
-            assert(false, "not implemented");
+            while_stmt := stmt_ast.as.while_stmt;
+            loop_start_label := tprint("%_start", while_stmt.label);
+            loop_end_label := tprint("%_end", while_stmt.label);
+
+            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+
+            condition := gen_instructions(tc, instructions, while_stmt.condition);
+            array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, loop_end_label } } });
+
+            gen_instructions(tc, instructions, while_stmt.body);
+
+            array_add(instructions, .{.JUMP, .{ jump = loop_start_label}});
+
+            array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .BREAK;
-            assert(false, "not implemented");
+            break_stmt := stmt_ast.as.break_stmt;
+            loop_end_label := tprint("%_end",break_stmt);
+            array_add(instructions, .{.JUMP, .{ jump = loop_end_label }});
         case .CONTINUE;
-            assert(false, "not implemented");
+            continue_stmt := stmt_ast.as.continue_stmt;
+            loop_start_label := tprint("%_start", continue_stmt);
+            array_add(instructions, .{.JUMP, .{ jump = loop_start_label }});
         case .NULL;
                 // pass through - nothing to do when null stmt is received
     }
