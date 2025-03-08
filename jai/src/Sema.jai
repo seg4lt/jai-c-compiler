@@ -3,6 +3,7 @@ Store :: Table(string, Owing_Entry(string));
 sema :: (ast: *Program_Ast_Node) {
     sema_var_resolution(ast);
     sema_label_resolution(ast);
+    sema_loop_labeling(ast);
     print("\n-- AFTER SEMA --\n");
     print_program_ast(ast);
 }
@@ -21,5 +22,6 @@ make_goto_label :: (name: string, n: int) -> string {
 
 #load "Sema_Goto_Label_Resolution.jai";
 #load "Sema_Var_Resolution.jai";
+#load "Sema_Loop_Labeling.jai";
 
 #scope_export

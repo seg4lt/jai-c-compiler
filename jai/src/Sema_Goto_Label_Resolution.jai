@@ -70,16 +70,13 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast_Node, label_store: *Store, block_
         case .COMPOUND; 
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
-        case .CONTINUE;
-            assert(false, "not implemented");
-        case .BREAK;
-            assert(false, "not implemented");
         case .FOR;
-            assert(false, "not implemented");
-        case .WHILE;
             assert(false, "not implemented");
         case .DO_WHILE;
             assert(false, "not implemented");
+        case .CONTINUE; #through;
+        case .BREAK; #through;
+        case .WHILE; #through;
         case .GOTO; #through;
         case .NULL;
             // noop
@@ -106,16 +103,13 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast_Node, goto_labels: *Store, label_s
         case .COMPOUND; 
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
-        case .CONTINUE;
-            assert(false, "not implemented");
-        case .BREAK;
-            assert(false, "not implemented");
         case .FOR;
-            assert(false, "not implemented");
-        case .WHILE;
             assert(false, "not implemented");
         case .DO_WHILE;
             assert(false, "not implemented");
+        case .CONTINUE; #through;
+        case .BREAK; #through;
+        case .WHILE; #through;
         case .LABEL; #through;
         case .NULL;
             // noop
