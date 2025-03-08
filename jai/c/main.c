@@ -1,7 +1,5 @@
 int main(void) {
-    int i = 0;
-    while(i++ < 10) {
-        i++;
-    }
-    return 0;
+    int x = 10;
+    x - 10 ? 0 : x--;
+    return x;
 }
