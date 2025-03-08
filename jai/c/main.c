@@ -1,13 +1,8 @@
 int main(void) {
     int x = 10;
-    while(x-- > 0) {
-        x--;
+    while(x > 0) {
+        x += 1;
         break;
-
-        while(x-- > 0) {
-            x--;
-            break;
-        }
     }
     return x;
 }
