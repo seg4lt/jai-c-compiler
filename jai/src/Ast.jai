@@ -47,7 +47,7 @@ Stmt_Ast_Node :: struct {
         compound: *Block_Ast_Node; 
         break_stmt: string;
         continue_stmt: string;
-        while_stmt: struct { condition: *Expr_Ast_Node; body: *Stmt_Ast_Node; };
+        while_stmt: struct { condition: *Expr_Ast_Node; body: *Stmt_Ast_Node; label: string; };
         do_while: struct {  body: *Stmt_Ast_Node; condition: *Expr_Ast_Node; };
         for_stmt: struct { init: *For_Init_Ast_Node; condition: /* Optional */ *Expr_Ast_Node; post: /* Optional */ *Expr_Ast_Node; body: *Stmt_Ast_Node; }
         // null : doesn't need value
@@ -189,10 +189,12 @@ Stmt :: struct {
                 consume(parser);
                 stmt := New(Stmt_Ast_Node);
                 stmt.* = .{.BREAK, .{break_stmt = "$$$UNPROCESSED_BREAK_LABEL$$$"}};
+                consume(parser, .SEMICOLON);
                 return stmt;
             case .CONTINUE;
                 consume(parser);
                 stmt := New(Stmt_Ast_Node);
+                consume(parser, .SEMICOLON);
                 stmt.* = .{.CONTINUE, .{continue_stmt = "$$$UNPROCESSED_CONTINUE_LABEL$$$"}};
                 return stmt;
             case .WHILE; return parse_while_stmt(parser) ;
@@ -238,7 +240,7 @@ Stmt :: struct {
         body := Stmt.parse_stmt_ast_node(parser);
 
         while_stmt := New(Stmt_Ast_Node);
-        while_stmt.* = .{ .WHILE, .{ while_stmt = .{ condition, body} } };
+        while_stmt.* = .{ .WHILE, .{ while_stmt = .{ condition, body, "$$NOT_PROCESSED$$"} } };
         return while_stmt;
     }
     parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
@@ -673,14 +675,14 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print("[COMPOUND]");
             print_block_ast(stmt.as.compound, depth + 2);
         case .CONTINUE;
-            assert(false, "not implemented");
+            print("[CONTINUE] %", stmt.as.continue_stmt);
         case .BREAK;
-            assert(false, "not implemented");
+            print("[BREAK] %", stmt.as.break_stmt);
         case .FOR;
             assert(false, "not implemented");
         case .WHILE;
             while_stmt := stmt.as.while_stmt;
-            print("[WHILE] ");
+            print("[WHILE] % ", while_stmt.label);
             print_expr_ast(while_stmt.condition, depth);
             print_space(depth + 1);
             print_stmt_ast(while_stmt.body, depth + 1);
