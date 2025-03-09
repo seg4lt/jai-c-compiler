@@ -73,10 +73,13 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast_Node, label_store: *Store, block_
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
+            do_while_stmt := stmt.as.do_while;
+            sema_label_resolution_stmt(do_while_stmt.body, label_store, block_items, index);
+        case .WHILE;
+            while_stmt := stmt.as.while_stmt;
+            sema_label_resolution_stmt(while_stmt.body, label_store, block_items, index);
         case .CONTINUE; #through;
         case .BREAK; #through;
-        case .WHILE; #through;
         case .GOTO; #through;
         case .NULL;
             // noop
@@ -106,10 +109,13 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast_Node, goto_labels: *Store, label_s
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
+            sema_goto_resolution_expr(stmt.as.do_while.condition, goto_labels, label_store);
+            sema_goto_resolution_stmt(stmt.as.do_while.body, goto_labels, label_store);
+        case .WHILE;
+            sema_goto_resolution_expr(stmt.as.while_stmt.condition, goto_labels, label_store);
+            sema_goto_resolution_stmt(stmt.as.while_stmt.body, goto_labels, label_store);
         case .CONTINUE; #through;
         case .BREAK; #through;
-        case .WHILE; #through;
         case .LABEL; #through;
         case .NULL;
             // noop

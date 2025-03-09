@@ -158,7 +158,18 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
+            do_while_stmt := stmt_ast.as.do_while;
+            loop_start_label := tprint("%_start", do_while_stmt.label);
+            loop_end_label := tprint("%_end", do_while_stmt.label);
+
+            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+
+            gen_instructions(tc, instructions, do_while_stmt.body);
+
+            condition := gen_instructions(tc, instructions, do_while_stmt.condition);
+            array_add(instructions, .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{ condition, loop_start_label } } });
+
+            array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .WHILE;
             while_stmt := stmt_ast.as.while_stmt;
             loop_start_label := tprint("%_start", while_stmt.label);

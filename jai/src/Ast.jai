@@ -48,7 +48,7 @@ Stmt_Ast_Node :: struct {
         break_stmt: string;
         continue_stmt: string;
         while_stmt: struct { condition: *Expr_Ast_Node; body: *Stmt_Ast_Node; label: string; };
-        do_while: struct {  body: *Stmt_Ast_Node; condition: *Expr_Ast_Node; };
+        do_while: struct {  body: *Stmt_Ast_Node; condition: *Expr_Ast_Node; label: string;};
         for_stmt: struct { init: *For_Init_Ast_Node; condition: /* Optional */ *Expr_Ast_Node; post: /* Optional */ *Expr_Ast_Node; body: *Stmt_Ast_Node; }
         // null : doesn't need value
     };
@@ -244,8 +244,17 @@ Stmt :: struct {
         return while_stmt;
     }
     parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
-        assert(false, "not implemented");
-        return null;
+        consume(parser, .DO);
+        body := Stmt.parse_stmt_ast_node(parser);
+
+        consume(parser, .WHILE);
+        consume(parser, .LPAREN);
+        condition := Expr.parse_expr(parser, 0);
+        consume(parser, .RPAREN);
+
+        do_while := New(Stmt_Ast_Node);
+        do_while.* = .{ .DO_WHILE, .{ do_while = .{ body, condition, "$$NOT_PROCESSED$$"} } };
+        return do_while;
     }
     parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
         assert(false, "not implemented");
@@ -687,7 +696,13 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             print_space(depth + 1);
             print_stmt_ast(while_stmt.body, depth + 1);
         case .DO_WHILE;
-            assert(false, "not implemented");
+            do_while_stmt := stmt.as.do_while;
+            print("[DO] % ", do_while_stmt.label);
+            // print_space(depth + 1);
+            print_stmt_ast(do_while_stmt.body, depth + 1);
+            print_space(depth);
+            print("[DO_WHILE] % ", do_while_stmt.label);
+            print_expr_ast(do_while_stmt.condition, depth +1);
     }
 }
 

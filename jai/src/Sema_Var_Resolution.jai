@@ -46,8 +46,11 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
         case .FOR;
             assert(false, "not implemented");
         case .DO_WHILE;
-            assert(false, "not implemented");
-        case .WHILE; #through;
+            do_while_stmt := stmt.as.do_while;
+            sema_var_resolution_stmt(do_while_stmt.body, block_store);
+        case .WHILE;
+            while_stmt := stmt.as.while_stmt;
+            sema_var_resolution_stmt(while_stmt.body, block_store);
         case .CONTINUE; #through;
         case .BREAK; #through;
         case .GOTO; #through;
