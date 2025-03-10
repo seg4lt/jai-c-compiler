@@ -1,6 +1,9 @@
 sema_loop_labeling :: (ast: *Program_Ast_Node) {
     sema_loop_labeling_fn(ast.fn);
 }
+
+#scope_file
+
 sema_loop_labeling_fn :: (fn: *Fn_Ast_Node) {
     label_stack: [..]string;
     defer free(*label_stack);
@@ -47,7 +50,14 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast_Node, label_stack: *[..]string) {
             assert(label_stack.count > 0, "You need to be in construct that supports break");
             stmt.as.break_stmt = peek(label_stack.*);
         case .FOR;
-            assert(false, "not implemented");
+            label := tprint("L.forloop.%", label_stack.count);
+            stmt.as.for_stmt.label = label;
+            {
+                array_add(label_stack, label);
+                defer pop(label_stack);
+
+                sema_loop_labeling_stmt(stmt.as.for_stmt.body, label_stack);
+            }
         case .DO_WHILE;
             label := tprint("L.dwloop.%", label_stack.count);
             stmt.as.do_while.label = label;
