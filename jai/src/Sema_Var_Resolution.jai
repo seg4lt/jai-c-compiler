@@ -4,6 +4,8 @@ sema_var_resolution :: (ast: *Program_Ast_Node) {
     sema_var_resolution_block(block, null);
 }
 
+#scope_file
+
 sema_var_resolution_block :: (block: *Block_Ast_Node, block_store: *Store) {
     new_block_store : Store;
 
@@ -44,7 +46,25 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
             compound := stmt.as.compound;
             sema_var_resolution_block(compound, block_store);
         case .FOR;
-            assert(false, "not implemented");
+            new_block_store : Store;
+            defer deinit(*new_block_store);
+            new_block_store = table_clone_owing_entry(block_store);
+            for_stmt := stmt.as.for_stmt;
+            if #complete for_stmt.init.type == {
+                case .INIT_DECL;
+                    sema_var_resolution_decl(for_stmt.init.as.decl, *new_block_store);
+                case .INIT_EXPR;
+                    if for_stmt.init.as.expr != null {
+                        sema_var_resolution_expr(for_stmt.init.as.expr, *new_block_store);
+                    }
+            }
+            if for_stmt.condition != null {
+                sema_var_resolution_expr(for_stmt.condition, *new_block_store);
+            }
+            if for_stmt.post != null {
+                sema_var_resolution_expr(for_stmt.post, *new_block_store);
+            }
+            sema_var_resolution_stmt(for_stmt.body, *new_block_store);
         case .DO_WHILE;
             do_while_stmt := stmt.as.do_while;
             sema_var_resolution_stmt(do_while_stmt.body, block_store);
@@ -91,7 +111,6 @@ sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Store) {
         case .ASSIGNMENT;
             assignment := expr.as.assignment;
             // verify dst is valid lvalue
-
             if !(assignment.dst.type == .VAR || (assignment.dst.type == .GROUP && assignment.dst.as.group.type == .VAR)) {
                 print("\n-- DEBUG -- \n");
                 print_expr_ast(expr);
