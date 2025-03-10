@@ -1,10 +1,7 @@
 int main(void) {
     int x = 1;
-    do {
+    for (x = 1; x < 10; x+=1) {
         x = x + 1;
-        if (x == 5) {
-            break;
-        }
-    } while(x < 10);
+    }
     return x;
 }

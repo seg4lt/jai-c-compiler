@@ -29,10 +29,10 @@ Decl_Ast_Node :: struct {
 }
 
 For_Init_Ast_Node :: struct {
-    type: enum { INIT_DECL; INIT_EXP; };
+    type: enum { INIT_DECL; INIT_EXPR; };
     as: union {
         decl: *Decl_Ast_Node;
-        exp: *Expr_Ast_Node;
+        expr: * /*Optional*/ Expr_Ast_Node;
     };
 }
 
@@ -49,7 +49,7 @@ Stmt_Ast_Node :: struct {
         continue_stmt: string;
         while_stmt: struct { condition: *Expr_Ast_Node; body: *Stmt_Ast_Node; label: string; };
         do_while: struct {  body: *Stmt_Ast_Node; condition: *Expr_Ast_Node; label: string;};
-        for_stmt: struct { init: *For_Init_Ast_Node; condition: /* Optional */ *Expr_Ast_Node; post: /* Optional */ *Expr_Ast_Node; body: *Stmt_Ast_Node; }
+        for_stmt: struct { init: *For_Init_Ast_Node; condition: /* Optional */ *Expr_Ast_Node; post: /* Optional */ *Expr_Ast_Node; body: *Stmt_Ast_Node; label: string; }
         // null : doesn't need value
     };
 }
@@ -256,9 +256,39 @@ Stmt :: struct {
         do_while.* = .{ .DO_WHILE, .{ do_while = .{ body, condition, "$$NOT_PROCESSED$$"} } };
         return do_while;
     }
+
+    parse_for_init :: (parser: *Parser) -> *For_Init_Ast_Node {
+        if peek(parser).type == .INT {
+            decl := Decl.parse_decl_ast_node(parser);
+            for_init_decl := New(For_Init_Ast_Node);
+            for_init_decl.* = .{ .INIT_DECL, .{decl = decl}};
+            return for_init_decl;
+        }
+        expr := Expr.parse_optional_expr(parser, 0);
+        for_init_expr := New(For_Init_Ast_Node);
+        for_init_expr.* = .{ .INIT_EXPR, .{expr = expr}};
+        return for_init_expr;
+    }
+
     parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
-        assert(false, "not implemented");
-        return null;
+        consume(parser, .FOR);
+        consume(parser, .LPAREN);
+
+        for_init := parse_for_init(parser);
+        if for_init.type == .INIT_EXPR {
+            consume(parser, .SEMICOLON);
+        }
+        condition := Expr.parse_optional_expr(parser, 0);
+        consume(parser, .SEMICOLON);
+        post := Expr.parse_optional_expr(parser, 0);
+        consume(parser, .RPAREN);
+
+        body := Stmt.parse_stmt_ast_node(parser);
+
+
+        for_stmt := New(Stmt_Ast_Node);
+        for_stmt.* = .{.FOR, .{for_stmt = .{for_init, condition, post, body, "$$ UNPROCESSED FOR LOOP LABEL $$ "}}};
+        return for_stmt;
     }
 
     parse_if_stmt :: (parser: *Parser) -> *Stmt_Ast_Node {
@@ -296,6 +326,16 @@ Expr :: struct {
         expr.* = .{ expr_type, expr_value, postfix};
         return expr;
     }
+
+    parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr_Ast_Node {
+        if peek(parser).type == .SEMICOLON {
+            consume(parser, .SEMICOLON);
+            return null;
+        }
+        expr := parse_expr(parser, min_prec);
+        return expr;
+    }
+
     parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast_Node {
         left := parse_factor(parser);
         next_token := peek(parser);
@@ -688,7 +728,31 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
         case .BREAK;
             print("[BREAK] %", stmt.as.break_stmt);
         case .FOR;
-            assert(false, "not implemented");
+            for_stmt := stmt.as.for_stmt;
+            print("[FOR] %", for_stmt.label);
+            print_space(depth + 1);
+            if #complete for_stmt.init.type == {
+                case .INIT_DECL;
+                    print("<init decl> ");
+                    print_decl_ast(for_stmt.init.as.decl, depth + 1);
+                case .INIT_EXPR;
+                    if for_stmt.init.as.expr != null {
+                        print("<init expr> ");
+                        print_expr_ast(for_stmt.init.as.expr, depth + 1);
+                    }
+            }
+            print_space(depth + 1);
+            if for_stmt.condition != null {
+                print("<condition> ");
+                print_expr_ast(for_stmt.condition, depth + 1);
+            }
+            print_space(depth + 1);
+            if for_stmt.post != null  {
+                print("<post> ");
+                print_expr_ast(for_stmt.post, depth + 1);
+            }
+            print_space(depth + 1);
+            print_stmt_ast(for_stmt.body, depth + 1);
         case .WHILE;
             while_stmt := stmt.as.while_stmt;
             print("[WHILE] % ", while_stmt.label);
