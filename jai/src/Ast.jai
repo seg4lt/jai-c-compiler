@@ -251,6 +251,7 @@ Stmt :: struct {
         consume(parser, .LPAREN);
         condition := Expr.parse_expr(parser, 0);
         consume(parser, .RPAREN);
+        consume(parser, .SEMICOLON);
 
         do_while := New(Stmt_Ast_Node);
         do_while.* = .{ .DO_WHILE, .{ do_while = .{ body, condition, "$$NOT_PROCESSED$$"} } };
@@ -280,7 +281,7 @@ Stmt :: struct {
         }
         condition := Expr.parse_optional_expr(parser, 0);
         consume(parser, .SEMICOLON);
-        post := Expr.parse_optional_expr(parser, 0);
+        post := ifx peek(parser).type == .RPAREN null else Expr.parse_expr(parser, 0);
         consume(parser, .RPAREN);
 
         body := Stmt.parse_stmt_ast_node(parser);
@@ -329,7 +330,7 @@ Expr :: struct {
 
     parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr_Ast_Node {
         if peek(parser).type == .SEMICOLON {
-            consume(parser, .SEMICOLON);
+            // consume(parser, .SEMICOLON);
             return null;
         }
         expr := parse_expr(parser, min_prec);
@@ -731,24 +732,23 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
             for_stmt := stmt.as.for_stmt;
             print("[FOR] %", for_stmt.label);
             print_space(depth + 1);
+            print("<init> ");
             if #complete for_stmt.init.type == {
                 case .INIT_DECL;
-                    print("<init decl> ");
                     print_decl_ast(for_stmt.init.as.decl, depth + 1);
                 case .INIT_EXPR;
                     if for_stmt.init.as.expr != null {
-                        print("<init expr> ");
                         print_expr_ast(for_stmt.init.as.expr, depth + 1);
                     }
             }
             print_space(depth + 1);
+            print("<condition> ");
             if for_stmt.condition != null {
-                print("<condition> ");
                 print_expr_ast(for_stmt.condition, depth + 1);
             }
             print_space(depth + 1);
+            print("<post> ");
             if for_stmt.post != null  {
-                print("<post> ");
                 print_expr_ast(for_stmt.post, depth + 1);
             }
             print_space(depth + 1);
