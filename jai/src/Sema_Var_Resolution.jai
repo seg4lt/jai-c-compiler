@@ -68,8 +68,10 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
         case .DO_WHILE;
             do_while_stmt := stmt.as.do_while;
             sema_var_resolution_stmt(do_while_stmt.body, block_store);
+            sema_var_resolution_expr(do_while_stmt.condition, block_store);
         case .WHILE;
             while_stmt := stmt.as.while_stmt;
+            sema_var_resolution_expr(while_stmt.condition, block_store);
             sema_var_resolution_stmt(while_stmt.body, block_store);
         case .CONTINUE; #through;
         case .BREAK; #through;

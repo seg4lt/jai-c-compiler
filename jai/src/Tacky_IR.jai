@@ -98,17 +98,18 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block
             case .STMT;
                 gen_instructions(tc, instructions, it.as.stmt);
             case .DECL;
-                if (it.as.decl.init == null) {
-                    // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
-                    continue;
-                }
-                result := gen_instructions(tc, instructions, it.as.decl.init);
-                dst := Val_Tacky.{.VARIABLE, .{ variable = it.as.decl.ident}};
-                array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+                gen_instructions_decl(tc, instructions, it.as.decl);
         }
     }
-
-   
+}
+gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast_Node) {
+    if (decl_ast.init == null) {
+        // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
+        return;
+    }
+    result := gen_instructions(tc, instructions, decl_ast.init);
+    dst := Val_Tacky.{.VARIABLE, .{ variable = decl_ast.ident}};
+    array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast_Node) {
@@ -156,7 +157,31 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .COMPOUND;
             gen_instructions(tc, instructions, stmt_ast.as.compound);
         case .FOR;
-            assert(false, "not implemented");
+            for_stmt := stmt_ast.as.for_stmt;
+            loop_start_label := tprint("%_start", for_stmt.label);
+            loop_end_label := tprint("%_end", for_stmt.label);
+
+            if #complete for_stmt.init.type == {
+                case .INIT_DECL;
+                    gen_instructions_decl(tc, instructions, for_stmt.init.as.decl);
+                case .INIT_EXPR;
+                    if for_stmt.init.as.expr != null {
+                        gen_instructions(tc, instructions, for_stmt.init.as.expr);
+                    }
+            }
+            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+
+            if for_stmt.condition != null {
+                condition := gen_instructions(tc, instructions, for_stmt.condition);
+                array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, loop_end_label } } });
+            }
+
+            gen_instructions(tc, instructions, for_stmt.body);
+
+            if for_stmt.post != null gen_instructions(tc, instructions, for_stmt.post);
+
+            array_add(instructions, .{.JUMP, .{ jump = loop_start_label}});
+            array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .DO_WHILE;
             do_while_stmt := stmt_ast.as.do_while;
             loop_start_label := tprint("%_start", do_while_stmt.label);
