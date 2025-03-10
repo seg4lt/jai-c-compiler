@@ -1,6 +1,8 @@
 sema_label_resolution :: (ast: *Program_Ast_Node) {
     sema_label_res_fn(ast.fn);
 }
+
+#scope_file
 sema_label_res_fn :: (fn: *Fn_Ast_Node) {
     label_store : Store;
     init(*label_store);
@@ -71,7 +73,8 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast_Node, label_store: *Store, block_
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
         case .FOR;
-            assert(false, "not implemented");
+            for_stmt := stmt.as.for_stmt;
+            sema_label_resolution_stmt(for_stmt.body, label_store, block_items,index);
         case .DO_WHILE;
             do_while_stmt := stmt.as.do_while;
             sema_label_resolution_stmt(do_while_stmt.body, label_store, block_items, index);
@@ -107,7 +110,8 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast_Node, goto_labels: *Store, label_s
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
         case .FOR;
-            assert(false, "not implemented");
+            for_stmt := stmt.as.for_stmt;
+            sema_goto_resolution_stmt(stmt.as.for_stmt.body, goto_labels, label_store);
         case .DO_WHILE;
             sema_goto_resolution_expr(stmt.as.do_while.condition, goto_labels, label_store);
             sema_goto_resolution_stmt(stmt.as.do_while.body, goto_labels, label_store);
