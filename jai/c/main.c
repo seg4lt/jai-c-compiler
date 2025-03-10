@@ -1,7 +1,9 @@
-int main(void) {
-    for (int i = 0; i < 10; i++) {
-        if (i == 5)
-            break;
-    }
-    return 0;
+/* Test case from Listing 8-3:
+ * A variable declared in a loop body is out of scope in the controlling expression
+ */
+
+ int main(void) {
+    do {
+        int a = a + 1;
+    } while (a < 100);
 }
