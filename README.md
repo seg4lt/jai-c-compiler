@@ -1,9 +1,9 @@
-# writing-c-compiler implementation in Zig and Jai
+# C Compiler in Jai
 
-Simple implementation of c-compiler using Zig and Jai. Currently only Jai
+Simple implementation of c-compiler using Jai
 
 
-# TODO (jai)
+# TODO
 - [ ] Better reporting - error reporting as separate concern
 - [ ] SETCC needs only 1 byte, but today we are using 4 bytes. Need to fix this
 - [ ] Parse typedef - Read more on context sentitive grammer.
