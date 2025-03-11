@@ -71,6 +71,10 @@ Token_Type :: enum {
     WHILE;
     CONTINUE;
     BREAK;
+
+    SWITCH;
+    CASE;
+    DEFAULT;
 }
 
 Token :: struct {
@@ -332,6 +336,9 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
         case "while"; return .WHILE;
         case "break"; return .BREAK;
         case "continue"; return .CONTINUE;
+        case "switch"; return .SWITCH;
+        case "case"; return .CASE;
+        case "default"; return .DEFAULT;
         case; return .IDENT;
     }
 }

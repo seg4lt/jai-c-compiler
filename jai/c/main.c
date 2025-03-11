@@ -1,9 +1,17 @@
-/* Test case from Listing 8-3:
- * A variable declared in a loop body is out of scope in the controlling expression
- */
 
- int main(void) {
-    do {
-        int a = a + 1;
-    } while (a < 100);
+int main(void) {
+    int x = 2;
+    int y = 3;
+    switch(x) {
+        case 1:
+            y += 1;
+            break;
+        case 2:
+            y += 2;
+            break;
+        default:
+            y += 3;
+            break;
+    }
+    return y;
 }
