@@ -8,8 +8,7 @@
         "program": "./out/target",
         "args": ["./c/main.c"],
         "preLaunchTask": "Compile Current Jai File",
-        // "cwd": "${fileDirname}",
         "console": "integratedTerminal"
-    }
+      }
     ]
   }
