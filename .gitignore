@@ -1,23 +1,2 @@
 .build
-*
-!/**/
-!*.*
-!/bin/*
-.build
-*.dSYM
-*.dylib
 out/
-.build/
-*.symlink
-
-modules # symlinking moduels directory locally for faster search
-
-#
-!*.c
-!Makefile
-# preprocessed output
-*.i
-# ASM 
-*.s
-# object files
-*.o
