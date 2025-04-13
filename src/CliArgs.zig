@@ -42,11 +42,43 @@ pub const CliFlags = enum(u8) {
     all = 6,
 
     pub fn isEnabled(self: *const CliFlags, check_flag: CliFlags) bool {
-        return @intFromEnum(self) <= @intFromEnum(check_flag);
+        if (self.* == .all) return true;
+        return @intFromEnum(self.*) >= @intFromEnum(check_flag);
     }
 };
 
-const CliArgsError = error { NoSourceFile, SourceFileNotACExtension };
+const CliArgsError = error{ NoSourceFile, SourceFileNotACExtension };
 
 const Self = @This();
 const std = @import("std");
+
+test "test cli args" {
+    const TestData = struct {
+        arg: [*:0]const u8,
+        flags: []const CliFlags,
+    };
+    
+    const test_data = [_]TestData{
+        .{ .arg = "--lex", .flags = &[_]CliFlags{.lex} },
+        .{ .arg = "--parse", .flags = &[_]CliFlags{ .lex, .parse } },
+        .{ .arg = "--validate", .flags = &[_]CliFlags{ .lex, .parse, .sema } },
+        .{ .arg = "--tacky", .flags = &[_]CliFlags{ .lex, .parse, .sema, .tacky } },
+        .{ .arg = "--code-gen", .flags = &[_]CliFlags{ .lex, .parse, .sema, .tacky, .code_gen } },
+        .{ .arg = "", .flags = &[_]CliFlags{ .lex, .parse, .sema, .tacky, .code_gen, .all } },
+    };
+
+    for (test_data) |data| {
+        var argv = [_][*:0]u8{
+            @constCast(data.arg),
+            @constCast("main.c"),
+        };
+        std.os.argv = &argv;
+
+        const args = try parse();
+        for (data.flags) |expected_flag| {
+            try std.testing.expect(args.flag.isEnabled(expected_flag));
+        }
+    }
+}
+
+test "test error" {}
