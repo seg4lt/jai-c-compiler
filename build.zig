@@ -28,7 +28,7 @@ fn setupTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
     defer walker.deinit();
 
     while (walker.next() catch unreachable) |entry| {
-        if (entry.kind == .file and std.mem.endsWith(u8, entry.path, ".zig")) {
+        if (entry.kind == .file and std.mem.endsWith(u8, entry.path, ".test.zig")) {
             const t = b.addTest(.{
                 .root_source_file = b.path(b.pathJoin(&.{ "src", entry.path })),
                 .target = target,

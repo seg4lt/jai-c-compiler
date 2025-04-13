@@ -1,12 +1,21 @@
 Lexer :: struct {
     line: int = 1;
-    line_start: int = 0;
-    previous_line_start: int = 0;
-    previous_line_end: int = 0;
     src: string;
     start: int = 0; // current token start position
     current: int = 0; // where is cursor right now
     tokens: [..]Token;
+}
+
+lex :: (args: Cli_Args) -> Lexer {
+    src, r_success := read_entire_file(tprint("%.i", args.source_file_path_without_ext));
+    if !r_success {
+        assert(false, "Unable to read file -- '%'", args.source_file_path);
+        exit(1);
+    }
+    lexer := Lexer.{src = src};
+    scan(*lexer);
+    print_tokens(lexer.tokens);
+    return lexer;
 }
 
 Token_Type :: enum {
@@ -83,17 +92,7 @@ Token :: struct {
     line: int;
 }
 
-lex :: (args: Cli_Args) -> Lexer {
-    src, r_success := read_entire_file(tprint("%.i", args.source_file_path_without_ext));
-    if !r_success {
-        assert(false, "Unable to read file -- '%'", args.source_file_path);
-        exit(1);
-    }
-    lexer := Lexer.{src = src};
-    scan(*lexer);
-    print_tokens(lexer.tokens);
-    return lexer;
-}
+#scope_file
 
 print_tokens :: (tokens: []Token) {
     print("\n -- Lexer -- \n");
@@ -101,14 +100,18 @@ print_tokens :: (tokens: []Token) {
     print("\n");
 }
 
+add_token(using lexer: *Lexer, type: Token_Type) {
+    array_add(*tokens, .{ type, slice(src, start, current-start, line }));
+}
+
 scan :: (using lexer: *Lexer) {
     while !is_at_end(lexer) {
         start = current;
         current_char := consume(lexer);
 
-        if String.is_space(current_char) continue;
-        if String.is_alpha(current_char) || current_char == #char "_" { ident_or_keyword(lexer); continue; }
-        if String.is_digit(current_char) { number(lexer); continue; }
+        if is_space(current_char) continue;
+        if is_alpha(current_char) || current_char == #char "_" { ident_or_keyword(lexer); continue; }
+        if is_digit(current_char) { number(lexer); continue; }
 
         if current_char == {
             case #char "("; array_add(*tokens, .{.LPAREN,      "(", line});
@@ -250,21 +253,10 @@ scan :: (using lexer: *Lexer) {
             case #char "?"; array_add(*tokens, .{.QUESTION_MARK, "?", line});
             case #char ":"; array_add(*tokens, .{.COLON, ":", line});
             case; 
-                print_err_line(lexer, tprint("Unexpected character %\n", String.to_string(*current_char, 1)));
+                log_error(tprint("Unexpected character %\n", to_string(*current_char, 1)));
+                exit(1);
         }
     }
-}
-
-print_err_line :: (using lexer: *Lexer, msg: string = "") {
-    new_line_index := current;
-    while (src.data + new_line_index).* != #char "\n" && new_line_index < src.count {
-        new_line_index += 1;
-    }
-    print("%\n", String.slice(src, previous_line_start, previous_line_end - previous_line_start));
-    print("%\n", String.slice(src, line_start, new_line_index-line_start));
-    for 0..current-line_start-2 print(" ");
-    print("^---");
-    assert(false, "%", msg);
 }
 
 comment :: (using lexer: *Lexer) {
@@ -273,53 +265,50 @@ comment :: (using lexer: *Lexer) {
             while !is_at_end(lexer) && peek(lexer) != #char "\n" {
                 consume(lexer);
             }
-            increment_line(lexer);
+            line += 1;
         case #char "*";
             consume(lexer);
             while !is_at_end(lexer) {
                 c := consume(lexer);
-                if c == #char "\n"  { 
-                    increment_line(lexer);
-                }
+                if c == #char "\n" line += 1;
                 if c == #char "*" && peek(lexer) == #char "/" break;
             }
             consume(lexer); // consume closing /, if not found, this is an error
-        case; print_err_line(lexer, "unable to parse comment");
+        case; 
+          log_error("unable to parse comment\n");
+          exit(1);
     }
 }
 
-increment_line :: (using lexer: *Lexer) {
-    previous_line_start = line_start;
-    previous_line_end = current - 1;
-    line += 1;
-    line_start = current;
-}
 
 number :: (using lexer: *Lexer) {
     found_alpha := false;
-    while !is_at_end(lexer) && (String.is_digit(peek(lexer)) || String.is_alpha(peek(lexer))) {
-        if String.is_alpha(peek(lexer)) found_alpha = true;
+    while !is_at_end(lexer) && (is_digit(peek(lexer)) || is_alpha(peek(lexer))) {
+        if is_alpha(peek(lexer)) found_alpha = true;
         consume(lexer);
     }
-    str := String.slice(src, start, current-start);
-    if found_alpha print_err_line(lexer, tprint("Invalid number found %", str));
+    str := slice(src, start, current-start);
+    if found_alpha  {
+        log_error(tprint("Invalid number found %", str));
+        exit(1);
+    }
 
     token := Token.{ .INT_LITERAL, str, line};
     array_add(*tokens, token); 
 }
 
 ident_or_keyword :: (using lexer: *Lexer) {
-    while !is_at_end(lexer) && String.is_alnum(peek(lexer)) consume(lexer);
-    str := String.slice(src, start, current-start);
+    while !is_at_end(lexer) && is_alnum(peek(lexer)) consume(lexer);
+    str := slice(src, start, current-start);
     token_type := find_keyword_or_ident(str);
     token := Token.{ token_type, str, line};
     array_add(*tokens, token);
 }
 
 eat_whitespace :: (lexer: *Lexer) {
-    while String.is_space(peek(lexer)) {
+    while is_space(peek(lexer)) {
         token := consume(lexer);
-        if token == #char "\n" increment_line(lexer);
+        if token == #char "\n" lexer.line += 1;
     }
 }
 
@@ -346,9 +335,7 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
 consume :: (using lexer: *Lexer) -> u8 {
     defer current += 1;
     c := peek(lexer);
-    if c == #char "\n" {
-        increment_line(lexer);
-    }
+    if c == #char "\n" line += 1;
     return c;
 }
 
@@ -363,6 +350,6 @@ is_at_end :: (using lexer: *Lexer) -> bool {
 #scope_file
 
 #import "Basic";
-String :: #import "String";
+#import "String";
 
 #scope_export
