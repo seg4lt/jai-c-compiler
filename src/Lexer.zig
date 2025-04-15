@@ -1,7 +1,8 @@
 const std = @import("std");
 const log = std.log;
 const Allocator = std.mem.Allocator;
-const TokenArray = std.ArrayList(Token);
+pub const TokenArray = std.ArrayList(Token);
+
 const Self = @This();
 
 src: []const u8,
@@ -246,7 +247,7 @@ fn isAtEnd(s: *Self) bool {
     return s.current >= s.src.len;
 }
 
-const TokenType = enum {
+pub const TokenType = enum {
     lparen,
     rparen,
     lcurly,
@@ -312,9 +313,10 @@ const TokenType = enum {
     @"switch",
     case,
     default,
+    eof,
 };
 
-const Token = struct {
+pub const Token = struct {
     type: TokenType,
     value: []const u8,
     line: u16,

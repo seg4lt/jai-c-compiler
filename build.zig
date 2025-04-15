@@ -18,25 +18,31 @@ pub fn build(b: *std.Build) void {
 }
 
 fn setupTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
-    // region Test Step
     const test_step = b.step("test", "Run all test");
-    const src_dir = b.pathFromRoot("src");
-    var dir = std.fs.openDirAbsolute(src_dir, .{ .iterate = true }) catch unreachable;
-    defer dir.close();
+    const t = b.addTest(.{
+        .root_source_file = b.path("src/tests.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const rt = b.addRunArtifact(t);
+    test_step.dependOn(&rt.step);
 
-    var walker = dir.walk(b.allocator) catch unreachable;
-    defer walker.deinit();
+    // const src_dir = b.pathFromRoot("src");
+    // var dir = std.fs.openDirAbsolute(src_dir, .{ .iterate = true }) catch unreachable;
+    // defer dir.close();
 
-    while (walker.next() catch unreachable) |entry| {
-        if (entry.kind == .file and std.mem.endsWith(u8, entry.path, ".test.zig")) {
-            const t = b.addTest(.{
-                .root_source_file = b.path(b.pathJoin(&.{ "src", entry.path })),
-                .target = target,
-                .optimize = optimize,
-            });
-            const rt = b.addRunArtifact(t);
-            test_step.dependOn(&rt.step);
-        }
-    }
-    // endregion
+    // var walker = dir.walk(b.allocator) catch unreachable;
+    // defer walker.deinit();
+
+    // while (walker.next() catch unreachable) |entry| {
+    //     if (entry.kind == .file and std.mem.endsWith(u8, entry.path, ".test.zig")) {
+    //         const t = b.addTest(.{
+    //             .root_source_file = b.path(b.pathJoin(&.{ "src", entry.path })),
+    //             .target = target,
+    //             .optimize = optimize,
+    //         });
+    //         const rt = b.addRunArtifact(t);
+    //         test_step.dependOn(&rt.step);
+    //     }
+    // }
 }

@@ -20,10 +20,11 @@ main :: () {
 #import "Basic"()(MEMORY_DEBUGGER=true);
 String :: #import "String";
 Process :: #import "Process";
+#import "Lexer";
+
 #import "File";
 #load "Cli_Args.jai";
 #load "Compiler_Util.jai";
-#load "Lexer.jai";
 #load "Ast.jai";
 #load "Sema.jai";
 #load "Tacky_IR.jai";

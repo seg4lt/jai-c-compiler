@@ -349,7 +349,3 @@ is_at_end :: (using lexer: *Lexer) -> bool {
 
 #scope_file
 
-#import "Basic";
-#import "String";
-
-#scope_export
