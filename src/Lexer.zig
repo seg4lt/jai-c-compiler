@@ -13,7 +13,9 @@ start: usize = 0, // current token start position
 current: usize = 0, // where is cursor right now
 
 pub fn initFromSrcPath(allocator: Allocator, src_path: []const u8) !Self {
-    const src = try std.fs.cwd().readFileAlloc(allocator, src_path, 4096);
+    const file = std.fmt.allocPrint(allocator, "{s}.i", .{src_path[0 .. src_path.len - 2]}) catch unreachable;
+    defer allocator.free(file);
+    const src = try std.fs.cwd().readFileAlloc(allocator, file, 4096);
     return initFromSrc(allocator, src);
 }
 

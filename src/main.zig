@@ -9,6 +9,7 @@ pub fn main() !void {
 
     const args = try CliArgs.parse();
     log.debug("Compiling file: {s}", .{args.src});
+    preprocessor(arena, args.srcWithoutExt());
 
     const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrcPath(arena, args.src) else null;
     const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(arena, lexer.?.tokens) else null;
@@ -30,7 +31,9 @@ const CliArgs = @import("CliArgs.zig");
 const Lexer = @import("Lexer.zig");
 const Parser = @import("parser/Parser.zig");
 const builtin = @import("builtin");
-const log = @import("util.zig").log;
+const util = @import("util.zig");
+const log = util.log;
+const preprocessor = util.preprocessor;
 
 const Allocator = std.mem.Allocator;
 const ProgramAst = Parser.Program;
