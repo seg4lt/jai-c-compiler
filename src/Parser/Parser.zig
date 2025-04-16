@@ -117,7 +117,8 @@ fn parseExpr(p: *Parser, min_precedence: u8) ParseError!*Ast.Expr {
         } else if (next_token.type == .question_mark) {
             unreachable;
         } else {
-            const op = mapToBinaryOperator(next_token.type);
+            const cur_token = p.consumeAny() catch return ParseError.ExpectedSomeToken;
+            const op = mapToBinaryOperator(cur_token.type);
             const right = try p.parseExpr(precedence(next_token.type) + 1);
             const binary: *Ast.Expr = .binaryExpr(p.allocator, op, left, right);
             left = binary;

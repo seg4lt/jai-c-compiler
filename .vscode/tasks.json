@@ -4,7 +4,7 @@
       {
         "label": "Compile Zig",
         "type": "shell",
-        "command": "zig build",
+        "command": "zig build run -- c/main.c",
         "group": {
           "kind": "build",
           "isDefault": true
