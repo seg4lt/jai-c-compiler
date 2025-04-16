@@ -238,3 +238,64 @@ test "parser - binary group with unary" {
     ;
     try doTest(src, expected);
 }
+
+test "parser error: double operator" {
+    const src =
+        \\int main(void) {
+        \\    return 42 / * 42;
+        \\}
+    ;
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
+
+test "parser error: binary operator with missing closing paren" {
+    const src =
+        \\int main(void) {
+        \\    return (42 + 42;
+        \\}
+    ;
+
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
+
+test "parser error: binary operator but paren is in wrong place" {
+    const src =
+        \\int main(void) {
+        \\    return 42 (-42);
+        \\}
+    ;
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
+
+test "parser error: semicolon in wrong place" {
+    const src =
+        \\int main(void) {
+        \\    return (42 + 42;)
+        \\}
+    ;
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
+
+test "parser error: divide used as unary" {
+    const src =
+        \\int main(void) {
+        \\    return /42;
+        \\}
+    ;
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
+
+test "parser error: plus without second operand" {
+    const src =
+        \\int main(void) {
+        \\    return 42 +;
+        \\}
+    ;
+    const result = doTest(src, "");
+    try std.testing.expectError(error.ReceivedUnexpectedToken, result);
+}
