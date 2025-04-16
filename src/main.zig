@@ -1,14 +1,3 @@
-const std = @import("std");
-const CliArgs = @import("CliArgs.zig");
-const Lexer = @import("Lexer.zig");
-const Parser = @import("Parser/Parser.zig");
-const builtin = @import("builtin");
-const native_os = builtin.os.tag;
-const log = std.log;
-const Allocator = std.mem.Allocator;
-const ProgramAst = Parser.Program;
-var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-
 pub fn main() !void {
     const gpa, const deinit = getAllocator();
     defer _ = if (deinit) debug_allocator.deinit();
@@ -21,8 +10,8 @@ pub fn main() !void {
     const args = try CliArgs.parse();
     log.debug("Compiling file: {s}", .{args.src});
 
-    const lexer: ?Lexer = if (args.flag.isEnabled(.lex)) try .initFromSrcPath(arena, args.src) else null;
-    const ast: ?*Parser.Ast.Program = if (args.flag.isEnabled(.parse)) try Parser.parse(arena, lexer.?.tokens) else null;
+    const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrcPath(arena, args.src) else null;
+    const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(arena, lexer.?.tokens) else null;
     _ = ast;
 }
 
@@ -36,6 +25,14 @@ pub fn getAllocator() struct { Allocator, bool } {
     };
 }
 
-test "test check" {
-    try std.testing.expect(true);
-}
+const std = @import("std");
+const CliArgs = @import("CliArgs.zig");
+const Lexer = @import("Lexer.zig");
+const Parser = @import("parser/Parser.zig");
+const builtin = @import("builtin");
+const log = @import("util.zig").log;
+
+const Allocator = std.mem.Allocator;
+const ProgramAst = Parser.Program;
+const native_os = builtin.os.tag;
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;

@@ -43,6 +43,11 @@ pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
 pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
     switch (expr.*) {
         .constant => |constant| print(writer, "{d}", .{constant}),
+        .unary => |unary| {
+            print(writer, "[UNARY] {s}", .{@tagName(unary.op)});
+            printSpace(writer, depth + 1);
+            printExpr(writer, unary.expr, depth + 1);
+        },
         .binary => |binary| {
             print(writer, "[BINARY] {s}", .{@tagName(binary.op)});
             printSpace(writer, depth + 1);
@@ -50,6 +55,19 @@ pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
             printSpace(writer, depth + 1);
             printExpr(writer, binary.right, depth + 1);
         },
+        .group => |group_expr| {
+            write(writer, "[GROUP] ");
+            printSpace(writer, depth + 1);
+            printExpr(writer, group_expr, depth + 1);
+        },
+        .postfix => |postfix_epxr| {
+            _ = postfix_epxr;
+            unreachable;
+        },
+        .@"var" => |var_value| {
+            _ = var_value;
+            unreachable;
+        }
     }
 }
 

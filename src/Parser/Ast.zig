@@ -1,4 +1,8 @@
 const std = @import("std");
+const log = @import("../util.zig").log;
+const Lexer = @import("../Lexer.zig");
+const Parser = @import("./Parser.zig");
+const ParseError = Parser.ParseError;
 const Allocator = std.mem.Allocator;
 
 pub const Program = struct {
@@ -72,23 +76,50 @@ pub const Stmt = union(enum) {
 
 pub const Expr = union(enum) {
     constant: i32,
-    binary: struct {
-        op: BinaryOp,
-        left: *Expr,
-        right: *Expr,
-    },
+    unary: struct { op: UnaryOp, expr: *Expr },
+    binary: struct { op: BinaryOp, left: *Expr, right: *Expr },
+    group: *Expr,
+    postfix: union(enum) { increment: *Expr, decrement: *Expr },
+    @"var": []const u8,
 
+    pub const UnaryOp = enum { bitwise_not, negate, not };
     pub const BinaryOp = enum { add, sub, mul, div, mod, left_shift, right_shift, bitwise_and, bitwise_xor, bitwise_or, not_equal, equal_equal, greater, greater_equal, less, less_equal, @"and", @"or" };
 
     pub fn constantExpr(allocator: Allocator, constant: i32) *@This() {
-        const expr = allocator.create(Expr) catch unreachable;
-        expr.* = .{ .constant = constant };
-        return expr;
+        const expr_value = allocator.create(Expr) catch unreachable;
+        expr_value.* = .{ .constant = constant };
+        return expr_value;
     }
 
     pub fn binaryExpr(allocator: Allocator, op: BinaryOp, left: *Expr, right: *Expr) *@This() {
         const expr = allocator.create(Expr) catch unreachable;
         expr.* = .{ .binary = .{ .op = op, .left = left, .right = right } };
         return expr;
+    }
+
+    pub fn unaryExpr(allocator: Allocator, op: UnaryOp, expr: *Expr) *@This() {
+        const unary_expr = allocator.create(Expr) catch unreachable;
+        unary_expr.* = .{ .unary = .{ .op = op, .expr = expr } };
+        return unary_expr;
+    }
+
+    pub fn groupExpr(allocator: Allocator, expr: *Expr) *@This() {
+        const group_expr = allocator.create(Expr) catch unreachable;
+        group_expr.* = .{ .group = expr };
+        return group_expr;
+    }
+    pub fn postfixExpr(allocator: Allocator, token_type: Lexer.TokenType, expr: *Expr) ParseError!*@This() {
+        const postfix_expr = allocator.create(Expr) catch unreachable;
+        postfix_expr.* = .{
+            .postfix = switch (token_type) {
+                .plus_plus => .{ .increment = expr },
+                .minus_minus => .{ .decrement = expr },
+                else => {
+                    log.err("Mapping to postfix operator failed for {any}", .{token_type});
+                    return ParseError.InvalidPostfixOperator;
+                },
+            },
+        };
+        return postfix_expr;
     }
 };

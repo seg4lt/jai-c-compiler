@@ -1,5 +1,5 @@
 const std = @import("std");
-const log = std.log;
+const log = @import("../util.zig").log;
 const Lexer = @import("../Lexer.zig");
 const Allocator = std.mem.Allocator;
 pub const AstPrinter = @import("AstPrinter.zig");
@@ -7,7 +7,14 @@ pub const Ast = @import("Ast.zig");
 
 const Parser = @This();
 
-const ParseError = error{ UnexpectedToken, InvalidIntValue, ExpectedSomeToken };
+pub const ParseError = error{
+    AllTokenNotConsumed,
+    ReceivedUnexpectedToken,
+    InvalidIntValue,
+    ExpectedSomeToken,
+    InvalidLValue,
+    InvalidPostfixOperator,
+};
 
 allocator: Allocator,
 tokens: Lexer.TokenArray,
@@ -17,8 +24,7 @@ pub fn parse(allocator: Allocator, tokens: Lexer.TokenArray) ParseError!*Ast.Pro
     var p: Parser = .{ .allocator = allocator, .tokens = tokens };
     const program = try p.parseProgram();
     if (!p.isAtEnd()) {
-        log.err("Parser did not consume all tokens", .{});
-        return ParseError.UnexpectedToken;
+        return ParseError.AllTokenNotConsumed;
     }
     print(allocator, program);
     return program;
@@ -87,7 +93,7 @@ fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
         .@"return" => try p.parseReturnStmt(),
         else => {
             log.err("Unexpected token {any}", .{cur});
-            unreachable;
+            return ParseError.ReceivedUnexpectedToken;
         },
     };
 }
@@ -132,12 +138,39 @@ fn parseFactor(p: *Parser) ParseError!*Ast.Expr {
             };
             return .constantExpr(p.allocator, constant);
         },
-        .minus, .not, .bitwise_not => unreachable,
+        .minus, .not, .bitwise_not => {
+            const token = try p.consumeAny();
+            const unary_op = mapToUnaryOperator(token.type);
+            const inner_expr = try p.parseFactor();
+            return .unaryExpr(p.allocator, unary_op, inner_expr);
+        },
         .minus_minus, .plus_plus => unreachable,
-        .lparen => unreachable,
+        .lparen => {
+            _ = try p.consume(.lparen);
+            // group resets the precendence level to internal expr
+            const inner_expr = try p.parseExpr(0);
+            const group: *Ast.Expr = .groupExpr(p.allocator, inner_expr);
+            _ = try p.consume(.rparen);
+
+            if (try p.parsePostfixIfNeeded(group)) |postfix| return postfix;
+
+            return group;
+        },
         .ident => unreachable,
         else => {
             log.err("What am I even seeing? {any}", .{tok});
+            return ParseError.ReceivedUnexpectedToken;
+        },
+    };
+}
+
+fn mapToUnaryOperator(token_type: Lexer.TokenType) Ast.Expr.UnaryOp {
+    return switch (token_type) {
+        .bitwise_not => .bitwise_not,
+        .minus => .negate,
+        .not => .not,
+        else => {
+            log.err("Mapping to unary operator failed for {any}", .{token_type});
             unreachable;
         },
     };
@@ -168,6 +201,22 @@ fn mapToBinaryOperator(token_type: Lexer.TokenType) Ast.Expr.BinaryOp {
             unreachable;
         },
     };
+}
+
+fn parsePostfixIfNeeded(p: *Parser, group_expr: *Ast.Expr) ParseError!?*Ast.Expr {
+    const token = p.peek() orelse return null;
+    if (token.type != .minus_minus and token.type != .plus_plus) return null;
+
+    if (!(group_expr.* == .@"var" or (group_expr.* == .group and group_expr.group.* == .@"var"))) {
+        log.err("invalid l value for postfix operator: {any}, {any}", .{ group_expr.*, group_expr });
+        return ParseError.InvalidLValue;
+    }
+
+    const postfix_op_token = p.consumeAny() catch |err| {
+        log.err("Expected postfix operator, found {any}. Err {any}", .{ token.type, err });
+        return ParseError.ExpectedSomeToken;
+    };
+    return try .postfixExpr(p.allocator, postfix_op_token.type, group_expr);
 }
 
 fn isCompoundAssignmentOperator(token_type: Lexer.TokenType) bool {
@@ -209,8 +258,14 @@ fn consume(p: *Parser, token_type: Lexer.TokenType) ParseError!*Lexer.Token {
     const token = p.peek() orelse return ParseError.ExpectedSomeToken;
     if (token.type != token_type) {
         log.err("Expected token type {any}, found {any}", .{ token_type, token.type });
-        return ParseError.UnexpectedToken;
+        return ParseError.ReceivedUnexpectedToken;
     }
+    p.current += 1;
+    return token;
+}
+
+fn consumeAny(p: *Parser) ParseError!*Lexer.Token {
+    const token = p.peek() orelse return ParseError.ExpectedSomeToken;
     p.current += 1;
     return token;
 }
@@ -225,5 +280,6 @@ fn isAtEnd(p: *const Parser) bool {
 }
 
 test {
-    _ = @import("Parser_test.zig");
+    _ = @import("tests/parser_test_001_basic_return.zig");
+    _ = @import("tests/parser_test_002_unary_operator.zig");
 }
