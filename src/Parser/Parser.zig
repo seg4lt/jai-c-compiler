@@ -283,4 +283,5 @@ fn isAtEnd(p: *const Parser) bool {
 test {
     _ = @import("tests/parser_test_001_basic_return.zig");
     _ = @import("tests/parser_test_002_unary_operator.zig");
+    _ = @import("tests/parser_test_003_binary_operator.zig");
 }
