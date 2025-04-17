@@ -40,12 +40,12 @@ pub const BlockItem = union(enum) {
     stmt: *Stmt,
     decl: *Decl,
 
-    pub fn initStmt(allocator: Allocator, stmt: *Stmt) *@This() {
+    pub fn stmtBlockItem(allocator: Allocator, stmt: *Stmt) *@This() {
         const block_item = allocator.create(BlockItem) catch unreachable;
         block_item.* = .{ .stmt = stmt };
         return block_item;
     }
-    pub fn initDecl(allocator: Allocator, decl: *Decl) *@This() {
+    pub fn declBlockItem(allocator: Allocator, decl: *Decl) *@This() {
         const block_item = allocator.create(BlockItem) catch unreachable;
         block_item.* = .{ .decl = decl };
         return block_item;
@@ -55,10 +55,18 @@ pub const BlockItem = union(enum) {
 pub const Decl = struct {
     ident: []const u8,
     init: ?*Expr,
+
+    pub fn initDecl(allocator: Allocator, ident: []const u8, init: ?*Expr) *@This() {
+        const decl = allocator.create(Decl) catch unreachable;
+        decl.* = .{ .ident = ident, .init = init };
+        return decl;
+    }
 };
 
 pub const Stmt = union(enum) {
     @"return": *Expr,
+    label: []const u8,
+    expr: *Expr,
     null,
 
     pub fn nullStmt(allocator: Allocator) *@This() {
@@ -72,6 +80,16 @@ pub const Stmt = union(enum) {
         stmt.* = .{ .@"return" = expr };
         return stmt;
     }
+    pub fn labelStmt(allocator: Allocator, label: []const u8) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        stmt.* = .{ .label = label };
+        return stmt;
+    }
+    pub fn exprStmt(allocator: Allocator, expr: *Expr) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        stmt.* = .{ .expr = expr };
+        return stmt;
+    }
 };
 
 pub const Expr = union(enum) {
@@ -81,6 +99,7 @@ pub const Expr = union(enum) {
     group: *Expr,
     postfix: union(enum) { increment: *Expr, decrement: *Expr },
     @"var": []const u8,
+    assignment: struct { dst: *Expr, src: *Expr },
 
     pub const UnaryOp = enum { bitwise_not, negate, not };
     pub const BinaryOp = enum { add, sub, mul, div, mod, left_shift, right_shift, bitwise_and, bitwise_xor, bitwise_or, not_equal, equal_equal, greater, greater_equal, less, less_equal, @"and", @"or" };
@@ -108,6 +127,19 @@ pub const Expr = union(enum) {
         group_expr.* = .{ .group = expr };
         return group_expr;
     }
+
+    pub fn varExpr(allocator: Allocator, ident: []const u8) *@This() {
+        const var_expr = allocator.create(Expr) catch unreachable;
+        var_expr.* = .{ .@"var" = ident };
+        return var_expr;
+    }
+
+    pub fn assignmentExpr(allocator: Allocator, dst: *Expr, src: *Expr) *@This() {
+        const assignment_expr = allocator.create(Expr) catch unreachable;
+        assignment_expr.* = .{ .assignment = .{ .dst = dst, .src = src } };
+        return assignment_expr;
+    }
+
     pub fn postfixExpr(allocator: Allocator, token_type: Lexer.TokenType, expr: *Expr) ParseError!*@This() {
         const postfix_expr = allocator.create(Expr) catch unreachable;
         postfix_expr.* = .{

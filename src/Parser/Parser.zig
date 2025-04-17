@@ -75,25 +75,65 @@ fn parseBlock(p: *Parser) ParseError!*Ast.Block {
 fn parseBlockItem(p: *Parser) ParseError!*Ast.BlockItem {
     const cur = p.peek() orelse return ParseError.ExpectedSomeToken;
     switch (cur.type) {
-        .int => unreachable,
+        .int => {
+            const decl = try p.parseDecl();
+            return .declBlockItem(p.allocator, decl);
+        },
         .semicolon => {
             _ = try p.consume(.semicolon);
-            return .initStmt(p.allocator, .nullStmt(p.allocator));
+            return .stmtBlockItem(p.allocator, .nullStmt(p.allocator));
         },
         else => {
             const stmt = try p.parseStmt();
-            return .initStmt(p.allocator, stmt);
+            return .stmtBlockItem(p.allocator, stmt);
         },
     }
 }
 
+fn parseDecl(p: *Parser) ParseError!*Ast.Decl {
+    _ = try p.consume(.int);
+    const ident_token = try p.consume(.ident);
+    const ident = ident_token.value;
+    if (std.ascii.isDigit(ident[0])) {
+        log.err("Invalid identifier {s}", .{ident});
+        return ParseError.InvalidIntValue;
+    }
+    const rvalue: ?*Ast.Expr = rvalue_l: {
+        if (p.peek()) |token| {
+            if (token.type == .assign) {
+                _ = try p.consumeAny();
+                break :rvalue_l try p.parseExpr(0);
+            }
+        }
+        break :rvalue_l null;
+    };
+    _ = try p.consume(.semicolon);
+    return .initDecl(p.allocator, ident, rvalue);
+}
+
 fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
-    const cur = p.peek() orelse return ParseError.ExpectedSomeToken;
-    return switch (cur.type) {
+    const peek_tok = p.peek() orelse return ParseError.ExpectedSomeToken;
+    return switch (peek_tok.type) {
+        .lcurly => unreachable,
+        .@"break" => unreachable,
+        .@"continue" => unreachable,
+        .@"while" => unreachable,
+        .do => unreachable,
+        .@"for" => unreachable,
         .@"return" => try p.parseReturnStmt(),
+        .@"if" => unreachable,
+        .goto => unreachable,
+        .semicolon => unreachable,
         else => {
-            log.err("Unexpected token {any}", .{cur});
-            return ParseError.ReceivedUnexpectedToken;
+            const next_peek_tok = p.peekOffset(1);
+            if (peek_tok.type == .ident and next_peek_tok != null and next_peek_tok.?.type == .colon) {
+                const label_ident = try p.consume(.ident);
+                _ = try p.consume(.colon);
+                return .labelStmt(p.allocator, label_ident.value);
+            }
+            const expr = try p.parseExpr(0);
+            _ = try p.consume(.semicolon);
+            return .exprStmt(p.allocator, expr);
         },
     };
 }
@@ -111,9 +151,23 @@ fn parseExpr(p: *Parser, min_precedence: u8) ParseError!*Ast.Expr {
 
     while (isBinaryOperator(next_token.type) and precedence(next_token.type) >= min_precedence) {
         if (next_token.type == .assign) {
-            unreachable;
+            _ = try p.consumeAny();
+            const right = try p.parseExpr(precedence(next_token.type));
+            const expr: *Ast.Expr = .assignmentExpr(p.allocator, left, right);
+            left = expr;
         } else if (isCompoundAssignmentOperator(next_token.type)) {
-            unreachable;
+            const token = try p.consumeAny();
+            const op = mapToBinaryOperator(token.type);
+            const right = try p.parseExpr(precedence(token.type));
+
+            // @note
+            // cloning the left side, as we will modify the content in sema phase
+            const left_clone = p.allocator.create(Ast.Expr) catch unreachable;
+            left_clone.* = left.*;
+
+            const binary: *Ast.Expr = .binaryExpr(p.allocator, op, left_clone, right);
+            const assignment: *Ast.Expr = .assignmentExpr(p.allocator, left, binary);
+            left = assignment;
         } else if (next_token.type == .question_mark) {
             unreachable;
         } else {
@@ -145,7 +199,31 @@ fn parseFactor(p: *Parser) ParseError!*Ast.Expr {
             const inner_expr = try p.parseFactor();
             return .unaryExpr(p.allocator, unary_op, inner_expr);
         },
-        .minus_minus, .plus_plus => unreachable,
+        .minus_minus, .plus_plus => { // prefix
+            const op_token = p.consumeAny() catch return ParseError.ExpectedSomeToken;
+            const ident_expr = try p.parseFactor();
+            log.debug("ident_expr: {any}", .{ident_expr.*});
+            // @todo
+            // probably need to do this recursively
+            // also this code is duplicated in parsePostfixIfNeeded
+            if (!(ident_expr.* == .@"var" or (ident_expr.* == .group and ident_expr.*.group.* == .@"var"))) {
+                log.err("invalid l value for postfix operator: {any}, {any}", .{ ident_expr.*, ident_expr });
+                return ParseError.InvalidLValue;
+            }
+            const op: Ast.Expr.BinaryOp = switch (op_token.*.type) {
+                .minus_minus => .sub,
+                .plus_plus => .add,
+                else => unreachable,
+            };
+            const ident = if (ident_expr.* == .@"var") ident_expr.@"var" else ident_expr.*.group.@"var";
+            const var_expr: *Ast.Expr = .varExpr(p.allocator, ident);
+            // using copy of same variable, as we will modify the content in sema phase
+            // maybe on sema we need to create new expr instead of modifying inplace
+            const assignment_dst: *Ast.Expr = .varExpr(p.allocator, ident);
+            const one: *Ast.Expr = .constantExpr(p.allocator, 1);
+            const binary_expr: *Ast.Expr = .binaryExpr(p.allocator, op, var_expr, one);
+            return .assignmentExpr(p.allocator, assignment_dst, binary_expr);
+        },
         .lparen => {
             _ = try p.consume(.lparen);
             // group resets the precendence level to internal expr
@@ -157,7 +235,12 @@ fn parseFactor(p: *Parser) ParseError!*Ast.Expr {
 
             return group;
         },
-        .ident => unreachable,
+        .ident => {
+            const ident = try p.consume(.ident);
+            const var_expr: *Ast.Expr = .varExpr(p.allocator, ident.value);
+            if (try p.parsePostfixIfNeeded(var_expr)) |postfix| return postfix;
+            return var_expr;
+        },
         else => {
             log.err("What am I even seeing? {any}", .{tok});
             return ParseError.ReceivedUnexpectedToken;
@@ -274,6 +357,10 @@ fn consumeAny(p: *Parser) ParseError!*Lexer.Token {
 fn peek(p: *const Parser) ?*Lexer.Token {
     if (p.isAtEnd()) return null;
     return &p.tokens.items[p.current];
+}
+fn peekOffset(p: *const Parser, offset: u8) ?*Lexer.Token {
+    if (p.current + offset >= p.tokens.items.len) return null;
+    return &p.tokens.items[p.current + offset];
 }
 
 fn isAtEnd(p: *const Parser) bool {

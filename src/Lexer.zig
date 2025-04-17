@@ -102,7 +102,7 @@ fn scan(s: *Self) !void {
             '>' => switch (s.peek()) {
                 '>' => {
                     _ = s.consumeAny();
-                    switch (s.peekWithOffset(1)) {
+                    switch (s.peek()) {
                         '=' => try s.consumeAnyAndAddToken(.right_shift_equal),
                         else => try s.addToken(.right_shift),
                     }
@@ -113,7 +113,7 @@ fn scan(s: *Self) !void {
             '<' => switch (s.peek()) {
                 '<' => {
                     _ = s.consumeAny();
-                    try switch (s.peekWithOffset(1)) {
+                    try switch (s.peek()) {
                         '=' => s.consumeAnyAndAddToken(.left_shift_equal),
                         else => s.addToken(.left_shift),
                     };
@@ -188,7 +188,7 @@ fn number(s: *Self) !void {
 }
 
 fn identOrKeyword(s: *Self) !void {
-    while (!s.isAtEnd() and std.ascii.isAlphanumeric(s.peek())) _ = s.consumeAny();
+    while (!s.isAtEnd() and (std.ascii.isAlphanumeric(s.peek()) or s.peek() == '_')) _ = s.consumeAny();
     const lexeme = s.src[s.start..s.current];
     const token_type = isKeywordOrIdent(lexeme);
     try s.addToken(token_type);

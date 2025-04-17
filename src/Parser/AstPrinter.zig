@@ -26,7 +26,7 @@ pub fn printBlock(writer: *AnyWriter, block: *Ast.Block, depth: u8) void {
     }
 }
 pub fn printDecl(writer: *AnyWriter, decl: *Ast.Decl, depth: u8) void {
-    print(writer, "[DECL] {s}", .{decl.ident});
+    print(writer, "[DECL] {s} ", .{decl.ident});
     if (decl.init) |init| printExpr(writer, init, depth + 1);
 }
 
@@ -37,7 +37,13 @@ pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
             printSpace(writer, depth + 1);
             printExpr(writer, expr, depth + 1);
         },
+        .expr => |expr| {
+            write(writer, "[EXPR] ");
+            printSpace(writer, depth + 1);
+            printExpr(writer, expr, depth + 1);
+        },
         .null => write(writer, "[NULL]"),
+        .label => |label| print(writer, "[LABEL] {s}", .{label}),
     }
 }
 pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
@@ -60,14 +66,21 @@ pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
             printSpace(writer, depth + 1);
             printExpr(writer, group_expr, depth + 1);
         },
-        .postfix => |postfix_epxr| {
-            _ = postfix_epxr;
-            unreachable;
+        .postfix => |postfix_expr| {
+            switch (postfix_expr) {
+                .increment => write(writer, "[++]"),
+                .decrement => write(writer, "[--]"),
+            }
         },
         .@"var" => |var_value| {
-            _ = var_value;
-            unreachable;
-        }
+            print(writer, "[VAR] {s}", .{var_value});
+        },
+        .assignment => |assignment| {
+            write(writer, "[ASSIGNMENT] ");
+            printExpr(writer, assignment.dst, depth);
+            write(writer, " = ");
+            printExpr(writer, assignment.src, depth);
+        },
     }
 }
 
