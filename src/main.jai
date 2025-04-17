@@ -7,7 +7,7 @@ main :: () {
     print("%\n", args);
     preprocessor(args);
 
-    lexer         := ifx args.flags & .LEX          lex(args);
+    lexer         := ifx args.flags & .LEX          lex_path(args.src_path);
     ast           := ifx args.flags & .PARSE        ast_parse(*lexer);
     if args.flags                   & .SEMA         sema(ast);
     tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast);

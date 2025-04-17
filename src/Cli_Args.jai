@@ -1,6 +1,9 @@
+
+#scope_export
+
 Cli_Args :: struct {
-    source_file_path: string;
-    source_file_path_without_ext: string;
+    src_path: string;
+    src_path_without_ext: string;
     flags: Cli_Args_Flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
 }
 
@@ -21,31 +24,26 @@ get_cli_args :: () -> Cli_Args {
 
     for args {
         if it == {
-            case "--lex";          flags &= ~(.PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL);
-            case "--parse";        flags &= ~(         .SEMA | .TACKY | .CODE_GEN | .ALL);
-            case "--validate";     flags &= ~(                 .TACKY | .CODE_GEN | .ALL);
-            case "--tacky";        flags &= ~(                          .CODE_GEN | .ALL);
-            case "--code-gen";     flags &= ~                                       .ALL;
-            case; source_file_path = it;
+            case "--lex";          flags = .LEX;
+            case "--parse";        flags = .LEX & .PARSE;
+            case "--validate";     flags = .LEX & .PARSE & .SEMA;
+            case "--tacky";        flags = .LEX & .PARSE & .TACKY;
+            case "--code-gen";     flags = .LEX & .PARSE & .TACKY & .CODE_GEN; 
+            // case "--lex";          flags &= ~(.PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL);
+            // case "--parse";        flags &= ~(         .SEMA | .TACKY | .CODE_GEN | .ALL);
+            // case "--validate";     flags &= ~(                 .TACKY | .CODE_GEN | .ALL);
+            // case "--tacky";        flags &= ~(                          .CODE_GEN | .ALL);
+            // case "--code-gen";     flags &= ~                                       .ALL;
+            case; src_path = it;
         }
     }
-    if source_file_path == "" {
-        log_error("No source file specified");
-        exit(1);
-    }
-    found, path_no_ext, ext := String.split_from_right(source_file_path, ".");
-    if !found || ext != "c" {
-        log_error("Source file must have an .c extension");
-        exit(1);
-    }
-    source_file_path_without_ext = path_no_ext;
+    if src_path == "" unreachable("No source file specified");
+    if slice(src_path, src_path.count - 2, 2) != ".c" unreachable("Source file must have an .c extension");
+    src_path_without_ext = slice(src_path, 0, src_path.count - 2);
     return cli_args;
 }
 
 #scope_file
-
+#import "String";
+#import "Compiler_Util";
 #import "Basic";
-String :: #import "String";
-
-#scope_export
-

@@ -822,6 +822,7 @@ print_space :: (depth: int = 0) {
 
 #scope_file
 #import "Memory";
+#import "Lexer";
 
 /* -- ADSL AST -- 
 

@@ -14,8 +14,7 @@ _run_tests :: () {
     }
 
     get_lexer :: (src: string) -> Lexer {
-        lexer := Lexer.{src = src};
-        scan(*lexer);
+        lexer := lex(src);
         return lexer;
     }
 

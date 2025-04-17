@@ -1,5 +1,5 @@
 code_emm :: (args: Cli_Args, program: *Program_Asm) {
-    file, success := file_open(tprint("%.s", args.source_file_path_without_ext), for_writing=true, keep_existing_content=false);
+    file, success := file_open(tprint("%.s", args.src_path_without_ext), for_writing=true, keep_existing_content=false);
     if !success return;
     defer file_close(*file);
 
