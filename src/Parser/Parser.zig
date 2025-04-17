@@ -244,6 +244,7 @@ fn parseFactor(p: *Parser) ParseError!*Ast.Expr {
             };
             const ident = if (ident_expr.* == .@"var") ident_expr.@"var" else ident_expr.*.group.@"var";
             const var_expr: *Ast.Expr = .varExpr(p.allocator, ident);
+            // @note
             // using copy of same variable, as we will modify the content in sema phase
             // maybe on sema we need to create new expr instead of modifying inplace
             const assignment_dst: *Ast.Expr = .varExpr(p.allocator, ident);
