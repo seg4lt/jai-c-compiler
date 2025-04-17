@@ -1,10 +1,6 @@
 flag: CliFlags = .all,
 src: []const u8,
 
-pub fn srcWithoutExt(self: *const Self) []const u8 {
-    return self.src[0 .. self.src.len - 2];
-}
-
 pub fn parse() CliArgsError!Self {
     var args = std.process.args();
 

@@ -9,7 +9,7 @@ pub fn main() !void {
 
     const args = try CliArgs.parse();
     log.debug("Compiling file: {s}", .{args.src});
-    preprocessor(arena, args.srcWithoutExt());
+    preprocessor(arena, args.src);
 
     const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrcPath(arena, args.src) else null;
     const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(arena, lexer.?.tokens) else null;
