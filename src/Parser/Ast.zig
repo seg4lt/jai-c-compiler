@@ -67,7 +67,14 @@ pub const Stmt = union(enum) {
     @"return": *Expr,
     label: []const u8,
     expr: *Expr,
+    if_stmt: struct { condition: *Expr, if_block: *Stmt, else_block: ?*Stmt },
     null,
+
+    pub fn ifStmt(allocator: Allocator, condition: *Expr, if_block: *Stmt, else_block: ?*Stmt) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        stmt.* = .{ .if_stmt = .{ .condition = condition, .if_block = if_block, .else_block = else_block } };
+        return stmt;
+    }
 
     pub fn nullStmt(allocator: Allocator) *@This() {
         const stmt = allocator.create(Stmt) catch unreachable;
@@ -100,6 +107,7 @@ pub const Expr = union(enum) {
     postfix: union(enum) { increment: *Expr, decrement: *Expr },
     @"var": []const u8,
     assignment: struct { dst: *Expr, src: *Expr },
+    ternary: struct { condition: *Expr, true_block: *Expr, false_block: *Expr },
 
     pub const UnaryOp = enum { bitwise_not, negate, not };
     pub const BinaryOp = enum { add, sub, mul, div, mod, left_shift, right_shift, bitwise_and, bitwise_xor, bitwise_or, not_equal, equal_equal, greater, greater_equal, less, less_equal, @"and", @"or" };
@@ -138,6 +146,12 @@ pub const Expr = union(enum) {
         const assignment_expr = allocator.create(Expr) catch unreachable;
         assignment_expr.* = .{ .assignment = .{ .dst = dst, .src = src } };
         return assignment_expr;
+    }
+
+    pub fn ternaryExpr(allocator: Allocator, condition: *Expr, true_block: *Expr, false_block: *Expr) *@This() {
+        const ternary_expr = allocator.create(Expr) catch unreachable;
+        ternary_expr.* = .{ .ternary = .{ .condition = condition, .true_block = true_block, .false_block = false_block } };
+        return ternary_expr;
     }
 
     pub fn postfixExpr(allocator: Allocator, token_type: Lexer.TokenType, expr: *Expr) ParseError!*@This() {

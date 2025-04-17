@@ -121,9 +121,12 @@ fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
         .do => unreachable,
         .@"for" => unreachable,
         .@"return" => try p.parseReturnStmt(),
-        .@"if" => unreachable,
+        .@"if" => try p.parseIfStmt(),
         .goto => unreachable,
-        .semicolon => unreachable,
+        .semicolon => {
+            _ = try p.consume(.semicolon);
+            return .nullStmt(p.allocator);
+        },
         else => {
             const next_peek_tok = p.peekOffset(1);
             if (peek_tok.type == .ident and next_peek_tok != null and next_peek_tok.?.type == .colon) {
@@ -143,6 +146,26 @@ fn parseReturnStmt(p: *Parser) ParseError!*Ast.Stmt {
     const expr = try p.parseExpr(0);
     _ = try p.consume(.semicolon);
     return .returnStmt(p.allocator, expr);
+}
+
+fn parseIfStmt(p: *Parser) ParseError!*Ast.Stmt {
+    _ = try p.consume(.@"if");
+    _ = try p.consume(.lparen);
+    const condition = try p.parseExpr(0);
+    _ = try p.consume(.rparen);
+
+    const if_block = try p.parseStmt();
+
+    const else_block = else_block: {
+        if (p.peek()) |token| {
+            if (token.type == .@"else") {
+                _ = try p.consume(.@"else");
+                break :else_block try p.parseStmt();
+            }
+        }
+        break :else_block null;
+    };
+    return .ifStmt(p.allocator, condition, if_block, else_block);
 }
 
 fn parseExpr(p: *Parser, min_precedence: u8) ParseError!*Ast.Expr {
@@ -169,7 +192,11 @@ fn parseExpr(p: *Parser, min_precedence: u8) ParseError!*Ast.Expr {
             const assignment: *Ast.Expr = .assignmentExpr(p.allocator, left, binary);
             left = assignment;
         } else if (next_token.type == .question_mark) {
-            unreachable;
+            _ = try p.consume(.question_mark);
+            const true_block = try p.parseExpr(0);
+            _ = try p.consume(.colon);
+            const false_block = try p.parseExpr(precedence(next_token.type));
+            left = .ternaryExpr(p.allocator, left, true_block, false_block);
         } else {
             const cur_token = p.consumeAny() catch return ParseError.ExpectedSomeToken;
             const op = mapToBinaryOperator(cur_token.type);

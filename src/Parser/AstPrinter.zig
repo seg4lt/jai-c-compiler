@@ -32,6 +32,19 @@ pub fn printDecl(writer: *AnyWriter, decl: *Ast.Decl, depth: u8) void {
 
 pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
     switch (stmt.*) {
+        .if_stmt => |if_stmt| {
+            write(writer, "[IF]");
+            printSpace(writer, depth + 1);
+            printExpr(writer, if_stmt.condition, depth + 1);
+            printSpace(writer, depth + 2);
+            printStmt(writer, if_stmt.if_block, depth + 2);
+            if (if_stmt.else_block) |else_block_| {
+                printSpace(writer, depth);
+                write(writer, "[ELSE]");
+                printSpace(writer, depth + 2);
+                printStmt(writer, else_block_, depth + 2);
+            }
+        },
         .@"return" => |expr| {
             write(writer, "[RETURN] ");
             printSpace(writer, depth + 1);
@@ -80,6 +93,17 @@ pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
             printExpr(writer, assignment.dst, depth);
             write(writer, " = ");
             printExpr(writer, assignment.src, depth);
+        },
+        .ternary => |ternary| {
+            write(writer, "[TERNARY]");
+            printSpace(writer, depth + 1);
+            printExpr(writer, ternary.condition, depth);
+            printSpace(writer, depth + 1);
+            write(writer, " ? ");
+            printExpr(writer, ternary.true_block, depth + 2);
+            printSpace(writer, depth + 1);
+            write(writer, " : ");
+            printExpr(writer, ternary.false_block, depth + 2);
         },
     }
 }
