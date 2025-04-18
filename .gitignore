@@ -1,5 +1,6 @@
 .build
 out/
+jails.json
 
 .zig-cache/
 zig-out
