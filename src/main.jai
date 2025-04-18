@@ -21,11 +21,11 @@ main :: () {
 String :: #import "String";
 Process :: #import "Process";
 #import "Lexer";
-
+#import "Parser";
 #import "File";
+
 #load "Cli_Args.jai";
 #load "Compiler_Util.jai";
-#load "Ast.jai";
 #load "Sema.jai";
 #load "Tacky_IR.jai";
 #load "Asm_Gen.jai";

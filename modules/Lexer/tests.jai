@@ -1,6 +1,7 @@
 #scope_file
 
 #import "Compiler";
+#import "Parser";
 
 #run _run_tests();
 
