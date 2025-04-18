@@ -55,6 +55,10 @@ pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
             printSpace(writer, depth + 1);
             printExpr(writer, expr, depth + 1);
         },
+        .compound => |compound| {
+            write(writer, "[COMPOUND]");
+            printBlock(writer, compound, depth + 2);
+        },
         .null => write(writer, "[NULL]"),
         .label => |label| print(writer, "[LABEL] {s}", .{label}),
     }

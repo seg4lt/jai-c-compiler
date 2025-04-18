@@ -68,7 +68,14 @@ pub const Stmt = union(enum) {
     label: []const u8,
     expr: *Expr,
     if_stmt: struct { condition: *Expr, if_block: *Stmt, else_block: ?*Stmt },
+    compound: *Block,
     null,
+
+    pub fn compoundStmt(allocator: Allocator, block: *Block) *@This() {
+        const compound = allocator.create(Stmt) catch unreachable;
+        compound.* = .{ .compound = block };
+        return compound;
+    }
 
     pub fn ifStmt(allocator: Allocator, condition: *Expr, if_block: *Stmt, else_block: ?*Stmt) *@This() {
         const stmt = allocator.create(Stmt) catch unreachable;

@@ -114,7 +114,12 @@ fn parseDecl(p: *Parser) ParseError!*Ast.Decl {
 fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
     const peek_tok = p.peek() orelse return ParseError.ExpectedSomeToken;
     return switch (peek_tok.type) {
-        .lcurly => unreachable,
+        .lcurly => {
+            _ = try p.consume(.lcurly);
+            const body = try p.parseBlock();
+            _ = try p.consume(.rcurly);
+            return .compoundStmt(p.allocator, body);
+        },
         .@"break" => unreachable,
         .@"continue" => unreachable,
         .@"while" => unreachable,

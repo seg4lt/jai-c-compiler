@@ -1,8 +1,10 @@
-int main(void) {
-    int x = 0;
-    if (0)
-        ;
-    else
-        x = 1;
-    return x;
+int main(void)
+{
+    int x;
+    {
+        x = 3;
+    }
+    {
+        return x;
+    }
 }
