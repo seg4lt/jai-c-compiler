@@ -1,10 +1,4 @@
-int main(void)
-{
-    int x;
-    {
-        x = 3;
-    }
-    {
-        return x;
-    }
+int main(void) {
+    // NOTE: this is invalid in C17, but valid in C23
+    foo:
 }

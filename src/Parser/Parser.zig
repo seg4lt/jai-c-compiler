@@ -127,7 +127,12 @@ fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
         .@"for" => unreachable,
         .@"return" => try p.parseReturnStmt(),
         .@"if" => try p.parseIfStmt(),
-        .goto => unreachable,
+        .goto => {
+            _ = try p.consume(.goto);
+            const token = try p.consume(.ident);
+            _ = try p.consume(.semicolon);
+            return .gotoStmt(p.allocator, token.value);
+        },
         .semicolon => {
             _ = try p.consume(.semicolon);
             return .nullStmt(p.allocator);

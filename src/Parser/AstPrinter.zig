@@ -59,6 +59,9 @@ pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
             write(writer, "[COMPOUND]");
             printBlock(writer, compound, depth + 2);
         },
+        .goto => |label| {
+            print(writer, "[GOTO] {s}", .{label});
+        },
         .null => write(writer, "[NULL]"),
         .label => |label| print(writer, "[LABEL] {s}", .{label}),
     }

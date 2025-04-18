@@ -69,7 +69,14 @@ pub const Stmt = union(enum) {
     expr: *Expr,
     if_stmt: struct { condition: *Expr, if_block: *Stmt, else_block: ?*Stmt },
     compound: *Block,
+    goto: []const u8,
     null,
+
+    pub fn gotoStmt(allocator: Allocator, label: []const u8) *@This() {
+        const goto = allocator.create(Stmt) catch unreachable;
+        goto.* = .{ .goto = label };
+        return goto;
+    }
 
     pub fn compoundStmt(allocator: Allocator, block: *Block) *@This() {
         const compound = allocator.create(Stmt) catch unreachable;
