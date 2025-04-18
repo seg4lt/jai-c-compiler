@@ -1,12 +1,12 @@
 
-sema_var_resolution :: (ast: *Program_Ast_Node) {
+sema_var_resolution :: (ast: *Program_Ast) {
     block := ast.fn.block;
     sema_var_resolution_block(block, null);
 }
 
 #scope_file
 
-sema_var_resolution_block :: (block: *Block_Ast_Node, block_store: *Store) {
+sema_var_resolution_block :: (block: *Block_Ast, block_store: *Store) {
     new_block_store : Store;
 
     if block_store == null  {
@@ -21,7 +21,7 @@ sema_var_resolution_block :: (block: *Block_Ast_Node, block_store: *Store) {
     sema_var_resolution_block_item(*block.items, *new_block_store);
 }
 
-sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast_Node, block_store: *Store) {
+sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, block_store: *Store) {
     for block_items.* {
         if #complete it.type == {
             case .DECL; sema_var_resolution_decl(it.as.decl, block_store);
@@ -30,7 +30,7 @@ sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast_Node, block
     }
 }
 
-sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
+sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store) {
     if #complete stmt.type == {
         case .RETURN;
             sema_var_resolution_expr(stmt.as.return_stmt.expr, block_store);
@@ -82,7 +82,7 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast_Node, block_store: *Store) {
     }
 }
 
-sema_var_resolution_decl:: (decl: *Decl_Ast_Node, block_store: *Store) {
+sema_var_resolution_decl:: (decl: *Decl_Ast, block_store: *Store) {
     entry, success := table_find(block_store, decl.ident);
     if success && entry.owing_block {
         assert(false, "duplicate variable declaration! : %", decl.ident);
@@ -94,7 +94,7 @@ sema_var_resolution_decl:: (decl: *Decl_Ast_Node, block_store: *Store) {
     decl.* = .{ new_ident, decl.init};
 }
 
-sema_var_resolution_expr :: (expr: *Expr_Ast_Node, table: *Store) {
+sema_var_resolution_expr :: (expr: *Expr_Ast, table: *Store) {
     if #complete expr.type == {
         case .CONSTANT; // noop
         case .UNARY; 

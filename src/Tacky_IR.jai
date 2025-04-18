@@ -67,7 +67,8 @@ Tacky_Ctx :: struct {
     label_index: int = 0;
 }
 
-gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
+gen_program_tacky :: (program_ast: *Program_Ast
+) -> *Program_Tacky {
     tc : Tacky_Ctx;
     fn := gen_fn_tacky(*tc, program_ast.fn);
     program := New(Program_Tacky);
@@ -76,7 +77,7 @@ gen_program_tacky :: (program_ast: *Program_Ast_Node) -> *Program_Tacky {
     return program;
 }
 
-gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
+gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
     gen_instructions(tc, *instructions, fn_ast.block);
 
@@ -92,7 +93,7 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast_Node) -> Fn_Tacky {
     return .{ fn_ast.ident, instructions };
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast_Node) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast) {
     for block_ast.items {
         if #complete it.type == {
             case .STMT;
@@ -102,7 +103,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block
         }
     }
 }
-gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast_Node) {
+gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast) {
     if (decl_ast.init == null) {
         // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
         return;
@@ -112,7 +113,7 @@ gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
     array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast_Node) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast) {
     if #complete stmt_ast.type == {
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
@@ -222,12 +223,12 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
                 // pass through - nothing to do when null stmt is received
     }
 }
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node) -> dst: Val_Tacky {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
     val := gen_instructions_expr(tc, instructions, expr_ast);
     return gen_inst_for_possible_postfix(tc, instructions, expr_ast, val);
 }
 
-gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node) -> dst: Val_Tacky {
+gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
     if #complete expr_ast.type == {
         case .UNARY;
             src := gen_instructions(tc, instructions, expr_ast.as.unary.expr);
@@ -297,7 +298,7 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
     }
 }
 
-gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast_Node, expr_val_tacky: Val_Tacky) -> Val_Tacky {
+gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast, expr_val_tacky: Val_Tacky) -> Val_Tacky {
     if (expr_ast.postfix == .NONE) return expr_val_tacky;
     old_value_dst := make_var(tc);
     old_value := Instruction_Tacky.{.COPY, .{copy = .{src = expr_val_tacky, dst = old_value_dst }}};
@@ -318,7 +319,7 @@ gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction
     return old_value_dst;
 }
 
-gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast_Node.as.binary)) -> Val_Tacky {
+gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.as.binary)) -> Val_Tacky {
     label_false := make_label(tc, tprint("cond_%", "false"));
 
     src1 := gen_instructions(tc, instructions, bin_ast.left);
@@ -344,7 +345,7 @@ gen_logical_and_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_T
     return result_var;
 }
 
-gen_logical_or_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast_Node.as.binary)) -> Val_Tacky {
+gen_logical_or_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.as.binary)) -> Val_Tacky {
     label_false := make_label(tc, tprint("cond_%", "true"));
 
     src1 := gen_instructions(tc, instructions, bin_ast.left);
@@ -371,7 +372,7 @@ gen_logical_or_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
     return result_var;
 }
 
-from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast_Node.as.binary.op)) -> type_of(Instruction_Tacky.as.binary.op) {
+from_ast_binop_to_tacky :: (ast_op: type_of(Expr_Ast.as.binary.op)) -> type_of(Instruction_Tacky.as.binary.op) {
     if #complete ast_op == {
         case .ADD; return .ADD;
         case .SUB; return .SUB; 

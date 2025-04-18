@@ -1,9 +1,9 @@
-sema_label_resolution :: (ast: *Program_Ast_Node) {
+sema_label_resolution :: (ast: *Program_Ast) {
     sema_label_res_fn(ast.fn);
 }
 
 #scope_file
-sema_label_res_fn :: (fn: *Fn_Ast_Node) {
+sema_label_res_fn :: (fn: *Fn_Ast) {
     label_store : Store;
     init(*label_store);
     defer deinit(*label_store);
@@ -28,11 +28,11 @@ sema_label_res_fn :: (fn: *Fn_Ast_Node) {
     }
 }
 
-sema_label_resolution_block :: (block: *Block_Ast_Node, label_store: *Store) {
+sema_label_resolution_block :: (block: *Block_Ast, label_store: *Store) {
     sema_label_resolution_block_item(*block.items, label_store);
 }
 
-sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast_Node, label_store: *Store) {
+sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, label_store: *Store) {
     // gather all labels
     for block_items.* {
         if #complete it.type == {
@@ -44,7 +44,7 @@ sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast_Node, lab
    
 }
 
-sema_label_resolution_stmt :: (stmt: *Stmt_Ast_Node, label_store: *Store, block_items: []*Block_Item_Ast_Node, index: int) {
+sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Store, block_items: []*Block_Item_Ast, index: int) {
     if #complete stmt.type == {
         case .RETURN;
             sema_label_resolution_expr(stmt.as.return_stmt.expr, label_store);
@@ -89,7 +89,7 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast_Node, label_store: *Store, block_
     }
 }
 
-sema_goto_resolution_stmt :: (stmt: *Stmt_Ast_Node, goto_labels: *Store, label_store: *Store) {
+sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Store, label_store: *Store) {
     if #complete stmt.type == {
         case .RETURN;
             sema_goto_resolution_expr(stmt.as.return_stmt.expr, goto_labels, label_store);
@@ -126,7 +126,7 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast_Node, goto_labels: *Store, label_s
     }
 }
 
-sema_goto_resolution_expr :: (expr: *Expr_Ast_Node, goto_labels: *Store, label_store: Store) {
+sema_goto_resolution_expr :: (expr: *Expr_Ast, goto_labels: *Store, label_store: Store) {
     if #complete expr.type == {
         case .CONSTANT; #through;
         case .UNARY;  #through;
@@ -143,7 +143,7 @@ sema_goto_resolution_expr :: (expr: *Expr_Ast_Node, goto_labels: *Store, label_s
     }
 }
 
-sema_label_resolution_expr :: (expr: *Expr_Ast_Node, label_store: *Store) {
+sema_label_resolution_expr :: (expr: *Expr_Ast, label_store: *Store) {
     if #complete expr.type == {
         case .CONSTANT; #through;
         case .UNARY;  #through;

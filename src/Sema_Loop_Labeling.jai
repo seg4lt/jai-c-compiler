@@ -1,21 +1,21 @@
-sema_loop_labeling :: (ast: *Program_Ast_Node) {
+sema_loop_labeling :: (ast: *Program_Ast) {
     sema_loop_labeling_fn(ast.fn);
 }
 
 #scope_file
 
-sema_loop_labeling_fn :: (fn: *Fn_Ast_Node) {
+sema_loop_labeling_fn :: (fn: *Fn_Ast) {
     label_stack: [..]string;
     defer free(*label_stack);
 
     sema_loop_labeling_block(fn.block, *label_stack);
 }
 
-sema_loop_labeling_block :: (block: *Block_Ast_Node, label_stack: *[..]string) {
+sema_loop_labeling_block :: (block: *Block_Ast, label_stack: *[..]string) {
     sema_loop_labeling_block_item(*block.items, label_stack);
 }
 
-sema_loop_labeling_block_item :: (block_items: *[..]*Block_Item_Ast_Node, label_stack: *[..]string) {
+sema_loop_labeling_block_item :: (block_items: *[..]*Block_Item_Ast, label_stack: *[..]string) {
     for block_items.* {
         if #complete it.type == {
             case .DECL; // noop
@@ -27,7 +27,7 @@ sema_loop_labeling_block_item :: (block_items: *[..]*Block_Item_Ast_Node, label_
    
 }
 
-sema_loop_labeling_stmt :: (stmt: *Stmt_Ast_Node, label_stack: *[..]string) {
+sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_stack: *[..]string) {
     if #complete stmt.type == {
         case .IF;
             if_stmt := stmt.as.if_stmt;
@@ -73,7 +73,7 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast_Node, label_stack: *[..]string) {
     }
 }
 
-sema_loop_labeling_expr :: (expr: *Expr_Ast_Node, label_stack: *[..]string) {
+sema_loop_labeling_expr :: (expr: *Expr_Ast, label_stack: *[..]string) {
     if #complete expr.type == {
         case .CONSTANT; #through;
         case .UNARY;  #through;

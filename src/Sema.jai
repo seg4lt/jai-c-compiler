@@ -1,6 +1,6 @@
 Store :: Table(string, Owing_Entry(string));
 
-sema :: (ast: *Program_Ast_Node) {
+sema :: (ast: *Program_Ast) {
     sema_var_resolution(ast);
     sema_label_resolution(ast);
     sema_loop_labeling(ast);

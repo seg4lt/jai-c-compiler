@@ -1,17 +1,17 @@
-print_program_ast :: (program: *Program_Ast_Node, depth: int = 0) {
+print_program_ast :: (program: *Program_Ast, depth: int = 0) {
     print("\n\n -- AST -- \n");
     print("[PROGRAM] ");
     print_fn_ast(program.fn, depth + 1);
     print("\n\n");
 }
 
-print_fn_ast :: (fn: *Fn_Ast_Node, depth: int = 0) {
+print_fn_ast :: (fn: *Fn_Ast, depth: int = 0) {
     print_space(depth);
     print("[FN] %", fn.ident);
     print_block_ast(fn.block, depth + 1);
 }
 
-print_block_ast :: (block: *Block_Ast_Node, depth: int = 0) {
+print_block_ast :: (block: *Block_Ast, depth: int = 0) {
     print_space(depth);
     print("[BLOCK]");
     for block.items {
@@ -23,7 +23,7 @@ print_block_ast :: (block: *Block_Ast_Node, depth: int = 0) {
     }
 }
 
-print_decl_ast :: (using decl: *Decl_Ast_Node, depth: int = 0)  {
+print_decl_ast :: (using decl: *Decl_Ast, depth: int = 0)  {
     print("[DECL] ");
     print("%", ident);
     if init != null {
@@ -32,7 +32,7 @@ print_decl_ast :: (using decl: *Decl_Ast_Node, depth: int = 0)  {
     }
 }
 
-print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
+print_stmt_ast :: (stmt: *Stmt_Ast, depth: int = 0)  {
     if #complete stmt.type == {
         case .RETURN;
             print("[RETURN] ");
@@ -109,7 +109,7 @@ print_stmt_ast :: (stmt: *Stmt_Ast_Node, depth: int = 0)  {
     }
 }
 
-print_expr_ast :: (expr: *Expr_Ast_Node, depth: int = 0) {
+print_expr_ast :: (expr: *Expr_Ast, depth: int = 0) {
     if #complete expr.type == {
         case .CONSTANT;
             print("%", expr.as.constant);
