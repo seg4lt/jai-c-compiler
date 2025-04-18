@@ -1,6 +1,7 @@
 const std = @import("std");
 const log = @import("../util.zig").log;
 const Lexer = @import("../Lexer.zig");
+const ErrorReporter = @import("../ErrorReporter.zig");
 const Allocator = std.mem.Allocator;
 pub const AstPrinter = @import("AstPrinter.zig");
 pub const Ast = @import("Ast.zig");
@@ -19,9 +20,10 @@ pub const ParseError = error{
 allocator: Allocator,
 tokens: Lexer.TokenArray,
 current: usize = 0,
+err_reporter: *ErrorReporter,
 
-pub fn parse(allocator: Allocator, tokens: Lexer.TokenArray) ParseError!*Ast.Program {
-    var p: Parser = .{ .allocator = allocator, .tokens = tokens };
+pub fn parse(allocator: Allocator, err_reporter: *ErrorReporter, tokens: Lexer.TokenArray) ParseError!*Ast.Program {
+    var p: Parser = .{ .allocator = allocator, .tokens = tokens, .err_reporter = err_reporter };
     const program = try p.parseProgram();
     if (!p.isAtEnd()) {
         return ParseError.AllTokenNotConsumed;

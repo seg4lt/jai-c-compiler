@@ -17,4 +17,5 @@ test "operators" {
         \\ ;
     ;
     const lexer = Lexer.lex(allocator, src);
+    _ = lexer;
 }
