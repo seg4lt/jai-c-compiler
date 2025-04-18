@@ -45,6 +45,29 @@ pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
                 printStmt(writer, else_block_, depth + 2);
             }
         },
+        .@"for" => |for_stmt| {
+            print(writer, "[FOR] {s} ", .{for_stmt.label});
+            printSpace(writer, depth + 1);
+            write(writer, "<init> ");
+            switch (for_stmt.init.*) {
+                .decl => |decl| printDecl(writer, decl, depth + 1),
+                .expr => |expr| if (expr) |it| printExpr(writer, it, depth + 1),
+            }
+            printSpace(writer, depth + 1);
+            write(writer, "<condition> ");
+            if (for_stmt.condition) |condition| printExpr(writer, condition, depth + 1);
+            printSpace(writer, depth + 1);
+            write(writer, "<post> ");
+            if (for_stmt.post) |post| printExpr(writer, post, depth + 1);
+            printSpace(writer, depth + 1);
+            printStmt(writer, for_stmt.body, depth + 1);
+        },
+        .@"while" => |while_stmt| {
+            print(writer, "[WHILE] {s} ", .{while_stmt.label});
+            printExpr(writer, while_stmt.condition, 0);
+            printSpace(writer, depth + 1);
+            printStmt(writer, while_stmt.body, depth + 1);
+        },
         .@"return" => |expr| {
             write(writer, "[RETURN] ");
             printSpace(writer, depth + 1);

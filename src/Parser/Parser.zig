@@ -122,9 +122,9 @@ fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
         },
         .@"break" => unreachable,
         .@"continue" => unreachable,
-        .@"while" => unreachable,
+        .@"while" => try p.parseWhileStmt(),
         .do => unreachable,
-        .@"for" => unreachable,
+        .@"for" => try p.parseForStmt(),
         .@"return" => try p.parseReturnStmt(),
         .@"if" => try p.parseIfStmt(),
         .goto => {
@@ -149,6 +149,47 @@ fn parseStmt(p: *Parser) ParseError!*Ast.Stmt {
             return .exprStmt(p.allocator, expr);
         },
     };
+}
+
+fn parseForStmt(p: *Parser) ParseError!*Ast.Stmt {
+    _ = try p.consume(.@"for");
+    _ = try p.consume(.lparen);
+
+    const for_init = try p.parseForInit();
+    if (for_init.* == .expr) _ = try p.consume(.semicolon);
+    const condition = try p.parseOptionalExpr(0);
+    _ = try p.consume(.lparen);
+    const post = post: {
+        if (p.peek()) |token| {
+            if (token.type == .rparen) {
+                break :post null;
+            }
+        }
+        break :post try p.parseExpr(0);
+    };
+    _ = try p.consume(.rparen);
+    const body = try p.parseStmt();
+    return .forStmt(p.allocator, for_init, condition, post, body);
+}
+
+fn parseForInit(p: *Parser) ParseError!*Ast.ForInit {
+    if (p.peek()) |token| {
+        if (token.type == .int) {
+            const decl = try p.parseDecl();
+            return .declForInit(p.allocator, decl);
+        }
+    }
+    const expr = try p.parseOptionalExpr(0);
+    return .exprForInit(p.allocator, expr);
+}
+
+fn parseWhileStmt(p: *Parser) ParseError!*Ast.Stmt {
+    _ = try p.consume(.@"while");
+    _ = try p.consume(.lparen);
+    const condition = try p.parseExpr(0);
+    _ = try p.consume(.rparen);
+    const body = try p.parseStmt();
+    return .whileStmt(p.allocator, condition, body);
 }
 
 fn parseReturnStmt(p: *Parser) ParseError!*Ast.Stmt {
@@ -176,6 +217,15 @@ fn parseIfStmt(p: *Parser) ParseError!*Ast.Stmt {
         break :else_block null;
     };
     return .ifStmt(p.allocator, condition, if_block, else_block);
+}
+
+fn parseOptionalExpr(p: *Parser, min_precedence: u8) ParseError!?*Ast.Expr {
+    if (p.peek()) |token| {
+        if (token.type == .semicolon) {
+            return null;
+        }
+    }
+    return p.parseExpr(min_precedence);
 }
 
 fn parseExpr(p: *Parser, min_precedence: u8) ParseError!*Ast.Expr {

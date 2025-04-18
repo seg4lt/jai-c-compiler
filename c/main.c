@@ -1,4 +1,10 @@
 int main(void) {
-    // NOTE: this is invalid in C17, but valid in C23
-    foo:
+    int a = 0;
+    for (; ; ) {
+        a = a + 1;
+        if (a > 3)
+            break;
+    }
+
+    return a;
 }

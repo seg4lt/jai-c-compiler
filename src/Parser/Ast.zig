@@ -70,7 +70,23 @@ pub const Stmt = union(enum) {
     if_stmt: struct { condition: *Expr, if_block: *Stmt, else_block: ?*Stmt },
     compound: *Block,
     goto: []const u8,
+    @"while": struct { condition: *Expr, body: *Stmt, label: []const u8 },
     null,
+    @"for": struct { init: *ForInit, condition: ?*Expr, post: ?*Expr, body: *Stmt, label: []const u8 },
+
+    pub fn forStmt(allocator: Allocator, init: *ForInit, condition: ?*Expr, post: ?*Expr, body:*Stmt) *@This() {
+       const stmt = allocator.create(Stmt) catch unreachable;
+       const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+       stmt.* = .{.@"for" = .{ .init = init, .condition = condition , .post = post, .body = body, .label = label}};
+       return stmt;
+    }
+
+    pub fn whileStmt(allocator: Allocator, condition: *Expr, body: *Stmt) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+        stmt.* = .{ .@"while" = .{ .condition = condition, .body = body, .label = label } };
+        return stmt;
+    }
 
     pub fn gotoStmt(allocator: Allocator, label: []const u8) *@This() {
         const goto = allocator.create(Stmt) catch unreachable;
@@ -110,6 +126,23 @@ pub const Stmt = union(enum) {
         const stmt = allocator.create(Stmt) catch unreachable;
         stmt.* = .{ .expr = expr };
         return stmt;
+    }
+};
+
+pub const ForInit = union(enum) {
+    decl: *Decl,
+    expr: ?*Expr,
+
+    pub fn declForInit(allocator: Allocator, decl: *Decl) *@This() {
+        const for_init = allocator.create(ForInit) catch unreachable;
+        for_init.* = .{ .decl = decl };
+        return for_init;
+    }
+
+    pub fn exprForInit(allocator: Allocator, expr: ?*Expr) *@This() {
+        const for_init = allocator.create(ForInit) catch unreachable;
+        for_init.* = .{ .expr = expr };
+        return for_init;
     }
 };
 
