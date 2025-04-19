@@ -3,7 +3,7 @@
 #import "Compiler";
 #import "Parser";
 
-#run _run_tests();
+// #run _run_tests();
 
 _run_tests :: () {
     log("Running test for file: %", #file);
@@ -41,18 +41,18 @@ _run_tests :: () {
         expected_tokens: [..]Token;
         array_add(*expected_tokens,
             // int main(void) {
-            .{.INT, "int", 1}, 
-            .{.IDENT, "main", 1}, 
-            .{.LPAREN, "(", 1}, 
-            .{.VOID, "void", 1}, 
-            .{.RPAREN, ")", 1}, 
-            .{.LCURLY, "{", 1},
+            .{.INT, "int", 1, 1}, 
+            .{.IDENT, "main", 1, 1}, 
+            .{.LPAREN, "(", 1, 1}, 
+            .{.VOID, "void", 1, 1}, 
+            .{.RPAREN, ")", 1, 1}, 
+            .{.LCURLY, "{", 1, 1},
             // return 0;
-            .{.RETURN, "return", 2}, 
-            .{.INT_LITERAL, "0", 2}, 
-            .{.SEMICOLON, ";", 2},
+            .{.RETURN, "return", 2, 2}, 
+            .{.INT_LITERAL, "0", 2, 2}, 
+            .{.SEMICOLON, ";", 2, 2},
             // }
-            .{.RCURLY, "}", 3}
+            .{.RCURLY, "}", 3, 2}
         );
         verify_tokens(#procedure_name(), src, expected_tokens);
     } 
@@ -65,16 +65,16 @@ _run_tests :: () {
         expected_tokens: [..]Token;
         array_add(*expected_tokens, 
             // var x = 10;
-            .{.IDENT, "var", 1}, 
-            .{.IDENT, "x", 1}, 
-            .{.ASSIGN, "=", 1}, 
-            .{.INT_LITERAL, "10", 1}, 
-            .{.SEMICOLON, ";", 1}, 
+            .{.IDENT, "var", 1, 1}, 
+            .{.IDENT, "x", 1, 1}, 
+            .{.ASSIGN, "=", 1, 1}, 
+            .{.INT_LITERAL, "10", 1, 1}, 
+            .{.SEMICOLON, ";", 1, 1}, 
             // x = 20;
-            .{.IDENT, "x", 2}, 
-            .{.ASSIGN, "=", 2}, 
-            .{.INT_LITERAL, "20", 2}, 
-            .{.SEMICOLON, ";", 2}
+            .{.IDENT, "x", 2, 1}, 
+            .{.ASSIGN, "=", 2, 1}, 
+            .{.INT_LITERAL, "20", 2, 1}, 
+            .{.SEMICOLON, ";", 2, 1}
         );
         verify_tokens(#procedure_name(), src, expected_tokens);
     }

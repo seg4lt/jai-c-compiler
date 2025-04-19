@@ -1,4 +1,5 @@
 int main(void) {
     int x = 0;
-    int y = 123asdf;
+    int y = 123;
 }
+foo;
