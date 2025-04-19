@@ -11,6 +11,7 @@ Token :: struct {
     type: Token_Type;
     value: string;
     line: int;
+    start: int;
 }
 
 lex :: (src: string, error_reporter: *Error_Reporter) -> Lexer {
@@ -213,7 +214,7 @@ number :: (using lexer: *Lexer) {
     str := slice(src, start, current-start);
     if found_alpha lex_error_report(lexer, "Invalid number found %", str);
 
-    token := Token.{ .INT_LITERAL, str, line};
+    token := Token.{ .INT_LITERAL, str, line, start};
     array_add(*tokens, token); 
 }
 
@@ -221,7 +222,7 @@ ident_or_keyword :: (using lexer: *Lexer) {
     while !is_at_end(lexer) && is_alnum(peek(lexer)) consume(lexer);
     str := slice(src, start, current-start);
     token_type := find_keyword_or_ident(str);
-    token := Token.{ token_type, str, line};
+    token := Token.{ token_type, str, line, start};
     array_add(*tokens, token);
 }
 
@@ -253,7 +254,7 @@ find_keyword_or_ident :: (str: string) -> Token_Type {
 }
 
 add_token :: (using lexer: *Lexer, type: Token_Type) {
-    array_add(*tokens, .{ type, slice(src, start, current-start), line });
+    array_add(*tokens, .{ type, slice(src, start, current-start), line, start });
 }
 
 consume :: (using lexer: *Lexer) -> u8 {
