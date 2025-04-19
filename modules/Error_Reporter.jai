@@ -4,6 +4,8 @@
 
 Error_Reporter :: struct {
     error_items: [..]Error_Item;
+    src: string;
+    src_path: string;
     writer: Writer;
 }
 
@@ -22,17 +24,18 @@ print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) {
     if panic exit(1);
 }
 
-error_report :: (error_reporter: *Error_Reporter, src: string, src_path: string, line: int, start: int, detail_msg_fmt: string, args: .. Any, start_msg: string = "", panic: bool = true) {
-    error_item := get_error_item(src,src_path, line,start, detail_msg_fmt, .. 
-    args, start_msg);
+error_report :: (error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, panic: bool = true) {
+    error_item := get_error_item(error_reporter.src, error_reporter.src_path, line, start, detail_msg_fmt, ..  args);
     array_add(*error_reporter.error_items, error_item);
     if panic print_errors(error_reporter, panic);
 }
 
 #scope_module
 
-
-get_error_item :: (src: string, src_path: string, line: int, start: int, detail_msg_fmt: string, args: .. Any, start_msg: string = "") -> Error_Item {
+//@todo
+// src today is preprocessed file, the line might not match
+// need to figure out how to map raw src file and preprocessed file
+get_error_item :: (src: string, src_path: string, line: int, start: int, detail_msg_fmt: string, args: .. Any) -> Error_Item {
     previous_line_start, current_line_start := find_line_start(src, start);
     current_line_end := start;
     for start..src.count-1 {
@@ -43,7 +46,7 @@ get_error_item :: (src: string, src_path: string, line: int, start: int, detail_
     }
     column := start - current_line_start;
     sb : String_Builder;
-    append(*sb, sprint("Error in %:%,% : %", src_path, line, column, start_msg));
+    append(*sb, sprint("\nError in %:%,%", src_path, line, column));
     append(*sb, "\n");
     append(*sb, sprint("%", slice(src, previous_line_start, current_line_start-previous_line_start)));
     append(*sb, sprint("%\n", slice(src, current_line_start, current_line_end-current_line_start)));

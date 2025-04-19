@@ -1,5 +1,11 @@
-#import "Basic";
-#import "String";
+
+run_preprocessor :: (src_path: string) -> src_content: string = "", success: bool = true, msg: string = "" {
+    preprocessor(src_path);
+    path := ifx ends_with(src_path, ".c") slice(src_path, 0, src_path.count - 2) else src_path;
+    src_content, success := read_entire_file(tprint("%.i", path));
+    if !success return success=false, msg=tprint("Unable to read file: %", path);
+    return src_content = src_content;
+}
 
 assember_and_linker :: (src_path_without_ext: string)  {
     command: [..] string;
@@ -33,3 +39,6 @@ unreachable:: (message := "", args: .. Any, log: bool = true, exit_status_code: 
 
 #scope_module
 Process :: #import "Process";
+#import "Basic";
+#import "String";
+#import "File";

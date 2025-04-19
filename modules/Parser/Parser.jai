@@ -8,14 +8,21 @@ Parser :: struct {
     tokens: []Token; 
     start: int = 0; 
     current: int = 0;
+    error_reporter: *Error_Reporter;
 }
 
-ast_parse :: (lexer: *Lexer) -> *Program_Ast {
-    parser := Parser.{ tokens = lexer.tokens };
+ast_parse :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
+    parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
     print_program_ast(program);
     if !is_at_end(*parser) unreachable("All token not consumed");
     return program;
+}
+
+#scope_module
+
+parser_error_report :: (using parser: *Parser, msg_fmg: string, args: .. Any) {
+    error_report(error_reporter, src, src_path, line, start, msg_fmt, .. args);
 }
 
 #scope_file

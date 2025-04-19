@@ -1,5 +1,4 @@
 Lexer :: struct {
-    src_path: string;
     src: string;
     tokens: [..]Token;
     error_reporter: *Error_Reporter;
@@ -14,15 +13,8 @@ Token :: struct {
     line: int;
 }
 
-lex_path :: (src_path: string, error_reporter: *Error_Reporter) -> Lexer {
-    path := ifx ends_with(src_path, ".c") slice(src_path, 0, src_path.count - 2) else src_path;
-    content, success := read_entire_file(tprint("%.i", path));
-    if !success unreachable("Unable to read file: %", path);
-    return lex(content, error_reporter, src_path);
-}
-
-lex :: (src: string, error_reporter: *Error_Reporter, src_path: string = "") -> Lexer {
-    lexer := Lexer.{src = src, error_reporter = error_reporter, src_path = src_path};
+lex :: (src: string, error_reporter: *Error_Reporter) -> Lexer {
+    lexer := Lexer.{src = src, error_reporter = error_reporter};
     scan(*lexer);
     print_tokens(lexer.tokens);
     return lexer;
@@ -184,7 +176,7 @@ scan :: (using lexer: *Lexer) {
 #scope_file
 
 lex_error_report :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
-    error_report(error_reporter, src, src_path, line, start, msg_fmt, .. args);
+    error_report(error_reporter, line, start, msg_fmt, .. args);
 }
 
 print_tokens :: (tokens: []Token) {
