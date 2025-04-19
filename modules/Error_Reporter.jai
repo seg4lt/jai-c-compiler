@@ -24,9 +24,9 @@ print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) {
     if panic exit(1);
 }
 
-error_report :: (error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, panic: bool = true) {
-    error_item := get_error_item(error_reporter.src, error_reporter.src_path, line, start, detail_msg_fmt, ..  args);
-    array_add(*error_reporter.error_items, error_item);
+error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, panic: bool = true) {
+    error_item := get_error_item(src, src_path, line, start, detail_msg_fmt, ..  args);
+    array_add(*error_items, error_item);
     if panic print_errors(error_reporter, panic);
 }
 
@@ -72,8 +72,3 @@ find_line_start :: (src: string, start: int) -> int, int {
     }
     return previous_line_start, current_line_start;
 }
-
-#scope_file
-
-
-#scope_export

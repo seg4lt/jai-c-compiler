@@ -473,6 +473,10 @@ print_tacky_val :: (val: *Val_Tacky) {
     }
 }
 
+#scope_module
+#import "Parser";
+#import "Basic";
+
 /* -- ADSL for TACKY IR -- 
 
 program             = Program(function_definition)

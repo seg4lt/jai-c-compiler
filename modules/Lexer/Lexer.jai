@@ -4,20 +4,20 @@ Lexer :: struct {
     error_reporter: *Error_Reporter;
     line: int = 1;
     start: int = 0; // current token start position
-    current: int = 0; // where is cursor right now
+    current : int = 0; // where is cursor right now
 }
 
 Token :: struct {
-    type: Token_Type;
-    value: string;
-    line: int;
-    start: int;
+    type  : Token_Type;
+    value : string;
+    line  : int;
+    start : int;
 }
 
-lex :: (src: string, error_reporter: *Error_Reporter) -> Lexer {
+parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, print: bool = false) -> Lexer {
     lexer := Lexer.{src = src, error_reporter = error_reporter};
     scan(*lexer);
-    print_tokens(lexer.tokens);
+    if print print_tokens(lexer.tokens);
     return lexer;
 }
 
@@ -169,14 +169,14 @@ scan :: (using lexer: *Lexer) {
                 add_token(lexer, .NOT);
             case #char "?"; add_token(lexer, .QUESTION_MARK);
             case #char ":"; add_token(lexer, .COLON);
-            case; lex_error_report(lexer, "Unexpected character %", to_string(*current_char, 1));
+            case; lex_err(lexer, "Unexpected character %", to_string(*current_char, 1));
         }
     }
 }
 
 #scope_file
 
-lex_error_report :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
+lex_err :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
     error_report(error_reporter, line, start, msg_fmt, .. args);
 }
 
@@ -201,7 +201,7 @@ comment :: (using lexer: *Lexer) {
                 if c == #char "*" && peek(lexer) == #char "/" break;
             }
             consume(lexer); // consume closing /, if not found, this is an error
-        case; lex_error_report(lexer, "unable to parse comment\n");
+        case; lex_err(lexer, "unable to parse comment\n");
     }
 }
 
@@ -212,7 +212,7 @@ number :: (using lexer: *Lexer) {
         consume(lexer);
     }
     str := slice(src, start, current-start);
-    if found_alpha lex_error_report(lexer, "Invalid number found %", str);
+    if found_alpha lex_err(lexer, "Invalid number found %", str);
 
     token := Token.{ .INT_LITERAL, str, line, start};
     array_add(*tokens, token); 

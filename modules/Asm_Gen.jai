@@ -470,8 +470,11 @@ print_asm_operand :: (operand: Operand_Asm) {
 }
 
 
-#scope_file
+#scope_module
 Hash_Table :: #import "Hash_Table";
+#import "Basic";
+#import "Tacky_IR";
+
 #scope_export
 
 /* ADSL ASM_GEN
