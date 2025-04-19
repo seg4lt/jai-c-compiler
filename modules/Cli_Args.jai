@@ -1,6 +1,3 @@
-
-#scope_export
-
 Cli_Args :: struct {
     src_path: string;
     src_path_without_ext: string;
@@ -30,11 +27,6 @@ get_cli_args :: () -> Cli_Args {
             case "--validate";     flags = .LEX | .PARSE | .SEMA;
             case "--tacky";        flags = .LEX | .PARSE | .TACKY;
             case "--code-gen";     flags = .LEX | .PARSE | .TACKY | .CODE_GEN; 
-            // case "--lex";          flags &= ~(.PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL);
-            // case "--parse";        flags &= ~(         .SEMA | .TACKY | .CODE_GEN | .ALL);
-            // case "--validate";     flags &= ~(                 .TACKY | .CODE_GEN | .ALL);
-            // case "--tacky";        flags &= ~(                          .CODE_GEN | .ALL);
-            // case "--code-gen";     flags &= ~                                       .ALL;
             case; src_path = it;
         }
     }
@@ -44,7 +36,7 @@ get_cli_args :: () -> Cli_Args {
     return cli_args;
 }
 
-#scope_file
+#scope_module
 #import "String";
 #import "Compiler_Util";
 #import "Basic";

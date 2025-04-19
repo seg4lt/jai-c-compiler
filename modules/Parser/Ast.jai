@@ -37,7 +37,7 @@ Stmt_Ast :: struct {
     as: union {
         return_stmt: struct { expr: *Expr_Ast; };
         expr: *Expr_Ast;
-        if_stmt: struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: *Stmt_Ast; /* Optional */ };
+        if_stmt: struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: * /* Optional */ Stmt_Ast;  };
         label: string;
         goto: string;
         compound: *Block_Ast; 
@@ -83,7 +83,7 @@ Binary_Operator :: enum {
 create_program_ast :: (fn: *Fn_Ast) -> *Program_Ast {
     assert(fn != null, "fn cannot be null");
     pg := New(Program_Ast);
-    pg.* = .{ fn = fn};
+    pg.* = .{ fn = fn };
     return pg;
 }
 

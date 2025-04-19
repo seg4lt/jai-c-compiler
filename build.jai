@@ -2,17 +2,17 @@
 #run build();
 
 build:: () {
-    w := compiler_create_workspace("Target Program");
+    w := compiler_create_workspace("Jai C Compiler");
     options := get_build_options(w);
     set_working_directory(#filepath);
 
-    modules_path := join(#filepath, "src/My_Modules");
-    modules_paths: [..] string;
-    array_add(*modules_paths, modules_path);
-    array_add(*modules_paths, ..options.import_path);
-    options.import_path = modules_paths;
+    // modules_path := join(#filepath, "src/My_Modules");
+    // modules_paths: [..] string;
+    // array_add(*modules_paths, modules_path);
+    // array_add(*modules_paths, ..options.import_path);
+    // options.import_path = modules_paths;
     options.output_path =  "out" ;
-    options.output_executable_name = "target";
+    options.output_executable_name = "jaicc";
 
     // set_optimization(*options, .OPTIMIZED);
     set_build_options(options, w);
