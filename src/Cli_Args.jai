@@ -22,13 +22,14 @@ get_cli_args :: () -> Cli_Args {
 
     using cli_args := Cli_Args.{};
 
+
     for args {
         if it == {
             case "--lex";          flags = .LEX;
-            case "--parse";        flags = .LEX & .PARSE;
-            case "--validate";     flags = .LEX & .PARSE & .SEMA;
-            case "--tacky";        flags = .LEX & .PARSE & .TACKY;
-            case "--code-gen";     flags = .LEX & .PARSE & .TACKY & .CODE_GEN; 
+            case "--parse";        flags = .LEX | .PARSE;
+            case "--validate";     flags = .LEX | .PARSE | .SEMA;
+            case "--tacky";        flags = .LEX | .PARSE | .TACKY;
+            case "--code-gen";     flags = .LEX | .PARSE | .TACKY | .CODE_GEN; 
             // case "--lex";          flags &= ~(.PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL);
             // case "--parse";        flags &= ~(         .SEMA | .TACKY | .CODE_GEN | .ALL);
             // case "--validate";     flags &= ~(                 .TACKY | .CODE_GEN | .ALL);

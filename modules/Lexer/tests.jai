@@ -14,13 +14,14 @@ _run_tests :: () {
         return false;
     }
 
-    get_lexer :: (src: string) -> Lexer {
-        lexer := lex(src);
+    get_lexer :: (src: string, error_reporter: *Error_Reporter) -> Lexer {
+        lexer := lex(src, error_reporter);
         return lexer;
     }
 
     verify_tokens :: (test_name: string, src: string, expected_tokens: [..]Token) {
-        lexer := get_lexer(src);
+        error_reporter: Error_Reporter;
+        lexer := get_lexer(src, *error_reporter);
         assert(expected_tokens.count == lexer.tokens.count, "Lexer token count doesn't match");
 
         for 0..lexer.tokens.count-1 {

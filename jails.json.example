@@ -1,0 +1,12 @@
+{
+    "local_modules": [
+        "modules",
+        "<path to jai std library>"
+    ],
+    "roots": [
+        "src/main.jai",
+        "build.jai"
+    ],
+    "build_root": "build.jai",
+    "intermediate_path": "tmp/"
+}
