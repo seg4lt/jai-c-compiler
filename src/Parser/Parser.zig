@@ -22,7 +22,7 @@ tokens: Lexer.TokenArray,
 current: usize = 0,
 err_reporter: *ErrorReporter,
 
-pub fn parse(allocator: Allocator, err_reporter: *ErrorReporter, tokens: Lexer.TokenArray) ParseError!*Ast.Program {
+pub fn parse(allocator: Allocator, tokens: Lexer.TokenArray, err_reporter: *ErrorReporter) ParseError!*Ast.Program {
     var p: Parser = .{ .allocator = allocator, .tokens = tokens, .err_reporter = err_reporter };
     const program = try p.parseProgram();
     if (!p.isAtEnd()) {

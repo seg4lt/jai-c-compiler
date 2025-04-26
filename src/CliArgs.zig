@@ -1,11 +1,11 @@
 flag: CliFlags = .all,
-src: []const u8,
+src_path: []const u8,
 
 pub fn parse() CliArgsError!Self {
     var args = std.process.args();
 
     var flag: CliFlags = .all;
-    var src: ?[]const u8 = null;
+    var src_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, "--lex", arg)) {
@@ -19,14 +19,14 @@ pub fn parse() CliArgsError!Self {
         } else if (std.mem.eql(u8, "--code-gen", arg)) {
             flag = .code_gen;
         } else {
-            src = arg;
+            src_path = arg;
         }
     }
 
-    if (!std.mem.endsWith(u8, src orelse return CliArgsError.NoSourceFile, ".c")) {
+    if (!std.mem.endsWith(u8, src_path orelse return CliArgsError.NoSourceFile, ".c")) {
         return CliArgsError.SourceFileNotACExtension;
     }
-    return .{ .flag = flag, .src = src.? };
+    return .{ .flag = flag, .src_path = src_path.? };
 }
 
 pub const CliFlags = enum(u8) {
@@ -53,7 +53,7 @@ test "test cli args" {
         arg: [*:0]const u8,
         flags: []const CliFlags,
     };
-    
+
     const test_data = [_]TestData{
         .{ .arg = "--lex", .flags = &[_]CliFlags{.lex} },
         .{ .arg = "--parse", .flags = &[_]CliFlags{ .lex, .parse } },

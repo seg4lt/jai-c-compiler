@@ -7,20 +7,27 @@ pub fn main() !void {
     const arena = arena_.allocator();
     defer _ = arena_.reset(.free_all);
 
-    var err_reporter = ErrorReporter.init(arena);
-    start(arena, &err_reporter) catch |err| {
-        log.err("Error: {any}", .{err});
-        err_reporter.printErrorsStdOut();
-        return err;
-    };
+    try startCompiler(arena);
 }
 
-pub fn start(arena: Allocator, err_reporter: *ErrorReporter) !void {
+pub fn startCompiler(allocator: Allocator) !void {
     const args = try CliArgs.parse();
-    log.debug("Compiling file: {s}", .{args.src});
-    preprocessor(arena, args.src);
-    const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrcPath(arena, err_reporter, args.src) else null;
-    const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(arena, err_reporter, lexer.?.tokens) else null;
+    log.debug("Compiling file: {s}", .{args.src_path});
+    preprocessor(allocator, args.src_path);
+
+    const file = std.fmt.allocPrint(allocator, "{s}.i", .{args.src_path[0 .. args.src_path.len - 2]}) catch unreachable;
+    defer allocator.free(file);
+    log.info("Reading file: {s}\n", .{file});
+    const src = try std.fs.cwd().readFileAlloc(allocator, file, 4096);
+
+    var error_reporter: ErrorReporter = .init(allocator, src, args.src_path);
+
+    const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrc(allocator, src, &error_reporter) else null;
+    const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(
+        allocator,
+        lexer.?.tokens,
+        &error_reporter,
+    ) else null;
     _ = ast;
 }
 

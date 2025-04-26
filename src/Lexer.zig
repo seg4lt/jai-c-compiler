@@ -7,7 +7,8 @@ pub const TokenArray = std.ArrayList(Token);
 pub const Token = struct {
     type: TokenType,
     value: []const u8,
-    line: u16,
+    line: usize,
+    start: usize,
 };
 
 const Self = @This();
@@ -22,16 +23,13 @@ start: usize = 0, // current token start position
 current: usize = 0, // where is cursor right now
 err_reporter: *ErrorReporter,
 
-pub fn initFromSrcPath(allocator: Allocator, err_reporter: *ErrorReporter, src_path: []const u8) !Self {
-    const file = std.fmt.allocPrint(allocator, "{s}.i", .{src_path[0 .. src_path.len - 2]}) catch unreachable;
-    defer allocator.free(file);
-    log.info("Reading file: {s}\n", .{file});
-    const src = try std.fs.cwd().readFileAlloc(allocator, file, 4096);
-    return initFromSrc(allocator, err_reporter, src);
-}
-
-pub fn initFromSrc(allocator: Allocator, err_reporter: *ErrorReporter, src: []const u8) !Self {
-    var lexer = Self{ .src = src, .tokens = TokenArray.init(allocator), .allocator = allocator, .err_reporter = err_reporter };
+pub fn initFromSrc(allocator: Allocator, src: []const u8, err_reporter: *ErrorReporter) !Self {
+    var lexer = Self{
+        .src = src,
+        .tokens = TokenArray.init(allocator),
+        .allocator = allocator,
+        .err_reporter = err_reporter,
+    };
     try lexer.scan();
     printTokens(lexer.tokens);
     return lexer;
@@ -53,7 +51,7 @@ fn addToken(s: *Self, token_type: TokenType) !void {
 }
 
 fn createToken(s: *Self, token_type: TokenType) Token {
-    return .{ .type = token_type, .src = s.src, .value = s.src[s.start..s.current], .line = s.line, .start = s.start };
+    return .{ .type = token_type, .value = s.src[s.start..s.current], .line = s.line, .start = s.start };
 }
 
 const LexerError = error{
@@ -157,7 +155,7 @@ fn scan(s: *Self) !void {
             '?' => s.addToken(.question_mark),
             ':' => s.addToken(.colon),
             else => {
-                s.err_reporter.add(s.createToken(.invalid), "Unexpected character: {c}\n", .{current_char});
+                s.err_reporter.addErrorAndPanic(s.line, s.start, "Unexpected character: {c}\n", .{current_char});
                 return LexerError.InvalidCharacter;
             },
         };
@@ -194,11 +192,7 @@ fn number(s: *Self) !void {
         _ = s.consumeAny();
     }
     const value = s.src[s.start..s.current];
-    if (found_alpha) {
-        const tok = s.createToken(.invalid);
-        s.err_reporter.add(tok, "Invalid number: {s}\n", .{value});
-        return LexerError.InvalidNumber;
-    }
+    if (found_alpha) s.err_reporter.addErrorAndPanic(s.line, s.start, "Invalid number {s}\n", .{value});
     try s.addToken(.int_literal);
 }
 
@@ -238,7 +232,7 @@ fn consume(s: *Self, char: u8) !u8 {
     defer s.current += 1;
     const c = s.peek();
     if (c != char) {
-        s.err_reporter.add(s.createToken(.invalid), "Unexpected character: {c}\n", .{c});
+        s.err_reporter.addErrorAndPanic(s.line, s.start, "Unexpected character: {c}\n", .{c});
         return LexerError.InvalidCharacter;
     }
     if (c == '\n') s.line += 1;

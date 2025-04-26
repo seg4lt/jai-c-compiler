@@ -1,53 +1,114 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Lexer = @import("Lexer.zig");
-const Token = Lexer.Token;
+const AnyWriter = std.io.AnyWriter;
 
-const Data = struct { msg: []const u8, token: Token };
-
-buffer: std.ArrayList(Data),
-allocator: std.mem.Allocator,
+error_items: std.ArrayList(ErrorItem),
+src: []const u8,
+src_path: []const u8,
+allocator: Allocator,
 
 const Self = @This();
 
-pub fn init(allocator: Allocator) Self {
-    return .{ .allocator = allocator, .buffer = std.ArrayList(Data).init(allocator) };
+pub const ErrorItem = struct {
+    msg: []const u8,
+    file: []const u8,
+    line: usize,
+    column: usize,
+};
+
+pub fn init(allocator: Allocator, src: []const u8, src_path: []const u8) Self {
+    return .{
+        .error_items = std.ArrayList(ErrorItem).init(allocator),
+        .src = src,
+        .src_path = src_path,
+        .allocator = allocator,
+    };
 }
 
-pub fn add(s: *Self, token: Token, comptime fmt: []const u8, args: anytype) void {
-    const owned_msg = std.fmt.allocPrint(s.allocator, fmt, args) catch unreachable;
-    s.buffer.append(.{ .msg = owned_msg, .token = token }) catch unreachable;
+pub fn printError(s: *const Self, writer: *AnyWriter) !void {
+    if (s.error_items.items.len == 0) return;
+    for (s.error_items.items) |it| {
+        try writer.print("{s}", .{it.msg});
+    }
 }
 
-pub fn hasError(s: *Self) bool {
-    return s.buffer.len > 0;
+pub fn printErrorAndPanic(s: *const Self, writer: *AnyWriter) !noreturn {
+    try s.printError(writer);
+    std.process.exit(1);
 }
 
-pub fn printErrors(s: *Self, writer: *std.io.AnyWriter) void {
-    for (s.buffer.items) |*it| printErrorItem(writer, it);
+pub fn printErrorOnStdErr(s: *const Self) !void {
+    var writer = std.io.getStdErr().writer();
+    try s.printError(&writer);
 }
 
-pub fn printErrorsStdOut(s: *Self) void {
-    var stdout = std.io.getStdOut().writer().any();
-    printErrors(s, &stdout);
+pub fn addError(s: *Self, line: usize, start: usize, comptime msg_fmt: []const u8, args: anytype) !void {
+    const item = getErrorItem(s.allocator, s.src, s.src_path, line, start, msg_fmt, args);
+    s.error_items.append(item) catch unreachable;
 }
 
-fn printErrorItem(writer: *std.io.AnyWriter, item: *const Data) void {
-    const column = if (item.token.line <= 1) item.token.start else getColumnIndex(item.token.src, item.token.line, item.token.start);
-
-    writer.print("Error: {s} at line {d}:{d}\n", .{ item.token.src, item.token.line }) catch unreachable;
-    _ = writer.print(" -- {s}\n", .{item.msg}) catch unreachable;
+pub fn addErrorAndPanic(s: *Self, line: usize, start: usize, comptime msg_fmt: []const u8, args: anytype) noreturn {
+    s.addError(line, start, msg_fmt, args) catch unreachable;
+    var writer = std.io.getStdErr().writer().any();
+    printErrorAndPanic(s, &writer) catch unreachable;
 }
 
-fn getColumnIndex(src: []const u8, line: u16, start: usize) usize {
-    var column: usize = 0;
-    for (src[0..start]) |c| {
-        if (c == '\n') {
-            line -= 1;
-            column = 0;
-        } else if (line == 1) {
-            column += 1;
+fn getErrorItem(allocator: Allocator, src: []const u8, src_path: []const u8, line: usize, start: usize, comptime msg_fmt: []const u8, args: anytype) ErrorItem {
+    const pls, const cls = findLineStart(src, start);
+    var cle = start;
+    for (start..src.len) |it| {
+        if (src[it] == '\n') {
+            cle = it;
+            break;
         }
     }
-    return column;
+    const column = start - cls;
+    var sb = std.ArrayList(u8).init(allocator);
+    defer sb.deinit();
+
+    const error_in = std.fmt.allocPrint(allocator, "Error in {s}:{d},{d}\n", .{ src_path, line, column }) catch unreachable;
+    defer allocator.free(error_in);
+    sb.appendSlice(error_in) catch unreachable;
+
+    const support_line = std.fmt.allocPrint(allocator, "{s}", .{src[pls..cls]}) catch unreachable;
+    defer allocator.free(support_line);
+    sb.appendSlice(support_line) catch unreachable;
+
+    const error_line = std.fmt.allocPrint(allocator, "{s}\n", .{src[cls..cle]}) catch unreachable;
+    defer allocator.free(error_line);
+    sb.appendSlice(error_line) catch unreachable;
+
+    const padding = allocator.alloc(u8, column) catch unreachable;
+    defer allocator.free(padding);
+    @memset(padding, ' ');
+
+    const detail_msg = std.fmt.allocPrint(allocator, msg_fmt, args) catch unreachable;
+    defer allocator.free(detail_msg);
+
+    const final_msg = std.fmt.allocPrint(allocator, "{s}^____{s}", .{ padding, detail_msg }) catch unreachable;
+    defer allocator.free(final_msg);
+
+    sb.appendSlice(final_msg) catch unreachable;
+
+    const full_msg = sb.toOwnedSlice() catch unreachable;
+    return .{ .msg = full_msg, .file = src_path, .line = line, .column = column };
+}
+
+fn findLineStart(src: []const u8, start: usize) struct { usize, usize } {
+    var pls = start;
+    var cls = start;
+
+    var cur = start;
+    var count: i32 = 0;
+
+    while (cur >= 0 and count <= 2) {
+        if (src[cur] == '\n') {
+            if (count == 0) cls = cur + 1;
+            count += 1;
+            pls = cur + 1;
+        }
+        if (cur == 0) break;
+        cur -= 1;
+    }
+    return .{ pls, cls };
 }
