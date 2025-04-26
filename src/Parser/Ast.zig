@@ -73,12 +73,22 @@ pub const Stmt = union(enum) {
     @"while": struct { condition: *Expr, body: *Stmt, label: []const u8 },
     null,
     @"for": struct { init: *ForInit, condition: ?*Expr, post: ?*Expr, body: *Stmt, label: []const u8 },
+    @"break": []const u8,
+    @"continue": []const u8,
+    do_while: struct { body: *Stmt, condition: *Expr, label: []const u8 },
 
-    pub fn forStmt(allocator: Allocator, init: *ForInit, condition: ?*Expr, post: ?*Expr, body:*Stmt) *@This() {
-       const stmt = allocator.create(Stmt) catch unreachable;
-       const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
-       stmt.* = .{.@"for" = .{ .init = init, .condition = condition , .post = post, .body = body, .label = label}};
-       return stmt;
+    pub fn doWhileStmt(allocator: Allocator, body: *Stmt, condition: *Expr) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+        stmt.* = .{ .do_while = .{ .body = body, .condition = condition, .label = label } };
+        return stmt;
+    }
+
+    pub fn forStmt(allocator: Allocator, init: *ForInit, condition: ?*Expr, post: ?*Expr, body: *Stmt) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+        stmt.* = .{ .@"for" = .{ .init = init, .condition = condition, .post = post, .body = body, .label = label } };
+        return stmt;
     }
 
     pub fn whileStmt(allocator: Allocator, condition: *Expr, body: *Stmt) *@This() {
@@ -125,6 +135,18 @@ pub const Stmt = union(enum) {
     pub fn exprStmt(allocator: Allocator, expr: *Expr) *@This() {
         const stmt = allocator.create(Stmt) catch unreachable;
         stmt.* = .{ .expr = expr };
+        return stmt;
+    }
+    pub fn breakStmt(allocator: Allocator) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+        stmt.* = .{ .@"break" = label };
+        return stmt;
+    }
+    pub fn continueStmt(allocator: Allocator) *@This() {
+        const stmt = allocator.create(Stmt) catch unreachable;
+        const label = std.fmt.allocPrint(allocator, "$$UNPROCESSED", .{}) catch unreachable;
+        stmt.* = .{ .@"continue" = label };
         return stmt;
     }
 };

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const AnyWriter = std.io.AnyWriter;
 
@@ -34,6 +35,9 @@ pub fn printError(s: *const Self, writer: *AnyWriter) !void {
 
 pub fn printErrorAndPanic(s: *const Self, writer: *AnyWriter) !noreturn {
     try s.printError(writer);
+    if (builtin.mode == .Debug) {
+        unreachable;
+    }
     std.process.exit(1);
 }
 
@@ -85,7 +89,7 @@ fn getErrorItem(allocator: Allocator, src: []const u8, src_path: []const u8, lin
     const detail_msg = std.fmt.allocPrint(allocator, msg_fmt, args) catch unreachable;
     defer allocator.free(detail_msg);
 
-    const final_msg = std.fmt.allocPrint(allocator, "{s}^____{s}", .{ padding, detail_msg }) catch unreachable;
+    const final_msg = std.fmt.allocPrint(allocator, "{s}^____ {s}", .{ padding, detail_msg }) catch unreachable;
     defer allocator.free(final_msg);
 
     sb.appendSlice(final_msg) catch unreachable;

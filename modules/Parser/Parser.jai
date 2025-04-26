@@ -149,7 +149,9 @@ parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
 }
 
 parse_for_init :: (parser: *Parser) -> *For_Init_Ast {
-    if peek(parser).type == .INT return create_decl_for_init(parse_decl_ast(parser));
+    if peek(parser).type == .INT 
+        return create_decl_for_init(parse_decl_ast(parser));
+        
     expr := parse_optional_expr(parser, 0);
     return create_expr_for_init(expr);
 }

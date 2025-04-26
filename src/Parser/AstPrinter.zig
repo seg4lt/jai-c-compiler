@@ -32,6 +32,19 @@ pub fn printDecl(writer: *AnyWriter, decl: *Ast.Decl, depth: u8) void {
 
 pub fn printStmt(writer: *AnyWriter, stmt: *Ast.Stmt, depth: u8) void {
     switch (stmt.*) {
+        .do_while => |do_while| {
+            print(writer, "[DO] {s}", .{do_while.label});
+            printStmt(writer, do_while.body, depth + 1);
+            printSpace(writer, depth);
+            print(writer, "[DO_WHILE] {s}", .{do_while.label});
+            printExpr(writer, do_while.condition, depth + 1);
+        },
+        .@"break" => |label| {
+            print(writer, "[BREAK] {s}", .{label});
+        },
+        .@"continue" => |label| {
+            print(writer, "[CONTINUE] {s}", .{label});
+        },
         .if_stmt => |if_stmt| {
             write(writer, "[IF]");
             printSpace(writer, depth + 1);

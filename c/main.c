@@ -1,4 +1,9 @@
 int main(void) {
-    int x = 0;
-    int y = "asf";
+    int a = 0;
+    for (; ; ) {
+        a = a + 1;
+        if (a > 3)
+            break;
+    }
+    return a;
 }
