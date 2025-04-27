@@ -23,11 +23,13 @@ pub fn startCompiler(allocator: Allocator) !void {
     var error_reporter: ErrorReporter = .init(allocator, src, args.src_path);
 
     const lexer = if (args.flag.isEnabled(.lex)) try Lexer.initFromSrc(allocator, src, &error_reporter) else null;
+
     const ast = if (args.flag.isEnabled(.parse)) try Parser.parse(
         allocator,
         lexer.?.tokens,
         &error_reporter,
     ) else null;
+
     _ = ast;
 }
 

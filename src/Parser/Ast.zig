@@ -2,6 +2,7 @@ const std = @import("std");
 const log = @import("../util.zig").log;
 const Lexer = @import("../Lexer.zig");
 const Parser = @import("./Parser.zig");
+const ErrorReporter = @import("../ErrorReporter.zig");
 const ParseError = Parser.ParseError;
 const Allocator = std.mem.Allocator;
 
@@ -173,6 +174,7 @@ pub const Expr = union(enum) {
     unary: struct { op: UnaryOp, expr: *Expr },
     binary: struct { op: BinaryOp, left: *Expr, right: *Expr },
     group: *Expr,
+    prefix: union(enum) { increment: *Expr, decrement: *Expr },
     postfix: union(enum) { increment: *Expr, decrement: *Expr },
     @"var": []const u8,
     assignment: struct { dst: *Expr, src: *Expr },
@@ -221,6 +223,25 @@ pub const Expr = union(enum) {
         const ternary_expr = allocator.create(Expr) catch unreachable;
         ternary_expr.* = .{ .ternary = .{ .condition = condition, .true_block = true_block, .false_block = false_block } };
         return ternary_expr;
+    }
+
+    pub fn prefixExpr(allocator: Allocator, token: *Lexer.Token, expr: *Expr, error_reporter: *ErrorReporter) ParseError!*@This() {
+        const prefix_expr = allocator.create(Expr) catch unreachable;
+        prefix_expr.* = .{
+            .prefix = switch (token.*.type) {
+                .plus_plus => .{ .increment = expr },
+                .minus_minus => .{ .decrement = expr },
+                else => {
+                    error_reporter.addErrorAndPanic(
+                        token.line,
+                        token.start,
+                        "Invalid prefix operator: {s}",
+                        .{token.value},
+                    );
+                },
+            },
+        };
+        return prefix_expr;
     }
 
     pub fn postfixExpr(allocator: Allocator, token_type: Lexer.TokenType, expr: *Expr) ParseError!*@This() {

@@ -124,8 +124,26 @@ pub fn printExpr(writer: *AnyWriter, expr: *Ast.Expr, depth: u8) void {
         },
         .postfix => |postfix_expr| {
             switch (postfix_expr) {
-                .increment => write(writer, "[++]"),
-                .decrement => write(writer, "[--]"),
+                .increment => {
+                    write(writer, "[++]");
+                    printExpr(writer, postfix_expr.increment, depth);
+                },
+                .decrement => {
+                    write(writer, "[--]");
+                    printExpr(writer, postfix_expr.decrement, depth);
+                },
+            }
+        },
+        .prefix => |prefix_expr| {
+            switch (prefix_expr) {
+                .increment => {
+                    write(writer, "[++]");
+                    printExpr(writer, prefix_expr.increment, depth);
+                },
+                .decrement => {
+                    write(writer, "[--]");
+                    printExpr(writer, prefix_expr.decrement, depth);
+                },
             }
         },
         .@"var" => |var_value| {

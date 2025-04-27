@@ -308,28 +308,31 @@ fn parseFactor(p: *Parser) ParseError!*Ast.Expr {
         },
         .minus_minus, .plus_plus => { // prefix
             const op_token = p.consumeAny();
-            const ident_expr = try p.parseFactor();
-            log.debug("ident_expr: {any}", .{ident_expr.*});
+            const inner_expr = try p.parseFactor();
+            return .prefixExpr(p.allocator, op_token, inner_expr, p.err_reporter);
+            // const op_token = p.consumeAny();
+            // const ident_expr = try p.parseFactor();
+            // log.debug("ident_expr: {any}", .{ident_expr.*});
             // @todo
             // probably need to do this recursively
             // also this code is duplicated in parsePostfixIfNeeded
-            if (!(ident_expr.* == .@"var" or (ident_expr.* == .group and ident_expr.*.group.* == .@"var"))) {
-                p.parseError(op_token, "invalid l value for prefix operator: {any}, {any}\n", .{ ident_expr.*, ident_expr });
-            }
-            const op: Ast.Expr.BinaryOp = switch (op_token.*.type) {
-                .minus_minus => .sub,
-                .plus_plus => .add,
-                else => p.parseError(op_token, "Invalid operator for prefix: {any}\n", .{op_token.type}),
-            };
-            const ident = if (ident_expr.* == .@"var") ident_expr.@"var" else ident_expr.*.group.@"var";
-            const var_expr: *Ast.Expr = .varExpr(p.allocator, ident);
-            // @note
-            // using copy of same variable, as we will modify the content in sema phase
-            // maybe on sema we need to create new expr instead of modifying inplace
-            const assignment_dst: *Ast.Expr = .varExpr(p.allocator, ident);
-            const one: *Ast.Expr = .constantExpr(p.allocator, 1);
-            const binary_expr: *Ast.Expr = .binaryExpr(p.allocator, op, var_expr, one);
-            return .assignmentExpr(p.allocator, assignment_dst, binary_expr);
+            // if (!(ident_expr.* == .@"var" or (ident_expr.* == .group and ident_expr.*.group.* == .@"var"))) {
+            //     p.parseError(op_token, "Unable to parse expr. Invalid lvalue. \n", .{});
+            // }
+            // const op: Ast.Expr.BinaryOp = switch (op_token.*.type) {
+            //     .minus_minus => .sub,
+            //     .plus_plus => .add,
+            //     else => p.parseError(op_token, "Invalid operator for prefix: {any}\n", .{op_token.type}),
+            // };
+            // const ident = if (ident_expr.* == .@"var") ident_expr.@"var" else ident_expr.*.group.@"var";
+            // const var_expr: *Ast.Expr = .varExpr(p.allocator, ident);
+            // // @note
+            // // using copy of same variable, as we will modify the content in sema phase
+            // // maybe on sema we need to create new expr instead of modifying inplace
+            // const assignment_dst: *Ast.Expr = .varExpr(p.allocator, ident);
+            // const one: *Ast.Expr = .constantExpr(p.allocator, 1);
+            // const binary_expr: *Ast.Expr = .binaryExpr(p.allocator, op, var_expr, one);
+            // return .assignmentExpr(p.allocator, assignment_dst, binary_expr);
         },
         .lparen => {
             _ = p.consume(.lparen);
@@ -392,9 +395,9 @@ fn mapToBinaryOperator(p: *const Parser, token: *const Lexer.Token) Ast.Expr.Bin
 fn parsePostfixIfNeeded(p: *Parser, group_expr: *Ast.Expr) ParseError!?*Ast.Expr {
     const token = p.peek() orelse return null;
     if (token.type != .minus_minus and token.type != .plus_plus) return null;
-    if (!(group_expr.* == .@"var" or (group_expr.* == .group and group_expr.group.* == .@"var"))) {
-        p.parseError(token, "invalid l value for postfix operator: {any}, {any}\n", .{ group_expr.*, group_expr });
-    }
+    // if (!(group_expr.* == .@"var" or (group_expr.* == .group and group_expr.group.* == .@"var"))) {
+    //     p.parseError(token, "invalid l value for postfix operator: {any}, {any}\n", .{ group_expr.*, group_expr });
+    // }
     const postfix_op_token = p.consumeAnyOrErrorWithMsg("Failed to consume postfix operator for {s}", .{token.value});
     return try .postfixExpr(p.allocator, postfix_op_token.type, group_expr);
 }
