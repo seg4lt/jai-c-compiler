@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "label": "Zig Build",
+        "label": "Jai Build",
         "type": "shell",
-        "command": "zig build" ,
+        "command": "jai build.jai",
         "group": {
           "kind": "build",
           "isDefault": true
