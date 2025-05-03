@@ -15,7 +15,7 @@ main :: () {
     if args.flags                   & .SEMA         sema(ast);
     tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast);
     asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky);
-    if args.flags                   & .CODE_GEN     code_emm(args, asm_construct); 
+    if args.flags                   & .CODE_GEN     code_emm(args.src_path_without_ext, asm_construct); 
     if args.flags                   & .ALL          assember_and_linker(args.src_path_without_ext);
 }
 
@@ -30,10 +30,8 @@ Process :: #import "Process";
 #import "Error_Reporter";
 #import "Compiler_Util";
 #import "Sema";
-
-#load "Cli_Args.jai";
-#load "Tacky_IR.jai";
-#load "Asm_Gen.jai";
-#load "Code_Emission.jai";
-#load "Utils.jai";
+#import "Tacky_IR";
+#import "Asm_Gen";
+#import "Code_Emission";
+#import "Cli_Args";
 

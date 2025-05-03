@@ -1,5 +1,5 @@
-code_emm :: (args: Cli_Args, program: *Program_Asm) {
-    file, success := file_open(tprint("%.s", args.src_path_without_ext), for_writing=true, keep_existing_content=false);
+code_emm :: (src_path_no_ext: string, program: *Program_Asm) {
+    file, success := file_open(tprint("%.s", src_path_no_ext), for_writing=true, keep_existing_content=false);
     if !success return;
     defer file_close(*file);
 
@@ -134,6 +134,9 @@ ce_fmt_reg :: (r: Reg_Asm) -> string {
     }
 }
 
-#scope_file
+#scope_module
 #import "File";
+#import "Basic";
+#import "Asm_Gen";
+
 #scope_export
