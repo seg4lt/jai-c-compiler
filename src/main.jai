@@ -6,11 +6,9 @@ main :: () {
     args := get_cli_args();
     src_content := run_preprocessor(args.src_path);
 
-    error_reporter: Error_Reporter;
-    error_reporter.src_path = args.src_path;
-    error_reporter.src = src_content;
+    error_reporter := Error_Reporter.{src_path = args.src_path, src = src_content};
 
-    lexer         := ifx args.flags & .LEX          lex(src_content, *error_reporter);
+    lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *error_reporter);
     ast           := ifx args.flags & .PARSE        ast_parse(*lexer, *error_reporter);
     if args.flags                   & .SEMA         sema(ast);
     tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast);

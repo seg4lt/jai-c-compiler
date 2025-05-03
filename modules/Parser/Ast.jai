@@ -83,7 +83,7 @@ Binary_Operator :: enum {
 create_program_ast :: (fn: *Fn_Ast) -> *Program_Ast {
     assert(fn != null, "fn cannot be null");
     pg := New(Program_Ast);
-    pg.* = .{ fn = fn};
+    pg.* = .{ fn = fn };
     return pg;
 }
 

@@ -14,14 +14,14 @@ Parser :: struct {
 ast_parse :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
-    if !is_at_end(*parser) parser_error_report(*parser,"All token not consumed");
+    if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
     print_program_ast(program);
     return program;
 }
 
 #scope_module
 
-parser_error_report :: (using parser: *Parser, msg_fmt: string, args: .. Any) {
+parse_err :: (using parser: *Parser, msg_fmt: string, args: .. Any) {
     cur_token := peek(parser);
     error_report(error_reporter, cur_token.line, cur_token.start, msg_fmt, .. args);
 }
@@ -69,11 +69,11 @@ parse_block_item :: (parser: *Parser) -> *Block_Item_Ast {
 
 
 parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
-    if peek(parser).type != .INT parser_error_report(parser, "Expected int found %", peek(parser).type);
+    if peek(parser).type != .INT parse_err(parser, "Expected int found %", peek(parser).type);
 
     consume(parser, .INT);
     ident := consume(parser).value;
-    if is_digit(ident.data.*) parser_error_report(parser, "identifier should not start with digit");
+    if is_digit(ident.data.*) parse_err(parser, "identifier should not start with digit");
 
     expr := ifx peek(parser).type == .ASSIGN {
         consume(parser);
@@ -83,7 +83,6 @@ parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
     consume(parser, .SEMICOLON);
     return create_decl_ast(ident, expr);
 }
-
 
 parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
     if peek(parser).type == {
@@ -251,7 +250,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
         case .INT_LITERAL;
             int_literal := consume(parser, .INT_LITERAL);
             int_value, success := string_to_int(int_literal.value);
-            if !success  parser_error_report(parser, "Expected int found %", int_literal.value);
+            if !success  parse_err(parser, "Expected int found %", int_literal.value);
             return create_constant_expr(int_value);
         case .MINUS; #through;
         case .NOT; #through;
@@ -265,7 +264,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             postfix_op_token := consume(parser);
             ident_expr := parse_factor(parser);
             if !(ident_expr.type == .VAR || (ident_expr.type == .GROUP && ident_expr.as.group.type == .VAR)) {
-                parser_error_report(parser, "expected var identifier");
+                parse_err(parser, "expected var identifier");
             }
             ident := ifx ident_expr.type == .VAR ident_expr.as.var else ident_expr.as.group.as.var;
 
@@ -292,7 +291,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             parse_postfix_expr_ast(parser, var_expr);
             return var_expr;
     }
-    parser_error_report(parser, "This expression is not something I can handle. Duh!! %", peek(parser).*);
+    parse_err(parser, "This expression is not something I can handle. Duh!! %", peek(parser).*);
     return null;
 }
 
@@ -302,7 +301,7 @@ parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
     }
 
     if !(expr.type == .VAR || (expr.type == .GROUP && expr.as.group.type == .VAR)) {
-        parser_error_report(parser, "invalid l value for postfix operator: %, %", expr.type, expr);
+        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr);
     }
 
     postfix_op_token := consume(parser);
@@ -330,9 +329,9 @@ parse_postfix_binary_op :: (parser: *Parser, tt: Token_Type) -> Binary_Operator 
     if tt == {
         case .PLUS_PLUS; return .ADD;
         case .MINUS_MINUS; return .SUB;
-        case; parser_error_report(parser, "Wanted postfix unary operator found %", tt);
+        case; parse_err(parser, "Wanted postfix unary operator found %", tt);
     }
-    parser_error_report(parser, "Wanted postfix unary operator found %", tt);
+    parse_err(parser, "Wanted postfix unary operator found %", tt);
     return .ADD; 
 }
 
@@ -340,9 +339,9 @@ parse_postfix_enum :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.post
     if tt == {
         case .PLUS_PLUS; return .INCR;
         case .MINUS_MINUS; return .DECR;
-        case; parser_error_report(parser, "Wanted postfix unary operator found %", tt);
+        case; parse_err(parser, "Wanted postfix unary operator found %", tt);
     }
-    parser_error_report(parser, "Wanted postfix unary operator found %", tt);
+    parse_err(parser, "Wanted postfix unary operator found %", tt);
     return .NONE; 
 }
 
@@ -430,7 +429,7 @@ precedence :: (parser: *Parser, tt: Token_Type) -> int {
         case .MOD_EQUAL;
             return 1;
     }
-    parser_error_report(parser, "precendence calc for any other token is currently not supported: %", tt);
+    parse_err(parser, "precendence calc for any other token is currently not supported: %", tt);
     return 0; 
 }
 
@@ -439,9 +438,9 @@ parse_unary_op :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.as.unary
         case .BITWISE_NOT; return .BITWISE_NOT;
         case .MINUS; return .NEGATE;
         case .NOT; return .NOT;
-        case; parser_error_report(parser, "Wanted unary operator found %", tt);
+        case; parse_err(parser, "Wanted unary operator found %", tt);
     }
-    parser_error_report(parser, "Wanted unary operator found %", tt);
+    parse_err(parser, "Wanted unary operator found %", tt);
     return .NEGATE;
 }
 
@@ -486,7 +485,7 @@ parse_binary_op :: (parser: *Parser, tt: Token_Type) -> Binary_Operator {
         case .AND; return .AND;
         case .OR; return .OR;
     }
-    parser_error_report(parser, "Wanted binary operator found %", tt);
+    parse_err(parser, "Wanted binary operator found %", tt);
     return .ADD;
 }
 
@@ -497,7 +496,7 @@ consume :: (using parser: *Parser) -> Token {
 
 consume:: (parser: *Parser, token_type: Token_Type) -> Token {
     tok := peek(parser);
-    if tok.type != token_type parser_error_report(parser, "Expected % found %", token_type, tok.type);
+    if tok.type != token_type parse_err(parser, "Expected % found %", token_type, tok.type);
     parser.current += 1;
     return tok;
 }
