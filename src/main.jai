@@ -29,9 +29,9 @@ Process :: #import "Process";
 #import "Not_Basic";
 #import "Error_Reporter";
 #import "Compiler_Util";
+#import "Sema";
 
 #load "Cli_Args.jai";
-#load "Sema.jai";
 #load "Tacky_IR.jai";
 #load "Asm_Gen.jai";
 #load "Code_Emission.jai";
