@@ -44,25 +44,29 @@ parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
     consume(parser, .LCURLY);
     body := parse_block_ast(parser);
     consume(parser, .RCURLY);
-    return create_fn_ast(ident_token.value, body);
+    return create_fn_ast(ident_token.value, body, ident_token.line, ident_token.start);
 }
 
 
 parse_block_ast :: (parser: *Parser) -> *Block_Ast {
+    start_tok := consume(parser, .LCURLY);
+
     body: [..]*Block_Item_Ast;
     while peek(parser).type != .RCURLY {
         b_item := parse_block_item(parser);
         array_add(*body, b_item);
     }
-    return create_block_ast(body);
+    consume(parser, .RCURLY);
+
+    return create_block_ast(body, start_tok.line, start_tok.start);
 }
 
 
 parse_block_item :: (parser: *Parser) -> *Block_Item_Ast {
     if peek(parser).type == .INT return create_decl_block_item(parse_decl_ast(parser));
     if peek(parser).type == .SEMICOLON {
-        consume(parser);
-        return create_stmt_block_item(create_null_stmt());
+        tok := consume(parser);
+        return create_stmt_block_item(create_null_stmt(tok.line, tok.start));
     }
     return create_stmt_block_item(parse_stmt_ast(parser));
 }
@@ -72,7 +76,8 @@ parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
     if peek(parser).type != .INT parse_err(parser, "Expected int found %", peek(parser).type);
 
     consume(parser, .INT);
-    ident := consume(parser).value;
+    ident_tok := consume(parser);
+    ident := ident_tok.value;
     if is_digit(ident.data.*) parse_err(parser, "identifier should not start with digit");
 
     expr := ifx peek(parser).type == .ASSIGN {
@@ -81,24 +86,22 @@ parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
     } else null;
 
     consume(parser, .SEMICOLON);
-    return create_decl_ast(ident, expr);
+    return create_decl_ast(ident, expr, ident_tok.line, ident_tok.start);
 }
 
 parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
     if peek(parser).type == {
         case .LCURLY;
-            consume(parser, .LCURLY);
             body := parse_block_ast(parser);
-            consume(parser, .RCURLY);
             return create_compound_stmt(body);
         case .BREAK;
-            consume(parser);
-            stmt := create_break_stmt();
+            break_tok := consume(parser);
+            stmt := create_break_stmt(break_tok.line, break_tok.start);
             consume(parser, .SEMICOLON);
             return stmt;
         case .CONTINUE;
-            consume(parser);
-            return create_continue_stmt();
+            continue_tok := consume(parser);
+            return create_continue_stmt(continue_tok.line, continue_tok.start);
         case .WHILE; return parse_while_stmt(parser) ;
         case .DO; return parse_do_while_stmt(parser);
         case .FOR; return parse_for_stmt(parser);
@@ -108,34 +111,34 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
             consume(parser, .GOTO);
             token := consume(parser, .IDENT);
             consume(parser, .SEMICOLON);
-            return create_goto_stmt(token.value);
+            return create_goto_stmt(token.value, token.line, token.start);
         case .SEMICOLON;
-            consume(parser, .SEMICOLON);
-            return create_null_stmt();
+            null_tok := consume(parser, .SEMICOLON);
+            return create_null_stmt(null_tok.line, null_tok.start);
     }
     if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
         token := consume(parser, .IDENT);
         consume(parser, .COLON);
-        return create_label_stmt(token.value);
+        return create_label_stmt(token.value, token.line, token.start);
     }
     expr := parse_expr(parser, 0);
     consume(parser, .SEMICOLON);
-    return create_expr_stmt(expr);
+    return create_expr_stmt(expr, expr.loc.line, expr.loc.start);
 }
 
 parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
-    consume(parser, .WHILE);
+    while_stmt_tok := consume(parser, .WHILE);
 
     consume(parser, .LPAREN);
     condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
 
     body := parse_stmt_ast(parser);
-    return create_while_stmt(condition, body);
+    return create_while_stmt(condition, body, while_stmt_tok.line, while_stmt_tok.start);
 }
 
 parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
-    consume(parser, .DO);
+    do_tok := consume(parser, .DO);
     body := parse_stmt_ast(parser);
 
     consume(parser, .WHILE);
@@ -144,7 +147,7 @@ parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
     consume(parser, .RPAREN);
     consume(parser, .SEMICOLON);
 
-    return create_do_while_stmt(body, condition);
+    return create_do_while_stmt(body, condition, do_tok.line, do_tok.start);
 }
 
 parse_for_init :: (parser: *Parser) -> *For_Init_Ast {
@@ -156,7 +159,7 @@ parse_for_init :: (parser: *Parser) -> *For_Init_Ast {
 }
 
 parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
-    consume(parser, .FOR);
+    for_tok := consume(parser, .FOR);
     consume(parser, .LPAREN);
 
     for_init := parse_for_init(parser);
@@ -172,11 +175,11 @@ parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
 
     body := parse_stmt_ast(parser);
 
-    return create_for_stmt(for_init, condition, post, body);
+    return create_for_stmt(for_init, condition, post, body, for_tok.line, for_tok.start);
 }
 
 parse_if_stmt :: (parser: *Parser) -> *Stmt_Ast {
-    consume(parser, .IF);
+    if_tok := consume(parser, .IF);
     consume(parser, .LPAREN);
     condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
@@ -188,14 +191,14 @@ parse_if_stmt :: (parser: *Parser) -> *Stmt_Ast {
         parse_stmt_ast(parser);
     } else null;
 
-    return create_if_stmt(condition, if_block, else_block);
+    return create_if_stmt(condition, if_block, else_block, if_tok.line, if_tok.start);
 }
 
 parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast {
-    consume(parser, .RETURN);
+    ret_tok := consume(parser, .RETURN);
     expr := parse_expr(parser, 0);
     consume(parser, .SEMICOLON);
-    return create_return_stmt(expr);
+    return create_return_stmt(expr, ret_tok.line, ret_tok.start);
 }
 
 parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr_Ast {
@@ -209,12 +212,13 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
     
     while is_binary_operator(next_token.type) && precedence(parser, next_token.type) >= min_prec {
         if next_token.type == .ASSIGN {
-            consume(parser);
+            assign_tok := consume(parser);
             right := parse_expr(parser, precedence(parser, next_token.type));
-            assignment := create_assignment_expr(left, right);
+            assignment := create_assignment_expr(left, right, assign_tok.line, assign_tok.start);
             left = assignment;
         } else if is_compound_assignment_operator(next_token.type) {
-            op := parse_binary_op(parser, consume(parser).type);
+            op_tok := consume(parser);
+            op := parse_binary_op(parser, op_tok.type);
             right := parse_expr(parser, precedence(parser, next_token.type));
 
             // @note
@@ -223,21 +227,22 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
             left_clone := New(Expr_Ast);
             left_clone.* = left.*;
 
-            binary := create_binary_expr(op, left_clone, right);
-            assignment := create_assignment_expr(left, binary);
+            binary := create_binary_expr(op, left_clone, right, op_tok.line, op_tok.start);
+            assignment := create_assignment_expr(left, binary, op_tok.line, op_tok.start);
 
             left = assignment;
         } else if next_token.type == .QUESTION_MARK {
-            consume(parser, .QUESTION_MARK);
+            q_tok := consume(parser, .QUESTION_MARK);
             true_block := parse_expr(parser, 0);
             consume(parser, .COLON);
             false_block := parse_expr(parser, precedence(parser, next_token.type));
-            conditional := create_ternary_expr(left, true_block, false_block);
+            conditional := create_ternary_expr(left, true_block, false_block, q_tok.line, q_tok.start);
             left = conditional;
         } else {
-            op := parse_binary_op(parser, consume(parser).type);
+            op_tok := consume(parser);
+            op := parse_binary_op(parser, op_tok.type);
             right := parse_expr(parser, precedence(parser, next_token.type) + 1);
-            binary := create_binary_expr(op, left, right);
+            binary := create_binary_expr(op, left, right, op_tok.line, op_tok.start);
             left = binary;
         }
         next_token = peek(parser);
@@ -251,13 +256,14 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             int_literal := consume(parser, .INT_LITERAL);
             int_value, success := string_to_int(int_literal.value);
             if !success  parse_err(parser, "Expected int found %", int_literal.value);
-            return create_constant_expr(int_value);
+            return create_constant_expr(int_value, int_literal.line , int_literal.start);
         case .MINUS; #through;
         case .NOT; #through;
         case .BITWISE_NOT;
-            op := parse_unary_op(parser, consume(parser).type);
+            op_tok := consume(parser);
+            op := parse_unary_op(parser, op_tok.type);
             inner_expr := parse_factor(parser);
-            expr := create_unary_expr(op, inner_expr); 
+            expr := create_unary_expr(op, inner_expr, op_tok.line, op_tok.start); 
             return expr;
         case .MINUS_MINUS; #through;
         case .PLUS_PLUS;
@@ -268,26 +274,26 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             }
             ident := ifx ident_expr.type == .VAR ident_expr.as.var else ident_expr.as.group.as.var;
 
-            var := create_var_expr(ident);
+            var := create_var_expr(ident, ident_expr.loc.line, ident_expr.loc.start);
             // @note
             // on sema phase we replace variable with identifier
             // we we use same reference we will update identifier twice
-            var_clone := create_var_expr(ident);
+            var_clone := create_var_expr(ident, ident_expr.loc.line, ident_expr.loc.start);
 
-            one := create_constant_expr(1);
+            one := create_constant_expr(1, postfix_op_token.line, postfix_op_token.start);
             op := parse_postfix_binary_op(parser, postfix_op_token.type); 
-            binary := create_binary_expr(op, var, one);
-            return create_assignment_expr(var_clone, binary);
+            binary := create_binary_expr(op, var, one, postfix_op_token.line, postfix_op_token.start);
+            return create_assignment_expr(var_clone, binary, postfix_op_token.line, postfix_op_token.start);
         case .LPAREN;
-            consume(parser, .LPAREN);
+            grp_start_tok := consume(parser, .LPAREN);
             inner_expr := parse_expr(parser, 0); // grp resets precedence level for its internal expr
-            expr := create_group_expr(inner_expr);
+            expr := create_group_expr(inner_expr, grp_start_tok.line, grp_start_tok.start);
             consume(parser, .RPAREN);
             parse_postfix_expr_ast(parser, expr);
             return expr;
         case .IDENT;
             ident := consume(parser);
-            var_expr := create_var_expr(ident.value);
+            var_expr := create_var_expr(ident.value, ident.line, ident.start);
             parse_postfix_expr_ast(parser, var_expr);
             return var_expr;
     }

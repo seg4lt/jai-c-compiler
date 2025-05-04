@@ -1,3 +1,8 @@
+Source_Location :: struct {
+    line: int;
+    start: int;
+}
+
 Program_Ast :: struct { 
     fn: *Fn_Ast; 
 }
@@ -5,10 +10,12 @@ Program_Ast :: struct {
 Fn_Ast :: struct {
     ident: string;
     block: *Block_Ast;
+    loc: Source_Location;
 }
 
 Block_Ast :: struct {
     items: [..]*Block_Item_Ast;
+    loc: Source_Location;
 }
 
 Block_Item_Ast :: struct {
@@ -22,6 +29,7 @@ Block_Item_Ast :: struct {
 Decl_Ast :: struct {
     ident: string;
     init: * /*Optional */ Expr_Ast;
+    loc: Source_Location;
 }
 
 For_Init_Ast :: struct {
@@ -48,6 +56,7 @@ Stmt_Ast :: struct {
         for_stmt: struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; }
         // null : doesn't need value
     };
+    loc: Source_Location;
 }
 
 Expr_Ast :: struct {
@@ -62,6 +71,7 @@ Expr_Ast :: struct {
         conditional: struct {condition: *Expr_Ast; true_block: *Expr_Ast; false_block: *Expr_Ast;};
     };
     postfix:  enum {NONE;INCR;DECR;} = .NONE;
+    loc: Source_Location;
 }
 
 Unary_Operator :: enum {
@@ -87,18 +97,18 @@ create_program_ast :: (fn: *Fn_Ast) -> *Program_Ast {
     return pg;
 }
 
-create_fn_ast :: (ident: string, block: *Block_Ast) -> *Fn_Ast {
+create_fn_ast :: (ident: string, block: *Block_Ast, line: int, start: int) -> *Fn_Ast {
     assert(ident != "", "ident cann't be null");
     assert(block != null, "block cannot be null");
 
     fn := New(Fn_Ast);
-    fn.* = .{ident, block};
+    fn.* = .{ident, block, .{line, start}};
     return fn;
 }
 
-create_block_ast :: (items: [..]*Block_Item_Ast) -> *Block_Ast {
+create_block_ast :: (items: [..]*Block_Item_Ast, line: int, start: int) -> *Block_Ast {
     block := New(Block_Ast);
-    block.* = .{items};
+    block.* = .{items, .{line, start}};
     return block;
 }
 
@@ -116,72 +126,72 @@ create_decl_block_item :: (decl: *Decl_Ast) -> *Block_Item_Ast {
     return item;
 }
 
-create_decl_ast :: (ident: string, init: *Expr_Ast) -> *Decl_Ast {
+create_decl_ast :: (ident: string, init: *Expr_Ast, line: int, start: int) -> *Decl_Ast {
     assert(ident != "", "ident can't be null");
     decl := New(Decl_Ast);
-    decl.* = .{ident, init};
+    decl.* = .{ident, init, .{line, start}};
     return decl;
 }
 
-create_null_stmt :: () -> *Stmt_Ast {
+create_null_stmt :: (line: int, start: int) -> *Stmt_Ast {
     stmt := New(Stmt_Ast);
-    stmt.* = .{.NULL, .{ }};
+    stmt.* = .{.NULL, .{}, .{line, start}};
     return stmt;
 }
 
 create_compound_stmt :: (block: *Block_Ast) -> *Stmt_Ast {
     assert(block != null, "block cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.COMPOUND, .{ compound = block }};
+    stmt.* = .{.COMPOUND, .{ compound = block }, block.loc};
     return stmt;
 }
 
-create_break_stmt :: () -> *Stmt_Ast {
+create_break_stmt :: (line: int, start: int) -> *Stmt_Ast {
     stmt := New(Stmt_Ast);
-    stmt.* = .{.BREAK, .{ break_stmt = "$$$UNPROCESSED$$$" }};
+    stmt.* = .{.BREAK, .{ break_stmt = "$$$UNPROCESSED$$$" }, .{line, start}};
     return stmt;
 }
 
-create_continue_stmt :: () -> *Stmt_Ast {
+create_continue_stmt :: (line: int, start: int) -> *Stmt_Ast {
     stmt := New(Stmt_Ast);
-    stmt.* = .{.CONTINUE, .{ continue_stmt = "$$$UNPROCESSED$$$" }};
+    stmt.* = .{.CONTINUE, .{ continue_stmt = "$$$UNPROCESSED$$$" }, .{line, start}};
     return stmt;
 }
 
-create_goto_stmt :: (label: string) -> *Stmt_Ast {
+create_goto_stmt :: (label: string, line: int, start: int) -> *Stmt_Ast {
     assert(label != "", "label cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.GOTO, .{ goto = label }};
+    stmt.* = .{.GOTO, .{ goto = label }, .{line, start}};
     return stmt;
 }
 
-create_label_stmt :: (label: string) -> *Stmt_Ast {
+create_label_stmt :: (label: string, line: int, start: int) -> *Stmt_Ast {
     assert(label != "", "label cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.LABEL, .{ label = label }};
+    stmt.* = .{.LABEL, .{ label = label }, .{line, start}};
     return stmt;
 }
 
-create_expr_stmt :: (expr: *Expr_Ast) -> *Stmt_Ast {
+create_expr_stmt :: (expr: *Expr_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(expr != null, "expr cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.EXPR, .{ expr = expr }};
+    stmt.* = .{.EXPR, .{ expr = expr }, .{line, start}};
     return stmt;
 }
 
-create_while_stmt :: (condition: *Expr_Ast, body: *Stmt_Ast, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
+create_while_stmt :: (condition: *Expr_Ast, body: *Stmt_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
     assert(body != null, "body cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.WHILE, .{while_stmt = .{ condition, body, label }}};
+    stmt.* = .{.WHILE, .{while_stmt = .{ condition, body, label }}, .{line, start}};
     return stmt;
 }
 
-create_do_while_stmt :: (body: *Stmt_Ast, condition: *Expr_Ast, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
+create_do_while_stmt :: (body: *Stmt_Ast, condition: *Expr_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
     assert(body != null, "body cannot be null");
     assert(condition != null, "condition cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.DO_WHILE, .{ do_while = .{ body, condition, label }}};
+    stmt.* = .{.DO_WHILE, .{ do_while = .{ body, condition, label }}, .{line, start}};
     return stmt;
 }
 
@@ -198,78 +208,78 @@ create_expr_for_init :: (expr: *Expr_Ast) -> *For_Init_Ast {
     return init;
 }
 
-create_for_stmt :: (init: *For_Init_Ast, condition: *Expr_Ast, post: *Expr_Ast, body: *Stmt_Ast, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
+create_for_stmt :: (init: *For_Init_Ast, condition: *Expr_Ast, post: *Expr_Ast, body: *Stmt_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
     assert(init != null, "init cannot be null");
     assert(body != null, "body cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.FOR, .{ for_stmt = .{ init, condition, post, body, label }}};
+    stmt.* = .{.FOR, .{ for_stmt = .{ init, condition, post, body, label }}, .{line, start}};
     return stmt;
 }
 
-create_if_stmt :: (condition: *Expr_Ast, if_block: *Stmt_Ast, else_block: *Stmt_Ast) -> *Stmt_Ast {
+create_if_stmt :: (condition: *Expr_Ast, if_block: *Stmt_Ast, else_block: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
     assert(if_block != null, "if_block cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.IF, .{ if_stmt = .{ condition, if_block, else_block }}};
+    stmt.* = .{.IF, .{ if_stmt = .{ condition, if_block, else_block }}, .{line, start}};
     return stmt;
 }
 
-create_return_stmt :: (expr: *Expr_Ast) -> *Stmt_Ast {
+create_return_stmt :: (expr: *Expr_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(expr != null, "expr cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.RETURN, .{ return_stmt = .{ expr }}};
+    stmt.* = .{.RETURN, .{ return_stmt = .{ expr }}, .{line, start}};
     return stmt;
 }
 
-create_assignment_expr :: (dst: *Expr_Ast, src: *Expr_Ast, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_assignment_expr :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(dst != null, "dst cannot be null");
     assert(src != null, "src cannot be null");
     expr := New(Expr_Ast);
-    expr.* = .{.ASSIGNMENT, .{ assignment = .{ dst, src }}, postfix};
+    expr.* = .{.ASSIGNMENT, .{ assignment = .{ dst, src }}, postfix, .{line, start}};
     return expr;
 }
 
-create_binary_expr :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_binary_expr :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(left != null, "left cannot be null");
     assert(right != null, "right cannot be null");
     expr := New(Expr_Ast);
-    expr.* = .{.BINARY, .{ binary = .{ op, left, right }}, postfix};
+    expr.* = .{.BINARY, .{ binary = .{ op, left, right }}, postfix, .{line, start}};
     return expr;
 }
 
-create_ternary_expr :: (condition: *Expr_Ast, true_block: *Expr_Ast, false_block: *Expr_Ast, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_ternary_expr :: (condition: *Expr_Ast, true_block: *Expr_Ast, false_block: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(condition != null, "condition cannot be null");
     assert(true_block != null, "true_block cannot be null");
     assert(false_block != null, "false_block cannot be null");
     expr := New(Expr_Ast);
-    expr.* = .{.CONDITIONAL, .{ conditional = .{ condition, true_block, false_block }}, postfix};
+    expr.* = .{.CONDITIONAL, .{ conditional = .{ condition, true_block, false_block }}, postfix, .{line, start}};
     return expr;
 }
 
-create_unary_expr :: (op: Unary_Operator, expr: *Expr_Ast, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_unary_expr :: (op: Unary_Operator, expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(expr != null, "expr cannot be null");
     unary := New(Expr_Ast);
-    unary .* = .{.UNARY, .{ unary = .{ op, expr }}, postfix};
+    unary .* = .{.UNARY, .{ unary = .{ op, expr }}, postfix, .{line, start}};
     return unary;
 }
 
-create_var_expr :: (ident: string, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_var_expr :: (ident: string, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(ident != "", "ident cannot be null");
     expr := New(Expr_Ast);
-    expr.* = .{.VAR, .{ var = ident }, postfix};
+    expr.* = .{.VAR, .{ var = ident }, postfix, .{line, start}};
     return expr;
 }
 
-create_constant_expr :: (constant: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_constant_expr :: (constant: int, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     expr := New(Expr_Ast);
-    expr.* = .{.CONSTANT, .{ constant = constant }, postfix};
+    expr.* = .{.CONSTANT, .{ constant = constant }, postfix, .{line, start}};
     return expr;
 }
 
-create_group_expr :: (expr: *Expr_Ast, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_group_expr :: (expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(expr != null, "expr cannot be null");
     group := New(Expr_Ast);
-    group.* = .{.GROUP, .{ group = expr }, postfix};
+    group.* = .{.GROUP, .{ group = expr }, postfix, .{line, start}};
     return group;
 }
 
