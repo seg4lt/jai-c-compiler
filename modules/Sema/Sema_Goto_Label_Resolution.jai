@@ -68,7 +68,7 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Store, block_items
            
             new_label := make_goto_label(stmt.as.label, label_store.count);
             table_set(label_store, stmt.as.label, .{true, new_label});
-            stmt.* = .{ .LABEL, .{ label = new_label }};
+            stmt.* = .{ .LABEL, .{ label = new_label }, stmt.loc};
         case .COMPOUND; 
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
@@ -105,7 +105,7 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Store, label_store:
                 assert(false, "undeclared label: '%'", stmt.as.goto);
             } 
             table_set(goto_labels, stmt.as.goto, value);
-            stmt.* = .{.GOTO, .{goto = value.processed}};
+            stmt.* = .{.GOTO, .{goto = value.processed}, .{stmt.loc.line, stmt.loc.start}};
         case .COMPOUND; 
             compound := stmt.as.compound;
             sema_label_resolution_block(compound, label_store);
