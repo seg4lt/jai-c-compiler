@@ -3,6 +3,7 @@
 #import "Memory";
 #import "Lexer";
 #import "Compiler_Util";
+#import "Not_Basic";
 
 Parser :: struct { 
     tokens: []Token; 
@@ -15,7 +16,14 @@ parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = f
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
-    if do_print print_program_ast(program);
+    if do_print {
+        writer := make_stdout_writer();
+        print_program_ast(*writer, program);
+        // sb: String_Builder;
+        // writer := make_sb_writer(*sb);
+        // print_program_ast(*writer, program);
+        // print("%", builder_to_string(*sb));
+    }
     return program;
 }
 

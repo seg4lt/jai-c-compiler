@@ -13,6 +13,7 @@ _run_tests :: () {
         for args if it == "tests" return true;
         return false;
     }
+    if !run_tests() return;
 
     get_lexer :: (src: string, error_reporter: *Error_Reporter) -> Lexer {
         lexer := parse_lex_tokens(src, error_reporter);
@@ -623,7 +624,6 @@ _run_tests :: () {
         verify_tokens(#procedure_name(), src, expected_tokens);
     }
 
-    if !run_tests() return;
 
     test__return_stmt();
     test__variable();
