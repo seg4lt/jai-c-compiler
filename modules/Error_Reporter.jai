@@ -16,15 +16,16 @@ Error_Item :: struct {
     column  : int;
 }
 
-print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) {
+print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) #expand {
     if error_reporter.error_items.count == 0 return;
     for error_item: error_reporter.error_items {
         log_error("%", error_item.msg);
     }
+    if panic assert(false, "Compile Failed");
     if panic exit(1);
 }
 
-error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, panic: bool = true) {
+error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, panic: bool = true) #expand {
     error_item := get_error_item(src, src_path, line, start, detail_msg_fmt, ..  args);
     array_add(*error_items, error_item);
     if panic print_errors(error_reporter, panic);
@@ -35,7 +36,7 @@ error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, d
 //@todo
 // src today is preprocessed file, the line might not match
 // need to figure out how to map raw src file and preprocessed file
-get_error_item :: (src: string, src_path: string, line: int, start: int, detail_msg_fmt: string, args: .. Any) -> Error_Item {
+get_error_item :: (src: string, src_path: string, line: int, start: int, detail_msg_fmt: string, args: .. Any) -> Error_Item #expand {
     previous_line_start, current_line_start := find_line_start(src, start);
     current_line_end := start;
     for start..src.count-1 {

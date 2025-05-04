@@ -11,11 +11,11 @@ Parser :: struct {
     error_reporter: *Error_Reporter;
 }
 
-parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
+parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = false) -> *Program_Ast {
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
-    print_program_ast(program);
+    if do_print print_program_ast(program);
     return program;
 }
 
@@ -41,9 +41,8 @@ parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
     if peek(parser).*.type == .VOID consume(parser, .VOID);
     consume(parser, .RPAREN);
 
-    consume(parser, .LCURLY);
     body := parse_block_ast(parser);
-    consume(parser, .RCURLY);
+
     return create_fn_ast(ident_token.value, body, ident_token.line, ident_token.start);
 }
 
@@ -307,7 +306,7 @@ parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
     }
 
     if !(expr.type == .VAR || (expr.type == .GROUP && expr.as.group.type == .VAR)) {
-        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr);
+        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr.*);
     }
 
     postfix_op_token := consume(parser);

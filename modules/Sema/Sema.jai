@@ -1,11 +1,14 @@
 Store :: Table(string, Owing_Entry(string));
 
-sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
+sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter, do_print: bool = false) {
     sema_var_resolution(ast, error_reporter);
-    sema_label_resolution(ast);
-    sema_loop_labeling(ast);
-    print("\n-- AFTER SEMA --\n");
-    print_program_ast(ast);
+    sema_label_resolution(ast, error_reporter);
+    sema_loop_labeling(ast, error_reporter);
+
+    if do_print {
+        print("\n-- AFTER SEMA --\n");
+        print_program_ast(ast);
+    }
 }
 
 make_variable :: (name: string, n: int) -> string {

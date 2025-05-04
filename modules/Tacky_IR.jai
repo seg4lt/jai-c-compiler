@@ -67,8 +67,7 @@ Tacky_Ctx :: struct {
     label_index: int = 0;
 }
 
-gen_program_tacky :: (program_ast: *Program_Ast
-) -> *Program_Tacky {
+gen_program_tacky :: (program_ast: *Program_Ast) -> *Program_Tacky {
     tc : Tacky_Ctx;
     fn := gen_fn_tacky(*tc, program_ast.fn);
     program := New(Program_Tacky);
