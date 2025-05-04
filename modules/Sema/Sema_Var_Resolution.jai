@@ -91,7 +91,7 @@ sema_var_resolution_decl:: (decl: *Decl_Ast, block_store: *Store, error_reporter
     table_set(block_store, decl.ident, .{true, new_ident});
 
     ifx decl.init sema_var_resolution_expr(decl.init, block_store, error_reporter);
-    decl.* = .{ new_ident, decl.init};
+    decl.* = .{ new_ident, decl.init, decl.loc };
 }
 
 sema_var_resolution_expr :: (expr: *Expr_Ast, table: *Store, error_reporter: *Error_Reporter) {
