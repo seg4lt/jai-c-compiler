@@ -11,7 +11,7 @@ Parser :: struct {
     error_reporter: *Error_Reporter;
 }
 
-ast_parse :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
+parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");

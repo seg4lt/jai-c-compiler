@@ -1,7 +1,7 @@
 Store :: Table(string, Owing_Entry(string));
 
-sema :: (ast: *Program_Ast) {
-    sema_var_resolution(ast);
+sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
+    sema_var_resolution(ast, error_reporter);
     sema_label_resolution(ast);
     sema_loop_labeling(ast);
     print("\n-- AFTER SEMA --\n");
@@ -35,5 +35,6 @@ table_clone_owing_entry :: (table: *Table(string, Owing_Entry(string))) -> Table
     return new_table;
 }
 
+#import "Error_Reporter";
 
 #scope_export
