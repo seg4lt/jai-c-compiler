@@ -14,10 +14,10 @@ Token :: struct {
     start : int;
 }
 
-parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, print: bool = false) -> Lexer {
+parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, do_print: bool = false) -> Lexer {
     lexer := Lexer.{src = src, error_reporter = error_reporter};
     scan(*lexer);
-    if print print_tokens(lexer.tokens);
+    if do_print print_tokens(lexer.tokens);
     return lexer;
 }
 

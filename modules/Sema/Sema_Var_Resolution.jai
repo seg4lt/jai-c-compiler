@@ -32,6 +32,8 @@ sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, block_stor
 
 sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
+        case .SWITCH;
+            assert(false, "Not implemented yet");
         case .RETURN;
             sema_var_resolution_expr(stmt.as.return_stmt.expr, block_store, error_reporter);
         case .EXPR;
@@ -85,7 +87,7 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporte
 sema_var_resolution_decl:: (decl: *Decl_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     entry, success := table_find(block_store, decl.ident);
     if success && entry.owing_block {
-        assert(false, "duplicate variable declaration! : %", decl.ident);
+        error_report(error_reporter, decl.loc.line, decl.loc.start, "duplicate variable declaration! : %", decl.ident);
     } 
     new_ident := make_variable(decl.ident, block_store.count);
     table_set(block_store, decl.ident, .{true, new_ident});
@@ -107,17 +109,14 @@ sema_var_resolution_expr :: (expr: *Expr_Ast, table: *Store, error_reporter: *Er
         case .VAR;
             value, success := table_find(table, expr.as.var);
             if !success {
-                assert(false, "undeclared variable: %", expr.as.var);
+                error_report(error_reporter, expr.loc.line, expr.loc.start, "undeclared variable: %", expr.as.var);
             }
             expr.as.var = value.processed;
         case .ASSIGNMENT;
             assignment := expr.as.assignment;
             // verify dst is valid lvalue
             if !(assignment.dst.type == .VAR || (assignment.dst.type == .GROUP && assignment.dst.as.group.type == .VAR)) {
-                print("\n-- DEBUG -- \n");
-                print_expr_ast(expr);
-                print("\n-- DEBUG -- \n");
-                assert(false, "expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
+                error_report(error_reporter, expr.loc.line, expr.loc.start,"expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
             }
             dst := ifx assignment.dst.type == .VAR then assignment.dst else assignment.dst.as.group;
             sema_var_resolution_expr(dst, table, error_reporter);

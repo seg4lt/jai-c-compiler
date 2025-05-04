@@ -3,6 +3,7 @@
 #import "Memory";
 #import "Lexer";
 #import "Compiler_Util";
+#import "Not_Basic";
 
 Parser :: struct { 
     tokens: []Token; 
@@ -11,19 +12,30 @@ Parser :: struct {
     error_reporter: *Error_Reporter;
 }
 
-parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter) -> *Program_Ast {
+parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = false) -> *Program_Ast {
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
     program := parse_program_ast(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
-    print_program_ast(program);
+    if do_print {
+        writer := make_stdout_writer();
+        print_program_ast(*writer, program);
+        // sb: String_Builder;
+        // writer := make_sb_writer(*sb);
+        // print_program_ast(*writer, program);
+        // print("%", builder_to_string(*sb));
+    }
     return program;
 }
 
 #scope_module
 
-parse_err :: (using parser: *Parser, msg_fmt: string, args: .. Any) {
+parse_err :: (parser: *Parser, msg_fmt: string, args: .. Any) #expand {
     cur_token := peek(parser);
-    error_report(error_reporter, cur_token.line, cur_token.start, msg_fmt, .. args);
+    error_report(parser.error_reporter, cur_token.line, cur_token.start, msg_fmt, .. args);
+}
+
+parse_err :: (parser: *Parser, tok: Token, msg_fmt: string, args: .. Any) #expand {
+    error_report(parser.error_reporter, tok.line, tok.start, msg_fmt, .. args);
 }
 
 #scope_file
@@ -41,9 +53,8 @@ parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
     if peek(parser).*.type == .VOID consume(parser, .VOID);
     consume(parser, .RPAREN);
 
-    consume(parser, .LCURLY);
     body := parse_block_ast(parser);
-    consume(parser, .RCURLY);
+
     return create_fn_ast(ident_token.value, body, ident_token.line, ident_token.start);
 }
 
@@ -107,6 +118,7 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
         case .FOR; return parse_for_stmt(parser);
         case .RETURN; return parse_return_stmt(parser);
         case .IF; return parse_if_stmt(parser);
+        case .SWITCH; return parse_switch_stmt(parser);
         case .GOTO; 
             consume(parser, .GOTO);
             token := consume(parser, .IDENT);
@@ -125,6 +137,61 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
     consume(parser, .SEMICOLON);
     return create_expr_stmt(expr, expr.loc.line, expr.loc.start);
 }
+
+parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
+    switch_tok := consume(parser, .SWITCH);
+
+    consume(parser, .LPAREN);
+    condition := parse_expr(parser, 0);
+    //@todo
+    // add check to verify that condition is of correct type (i.e. int)
+    // should we do that on sema phase?
+    consume(parser, .RPAREN);
+
+    if peek(parser).type == .LCURLY {
+        consume(parser, .LCURLY);
+        body:[..]*Switch_Case_Stmt_Ast;
+
+        while peek(parser).type != .RCURLY {
+            switch_case := parse_switch_case_ast(parser);
+            array_add(*body, switch_case);
+        }
+        consume(parser, .RCURLY);
+        return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
+    }
+    body:[..]*Switch_Case_Stmt_Ast;
+    if peek(parser).type != .CASE {
+        // @note
+        // if we have switch and no case with a statement - that stmt is ignored
+        parse_stmt_ast(parser);
+        return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
+    }
+    switch_case := parse_switch_case_ast(parser);
+    array_add(*body, switch_case);
+    return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
+}
+
+parse_switch_case_ast :: (parser: *Parser) -> *Switch_Case_Stmt_Ast  {
+    tok := consume(parser);
+    if tok.type != .CASE && tok.type != .DEFAULT {
+        parse_err(parser, tok, "Expected case/default found %\n", tok.type);
+    }
+    is_default := tok.type == .DEFAULT;
+
+    condition: *Expr_Ast = null;
+    if !is_default {
+        condition = parse_expr(parser, 0);
+        consume(parser, .COLON);
+    } else consume(parser, .COLON);
+
+    body: [..]*Stmt_Ast;
+    while peek(parser).type != .CASE && peek(parser).type != .DEFAULT && peek(parser).type != .RCURLY {
+        stmt := parse_stmt_ast(parser);
+        array_add(*body, stmt);
+    }
+    return create_switch_case_stmt(condition, body, is_default, tok.line, tok.start);
+}
+
 
 parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
     while_stmt_tok := consume(parser, .WHILE);
@@ -307,7 +374,7 @@ parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
     }
 
     if !(expr.type == .VAR || (expr.type == .GROUP && expr.as.group.type == .VAR)) {
-        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr);
+        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr.*);
     }
 
     postfix_op_token := consume(parser);
