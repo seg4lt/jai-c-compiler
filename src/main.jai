@@ -8,9 +8,9 @@ main :: () {
 
     error_reporter := Error_Reporter.{src_path = args.src_path, src = src_content};
 
-    lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *error_reporter);
-    ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *error_reporter);
-    if args.flags                   & .SEMA         sema(ast, *error_reporter);
+    lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *error_reporter, do_print=true);
+    ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *error_reporter, do_print=true);
+    if args.flags                   & .SEMA         sema(ast, *error_reporter, do_print=true);
     tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast);
     asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky);
     if args.flags                   & .CODE_GEN     code_emm(args.src_path_without_ext, asm_construct); 

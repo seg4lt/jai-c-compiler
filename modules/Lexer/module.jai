@@ -2,4 +2,4 @@
 #load "Token_Type.jai";
 
 #scope_file
-#load "tests.jai";
+#load "lexer_tests.jai";

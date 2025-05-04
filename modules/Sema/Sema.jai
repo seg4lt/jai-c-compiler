@@ -1,11 +1,14 @@
-Store :: Table(string, Owing_Entry(string));
 
-sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
+sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter, do_print: bool = false) {
     sema_var_resolution(ast, error_reporter);
-    sema_label_resolution(ast);
-    sema_loop_labeling(ast);
-    print("\n-- AFTER SEMA --\n");
-    print_program_ast(ast);
+    sema_label_resolution(ast, error_reporter);
+    sema_loop_labeling(ast, error_reporter);
+
+    if do_print {
+        print("\n-- AFTER SEMA --\n");
+        writer := make_stdout_writer();
+        print_program_ast(*writer, ast);
+    }
 }
 
 make_variable :: (name: string, n: int) -> string {
@@ -35,6 +38,9 @@ table_clone_owing_entry :: (table: *Table(string, Owing_Entry(string))) -> Table
     return new_table;
 }
 
+Store :: Table(string, Owing_Entry(string));
+
 #import "Error_Reporter";
+#import "Not_Basic";
 
 #scope_export

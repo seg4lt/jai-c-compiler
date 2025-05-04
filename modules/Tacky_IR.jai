@@ -67,8 +67,7 @@ Tacky_Ctx :: struct {
     label_index: int = 0;
 }
 
-gen_program_tacky :: (program_ast: *Program_Ast
-) -> *Program_Tacky {
+gen_program_tacky :: (program_ast: *Program_Ast) -> *Program_Tacky {
     tc : Tacky_Ctx;
     fn := gen_fn_tacky(*tc, program_ast.fn);
     program := New(Program_Tacky);
@@ -118,6 +117,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
+        case .SWITCH;
+            assert(false, "UNIMPLEMENTED");
         case .EXPR;
             gen_instructions(tc, instructions, stmt_ast.as.expr);
         case .IF;

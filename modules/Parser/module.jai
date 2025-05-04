@@ -4,3 +4,6 @@
 
 #scope_module
 #import "Error_Reporter";
+
+#scope_file
+#load "parser_tests.jai";
