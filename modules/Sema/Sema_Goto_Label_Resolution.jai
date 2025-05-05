@@ -55,6 +55,8 @@ sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, label_st
 
 sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, block_items: []*Block_Item_Ast, index: int, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
+        case .SWITCH;
+            assert(false, "Not implemented yet");
         case .RETURN;
             sema_label_resolution_expr(stmt.as.return_stmt.expr, label_store, error_reporter);
         case .EXPR;
@@ -100,6 +102,8 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, block
 
 sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
+        case .SWITCH;
+            assert(false, "Not implemented yet");
         case .RETURN;
             sema_goto_resolution_expr(stmt.as.return_stmt.expr, goto_labels, label_store, error_reporter);
         case .EXPR;

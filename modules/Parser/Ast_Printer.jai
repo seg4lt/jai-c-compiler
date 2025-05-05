@@ -37,11 +37,37 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
             write(writer, "[RETURN]・");
             print_space(writer, depth+1);
             print_expr_ast(writer, stmt.as.return_stmt.expr, depth+1);
+        case .SWITCH;
+            switch_stmt := stmt.as.switch;
+            write(writer, "[SWITCH]・% ", switch_stmt.label);
+            write(writer, "( ");
+            print_expr_ast(writer, switch_stmt.condition);
+            write(writer, " )");
+            print_space(writer, depth + 1);
+            for cases: switch_stmt.body {
+                if cases.default write(writer, "[DEFAULT]・");
+                else { 
+                    write(writer, "[CASE]・"); 
+                    print_expr_ast(writer, cases.condition);
+                }
+                print_space(writer, depth + 2);
+                for cases.body {
+                    print_stmt_ast(writer, it, depth + 2);
+                    // don't print space after last case stmt
+                    if it_index != cases.body.count - 1 {
+                        print_space(writer, depth + 2);
+                    }
+                }
+                // don't print space after last case
+                if it_index != switch_stmt.body.count - 1 {
+                    print_space(writer, depth + 1);
+                }
+            }
         case .EXPR;
             write(writer, "[EXPR]・");
             print_space(writer, depth + 1);
             print_expr_ast(writer, stmt.as.return_stmt.expr, depth+1);
-        case .NULL; 
+        case .NULL;
             write(writer, "[NULL_STMT]");
         case .IF;
             write(writer, "[IF]");

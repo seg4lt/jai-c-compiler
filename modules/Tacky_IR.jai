@@ -117,6 +117,8 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
+        case .SWITCH;
+            assert(false, "UNIMPLEMENTED");
         case .EXPR;
             gen_instructions(tc, instructions, stmt_ast.as.expr);
         case .IF;
