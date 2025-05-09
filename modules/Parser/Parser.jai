@@ -119,6 +119,16 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
         case .RETURN; return parse_return_stmt(parser);
         case .IF; return parse_if_stmt(parser);
         case .SWITCH; return parse_switch_stmt(parser);
+        case .CASE;
+            consume(parser, .CASE);
+            token := consume(parser, .INT_LITERAL);
+            consume(parser, .COLON);
+            expr := create_case_stmt(token.value, token.line, token.start);
+            return expr;
+        case .DEFAULT;
+            token := consume(parser, .DEFAULT);
+            consume(parser, .COLON);
+            return create_default_stmt(token.line, token.start);
         case .GOTO; 
             consume(parser, .GOTO);
             token := consume(parser, .IDENT);
@@ -140,58 +150,31 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
 
 parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
     switch_tok := consume(parser, .SWITCH);
-
     consume(parser, .LPAREN);
-    condition := parse_expr(parser, 0);
     //@todo
     // add check to verify that condition is of correct type (i.e. int)
     // should we do that on sema phase?
+    condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
 
+    body:[..]*Block_Item_Ast;
     if peek(parser).type == .LCURLY {
         consume(parser, .LCURLY);
-        body:[..]*Switch_Case_Stmt_Ast;
-
         while peek(parser).type != .RCURLY {
-            switch_case := parse_switch_case_ast(parser);
+            switch_case := parse_block_item(parser);
             array_add(*body, switch_case);
         }
         consume(parser, .RCURLY);
         return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
     }
-    body:[..]*Switch_Case_Stmt_Ast;
-    if peek(parser).type != .CASE {
-        // @note
-        // if we have switch and no case with a statement - that stmt is ignored
-        parse_stmt_ast(parser);
-        return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
+    stmt := parse_block_item(parser);
+    array_add(*body, stmt);
+    if stmt.type == .STMT && stmt.as.stmt.type  == .CASE {
+        case_stmt := parse_block_item(parser);
+        array_add(*body, case_stmt);
     }
-    switch_case := parse_switch_case_ast(parser);
-    array_add(*body, switch_case);
     return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);
 }
-
-parse_switch_case_ast :: (parser: *Parser) -> *Switch_Case_Stmt_Ast  {
-    tok := consume(parser);
-    if tok.type != .CASE && tok.type != .DEFAULT {
-        parse_err(parser, tok, "Expected case/default found %\n", tok.type);
-    }
-    is_default := tok.type == .DEFAULT;
-
-    condition: *Expr_Ast = null;
-    if !is_default {
-        condition = parse_expr(parser, 0);
-        consume(parser, .COLON);
-    } else consume(parser, .COLON);
-
-    body: [..]*Stmt_Ast;
-    while peek(parser).type != .CASE && peek(parser).type != .DEFAULT && peek(parser).type != .RCURLY {
-        stmt := parse_stmt_ast(parser);
-        array_add(*body, stmt);
-    }
-    return create_switch_case_stmt(condition, body, is_default, tok.line, tok.start);
-}
-
 
 parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
     while_stmt_tok := consume(parser, .WHILE);

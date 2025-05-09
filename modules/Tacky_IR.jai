@@ -114,6 +114,10 @@ gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast) {
     if #complete stmt_ast.type == {
+        case .DEFAULT;
+            assert(false, "UNIMPLEMENTED");
+        case .CASE;
+            assert(false, "UNIMPLEMENTED");
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
