@@ -32,6 +32,10 @@ sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, block_stor
 
 sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
+        case .DEFAULT;
+            assert(false, "Not implemented yet");
+        case .CASE;
+            assert(false, "Not implemented yet");
         case .SWITCH;
             assert(false, "Not implemented yet");
         case .RETURN;

@@ -41,7 +41,7 @@ For_Init_Ast :: struct {
 }
 
 Stmt_Ast :: struct {
-    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO; COMPOUND; BREAK;CONTINUE;WHILE;DO_WHILE;FOR;SWITCH;};
+    type: enum { RETURN; EXPR; IF; NULL; LABEL; GOTO; COMPOUND; BREAK;CONTINUE;WHILE;DO_WHILE;FOR;SWITCH;CASE; DEFAULT;};
     as: union {
         return_stmt: struct { expr: *Expr_Ast; };
         expr: *Expr_Ast;
@@ -54,17 +54,19 @@ Stmt_Ast :: struct {
         while_stmt: struct { condition: *Expr_Ast; body: *Stmt_Ast; label: string; };
         do_while: struct {  body: *Stmt_Ast; condition: *Expr_Ast; label: string;};
         for_stmt: struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; };
-        switch: struct { condition: *Expr_Ast; body: [..]*Switch_Case_Stmt_Ast; label: string; };
+        switch: struct { condition: *Expr_Ast; body: [..]*Block_Item_Ast; label: string; };
+        case_stmt: struct { value: string; label: string; }; 
+        default: string;
         // null : doesn't need value
     };
     loc: Source_Location;
 }
 
-Switch_Case_Stmt_Ast :: struct {
-    condition: *Expr_Ast;
-    body: [..]*Stmt_Ast;
-    default: bool = false;
-}
+// Switch_Case_Stmt_Ast :: struct {
+//     condition: *Expr_Ast;
+//     body: [..]*Stmt_Ast;
+//     default: bool = false;
+// }
 
 Expr_Ast :: struct {
     type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; CONDITIONAL;}
@@ -223,20 +225,26 @@ create_for_stmt :: (init: *For_Init_Ast, condition: *Expr_Ast, post: *Expr_Ast, 
     return stmt;
 }
 
-create_switch_stmt :: (condition: *Expr_Ast, body: [..]*Switch_Case_Stmt_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
+create_switch_stmt :: (condition: *Expr_Ast, body: [..]*Block_Item_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
     stmt := New(Stmt_Ast);
     stmt.* = .{.SWITCH, .{ switch = .{ condition, body, label }}, .{line, start}};
     return stmt;
 }
 
-create_switch_case_stmt :: (condition: *Expr_Ast, body: [..]*Stmt_Ast, default: bool, line: int, start: int) ->  *Switch_Case_Stmt_Ast {
-    if !default assert(condition != null, "condition cannot be null");
-    case_stmt := New(Switch_Case_Stmt_Ast);
-    case_stmt.* = .{ condition, body, default };
-    return case_stmt;
+create_case_stmt :: (value: string, line: int, start: int) -> *Stmt_Ast {
+    assert(value != "", "value cannot be null");
+    stmt := New(Stmt_Ast);
+    stmt.* = .{.CASE, .{ case_stmt = .{ value, "$$UNPROCESSED$$" }}, .{line, start}};
+    return stmt;
 }
 
+// create_switch_case_stmt :: (condition: *Expr_Ast, body: [..]*Stmt_Ast, default: bool, line: int, start: int) ->  *Switch_Case_Stmt_Ast {
+//     if !default assert(condition != null, "condition cannot be null");
+//     case_stmt := New(Switch_Case_Stmt_Ast);
+//     case_stmt.* = .{ condition, body, default };
+//     return case_stmt;
+// }
 
 create_if_stmt :: (condition: *Expr_Ast, if_block: *Stmt_Ast, else_block: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
@@ -303,6 +311,12 @@ create_group_expr :: (expr: *Expr_Ast, line: int, start: int, postfix: type_of(E
     group := New(Expr_Ast);
     group.* = .{.GROUP, .{ group = expr }, postfix, .{line, start}};
     return group;
+}
+
+create_default_stmt :: (line: int, start: int) -> *Stmt_Ast {
+    stmt := New(Stmt_Ast);
+    stmt.* = .{.DEFAULT, .{ default = "$$UNPROCESSED$$" }, .{line, start}};
+    return stmt;
 }
 
 

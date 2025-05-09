@@ -28,6 +28,10 @@ sema_loop_labeling_block_item :: (block_items: *[..]*Block_Item_Ast, label_stack
 
 sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_stack: *[..]string, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
+        case .DEFAULT;
+            assert(false, "Not implemented yet");
+        case .CASE;
+            assert(false, "Not implemented yet");
         case .SWITCH;
             assert(false, "Not implemented yet");
         case .IF;
