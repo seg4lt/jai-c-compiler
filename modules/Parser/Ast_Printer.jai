@@ -33,6 +33,11 @@ print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int = 0)  {
 
 print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
     if #complete stmt.type == {
+        case .DEFAULT;
+            write(writer, "[DEFAULT]・");
+            print_space(writer, depth + 1);
+        case .CASE; 
+            write(writer, "[CASE]・%・% ", stmt.as.case_stmt.value, stmt.as.case_stmt.label);
         case .RETURN;
             write(writer, "[RETURN]・");
             print_space(writer, depth+1);
@@ -44,24 +49,12 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
             print_expr_ast(writer, switch_stmt.condition);
             write(writer, " )");
             print_space(writer, depth + 1);
-            for cases: switch_stmt.body {
-                if cases.default write(writer, "[DEFAULT]・");
-                else { 
-                    write(writer, "[CASE]・"); 
-                    print_expr_ast(writer, cases.condition);
+            for switch_stmt.body {
+                if #complete it.type == {
+                    case .STMT; print_stmt_ast(writer, it.as.stmt, depth + 1);
+                    case .DECL; print_decl_ast(writer, it.as.decl, depth + 1);
                 }
-                print_space(writer, depth + 2);
-                for cases.body {
-                    print_stmt_ast(writer, it, depth + 2);
-                    // don't print space after last case stmt
-                    if it_index != cases.body.count - 1 {
-                        print_space(writer, depth + 2);
-                    }
-                }
-                // don't print space after last case
-                if it_index != switch_stmt.body.count - 1 {
-                    print_space(writer, depth + 1);
-                }
+                print_space(writer, depth + 1);
             }
         case .EXPR;
             write(writer, "[EXPR]・");
