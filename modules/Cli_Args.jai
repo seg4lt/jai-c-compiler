@@ -25,9 +25,9 @@ get_cli_args :: () -> Cli_Args {
             case "--lex";          flags = .LEX;
             case "--parse";        flags = .LEX | .PARSE;
             case "--validate";     flags = .LEX | .PARSE | .SEMA;
-            case "--tacky";        flags = .LEX | .PARSE | .TACKY;
-            case "--code-gen"; #through;
-            case "--codegen"; flags = .LEX | .PARSE | .TACKY | .CODE_GEN; 
+            case "--tacky";        flags = .LEX | .PARSE | .SEMA | .TACKY;
+            case "--code-gen";     #through;
+            case "--codegen";      flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN; 
             case; src_path = it;
         }
     }
