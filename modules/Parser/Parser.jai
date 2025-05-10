@@ -112,6 +112,7 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
             return stmt;
         case .CONTINUE;
             continue_tok := consume(parser);
+            consume(parser, .SEMICOLON);
             return create_continue_stmt(continue_tok.line, continue_tok.start);
         case .WHILE; return parse_while_stmt(parser) ;
         case .DO; return parse_do_while_stmt(parser);
@@ -160,9 +161,17 @@ parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
     body:[..]*Block_Item_Ast;
     if peek(parser).type == .LCURLY {
         consume(parser, .LCURLY);
+        case_found := false;
         while peek(parser).type != .RCURLY {
-            switch_case := parse_block_item(parser);
-            array_add(*body, switch_case);
+            peeked_token := peek(parser);
+            item := parse_block_item(parser);
+            if item.type == .STMT && item.as.stmt.type == .CASE || item.as.stmt.type == .DEFAULT {
+                case_found = true;
+            }
+            if case_found && item.type == .DECL {
+                parse_err(parser, peeked_token, "switch case should not have decl");
+            }
+            array_add(*body, item);
         }
         consume(parser, .RCURLY);
         return create_switch_stmt(condition, body, switch_tok.line, switch_tok.start);

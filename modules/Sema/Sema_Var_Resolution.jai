@@ -7,6 +7,10 @@ sema_var_resolution :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
 #scope_file
 
 sema_var_resolution_block :: (block: *Block_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
+    sema_var_resolution_block_item(*block.items, block_store, error_reporter);
+}
+
+sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     new_block_store : Store;
 
     if block_store == null  {
@@ -18,26 +22,19 @@ sema_var_resolution_block :: (block: *Block_Ast, block_store: *Store, error_repo
     }
     defer deinit(*new_block_store);
 
-    sema_var_resolution_block_item(*block.items, *new_block_store, error_reporter);
-}
-
-sema_var_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     for block_items.* {
         if #complete it.type == {
-            case .DECL; sema_var_resolution_decl(it.as.decl, block_store, error_reporter);
-            case .STMT; sema_var_resolution_stmt(it.as.stmt, block_store, error_reporter);
+            case .DECL; sema_var_resolution_decl(it.as.decl, *new_block_store, error_reporter);
+            case .STMT; sema_var_resolution_stmt(it.as.stmt, *new_block_store, error_reporter);
         }
     }
 }
 
 sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
-        case .DEFAULT;
-            assert(false, "Not implemented yet");
-        case .CASE;
-            assert(false, "Not implemented yet");
         case .SWITCH;
-            assert(false, "Not implemented yet");
+            sema_var_resolution_expr(stmt.as.switch.condition, block_store, error_reporter);
+            sema_var_resolution_block_item(*stmt.as.switch.body, block_store, error_reporter);
         case .RETURN;
             sema_var_resolution_expr(stmt.as.return_stmt.expr, block_store, error_reporter);
         case .EXPR;
@@ -83,6 +80,8 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporte
         case .BREAK; #through;
         case .GOTO; #through;
         case .LABEL; #through;
+        case .DEFAULT; #through;
+        case .CASE; #through;
         case .NULL;
             // noop
     }
