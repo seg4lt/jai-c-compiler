@@ -55,12 +55,6 @@ sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, label_st
 
 sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, block_items: []*Block_Item_Ast, index: int, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
-        case .DEFAULT;
-            assert(false, "Not implemented yet");
-        case .CASE;
-            assert(false, "Not implemented yet");
-        case .SWITCH;
-            assert(false, "Not implemented yet");
         case .RETURN;
             sema_label_resolution_expr(stmt.as.return_stmt.expr, label_store, error_reporter);
         case .EXPR;
@@ -96,9 +90,13 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, block
         case .WHILE;
             while_stmt := stmt.as.while_stmt;
             sema_label_resolution_stmt(while_stmt.body, label_store, block_items, index, error_reporter);
+        case .SWITCH;
+            sema_label_resolution_block_item(*stmt.as.switch.body, label_store, error_reporter);
         case .CONTINUE; #through;
         case .BREAK; #through;
         case .GOTO; #through;
+        case .DEFAULT; #through;
+        case .CASE; #through;
         case .NULL;
             // noop
     }
@@ -106,12 +104,13 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, block
 
 sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
-        case .DEFAULT;
-            assert(false, "Not implemented yet");
-        case .CASE;
-            assert(false, "Not implemented yet");
         case .SWITCH;
-            assert(false, "Not implemented yet");
+            for stmt.as.switch.body {
+                if #complete it.type == {
+                    case .DECL; // noop
+                    case .STMT; sema_goto_resolution_stmt(it.as.stmt, goto_labels, label_store, error_reporter);
+                }
+            }
         case .RETURN;
             sema_goto_resolution_expr(stmt.as.return_stmt.expr, goto_labels, label_store, error_reporter);
         case .EXPR;
@@ -142,6 +141,8 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_
         case .CONTINUE; #through;
         case .BREAK; #through;
         case .LABEL; #through;
+        case .DEFAULT; #through;
+        case .CASE; #through;
         case .NULL;
             // noop
     }

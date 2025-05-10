@@ -34,7 +34,7 @@ print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int = 0)  {
 print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
     if #complete stmt.type == {
         case .DEFAULT;
-            write(writer, "[DEFAULT]・");
+            write(writer, "[DEFAULT]・%", stmt.as.default);
             print_space(writer, depth + 1);
         case .CASE; 
             write(writer, "[CASE]・%・% ", stmt.as.case_stmt.value, stmt.as.case_stmt.label);
@@ -46,7 +46,7 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
             switch_stmt := stmt.as.switch;
             write(writer, "[SWITCH]・% ", switch_stmt.label);
             write(writer, "( ");
-            print_expr_ast(writer, switch_stmt.condition);
+            print_expr_ast(writer, switch_stmt.condition, depth + 1);
             write(writer, " )");
             print_space(writer, depth + 1);
             for switch_stmt.body {
