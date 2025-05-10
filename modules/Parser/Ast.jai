@@ -62,12 +62,6 @@ Stmt_Ast :: struct {
     loc: Source_Location;
 }
 
-// Switch_Case_Stmt_Ast :: struct {
-//     condition: *Expr_Ast;
-//     body: [..]*Stmt_Ast;
-//     default: bool = false;
-// }
-
 Expr_Ast :: struct {
     type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; CONDITIONAL;}
     as: union {

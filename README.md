@@ -19,7 +19,7 @@ Simple implementation of c-compiler using Jai
 # Test Flags
 Command: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
 - Lex: `--stage lex` - for lex
-- Parse: `--stage parse`
+- Parse: `--stage parse` ,  `--stage validate`
 - Asm Gen: `--stage codegen`
 - Tacky IR: `--stage tacky`
 - Full: `--chapter <n>`
