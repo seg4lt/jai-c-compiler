@@ -54,12 +54,18 @@ Stmt_Ast :: struct {
         while_stmt: struct { condition: *Expr_Ast; body: *Stmt_Ast; label: string; };
         do_while: struct {  body: *Stmt_Ast; condition: *Expr_Ast; label: string;};
         for_stmt: struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; };
-        switch: struct { condition: *Expr_Ast; body: [..]*Block_Item_Ast; label: string; };
+        switch: struct { condition: *Expr_Ast; body: [..]*Block_Item_Ast; label: string; cases_label: [..]Case_Label_Info;};
         case_stmt: struct { value: string; label: string; }; 
         default: string;
         // null : doesn't need value
     };
     loc: Source_Location;
+}
+
+Case_Label_Info :: struct {
+    label: string;
+    value: string;
+    is_default: bool = true;
 }
 
 Expr_Ast :: struct {
@@ -222,7 +228,7 @@ create_for_stmt :: (init: *For_Init_Ast, condition: *Expr_Ast, post: *Expr_Ast, 
 create_switch_stmt :: (condition: *Expr_Ast, body: [..]*Block_Item_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.SWITCH, .{ switch = .{ condition, body, label }}, .{line, start}};
+    stmt.* = .{.SWITCH, .{ switch = .{ condition = condition, body = body, label = label }}, .{line, start}};
     return stmt;
 }
 
