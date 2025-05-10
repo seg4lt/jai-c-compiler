@@ -11,11 +11,6 @@ Switch_Label :: struct {
     label: string;
     cases_label: [..]Case_Label_Info;
 }
-Case_Label_Info :: struct {
-    label: string;
-    value: string;
-    is_default: bool = true;
-}
 
 Label_Info :: struct {
     type: enum { LOOP; SWITCH; };
@@ -111,9 +106,9 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Default case already defined");
             }
 
-            label := tprint("L.s_def_%.%", switch_label_info.label, switch_label_info.cases_label.count);
+            label := tprint("L.switch_default_case_%.%", switch_label_info.label, switch_label_info.cases_label.count);
             stmt.as.default = label;
-            array_add(*switch_label_info.cases_label, .{label = label, value = stmt.as.default, is_default = true});
+            array_add(*switch_label_info.cases_label, .{label = label, value = "", is_default = true});
         case .CASE;
             switch_label_info := get_closest_switch_label(label_info);
             if !switch_label_info {
@@ -122,7 +117,7 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             if has_same_case(*switch_label_info.cases_label, stmt.as.case_stmt.value) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Case already defined");
             }
-            label := tprint("L.s_case_%.%", switch_label_info.label, switch_label_info.cases_label.count);
+            label := tprint("L.switch_case_%.%", switch_label_info.label, switch_label_info.cases_label.count);
             array_add(*switch_label_info.cases_label, .{label = label, value = stmt.as.case_stmt.value, is_default = false});
             stmt.as.case_stmt.label = label;
         case .SWITCH;
@@ -130,7 +125,11 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             stmt.as.switch.label = label;
             array_add(label_info, .{.SWITCH, .{ switch = .{ label = label }}});
             sema_loop_labeling_block_item(*stmt.as.switch.body, label_info, error_reporter);
-            pop(label_info);
+            switch_label_info := pop(label_info);
+            // @note
+            // saving references to all cases switch has
+            // Need this on tacky gen phase to know what cases we have so we can jump to right location
+            stmt.as.switch.cases_label = switch_label_info.as.switch.cases_label;
         case .IF;
             if_stmt := stmt.as.if_stmt;
             sema_loop_labeling_stmt(if_stmt.if_block, label_info, error_reporter);
