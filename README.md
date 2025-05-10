@@ -4,10 +4,8 @@ Simple implementation of c-compiler using Jai
 
 
 # TODO
-- [ ] Better reporting - error reporting as separate concern
 - [ ] SETCC needs only 1 byte, but today we are using 4 bytes. Need to fix this
 - [ ] Parse typedef - Read more on context sentitive grammer.
-- [ ] Postfix unary operator are not working properly. Need to fix this.
 - [ ] Update to support arm64 assembly
 
 
@@ -19,7 +17,8 @@ Simple implementation of c-compiler using Jai
 # Test Flags
 Command: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
 - Lex: `--stage lex` - for lex
-- Parse: `--stage parse` ,  `--stage validate`
+- Parse: `--stage parse` ,  
+- Validate: `--stage validate`
 - Asm Gen: `--stage codegen`
 - Tacky IR: `--stage tacky`
 - Full: `--chapter <n>`
