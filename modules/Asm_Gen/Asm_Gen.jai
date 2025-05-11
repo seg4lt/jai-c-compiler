@@ -48,16 +48,25 @@ Bin_Op_Asm :: enum {
 }; 
 Reg_Asm :: enum { AX; DX; R10; R11; RSP; RBP; }
 
-asm_gen :: (pgt: *Program_Tacky) -> *Program_Asm {
+asm_gen :: (pgt: *Program_Tacky, do_print: bool = false) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
-    print_asm(pasm_st_1, 1);
+    if do_print {
+        writer := make_stdout_writer();
+        print_asm(*writer, pasm_st_1, 1);
+    }
     stack_size := asm_gen_stage_2(pasm_st_1.fn.instructions);
-    print("\n Stack Size: %\n", stack_size);
-    print_asm(pasm_st_1, 2);
+    if do_print {
+        writer := make_stdout_writer();
+        write(*writer, "\n Stack Size: %\n", stack_size);
+        print_asm(*writer, pasm_st_1, 2);
+    }
 
     new_insts := asm_gen_stage_3(pasm_st_1.fn.instructions, stack_size);
     pasm_st_1.fn.instructions = new_insts;
-    print_asm(pasm_st_1, 3);
+    if do_print {
+        writer := make_stdout_writer();
+        print_asm(*writer, pasm_st_1, 3);
+    }
     return pasm_st_1;
 }
 
@@ -384,96 +393,8 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
     return insts;
 }
 
-print_asm :: (pg: *Program_Asm, stage: int) {
-    print("\n\n---- ASM GEN % --- \n", stage);
-    print(".program\n");
-    print_asm_fn(pg.fn);
-}
-
-print_asm_fn :: (fn: Fn_Asm) {
-    print(".%:\n", fn.ident);
-    for fn.instructions print_asm_inst(it);
-}
-
-print_asm_inst :: (inst: Instruction_Asm) {
-    if inst.type != .LABEL {
-        print("    ");
-    }
-
-    if #complete inst.type == {
-        case .MOV;
-            print("% ", inst.type);
-            print_asm_operand(inst.as.mov.src);
-            print(", ");
-            print_asm_operand(inst.as.mov.dst);
-            print("\n");
-        case .UNARY;
-            print("% ", inst.as.unary.op);
-            print_asm_operand(inst.as.unary.operand);
-            print("\n");
-        case .RET;
-            print("% ",inst.type);
-            print("\n");
-        case .ALLOCATE_STACK;
-            print("ASTK %", inst.as.allocate_stack);
-            print("\n");
-        case .CDQ;
-            print("CDQ ");
-            print("\n");
-        case .BINARY;
-            print("% ", inst.as.binary.op);
-            print_asm_operand(inst.as.binary.src1);
-            print(", ");
-            print_asm_operand(inst.as.binary.src2);
-            print("\n");
-        case .IDIV;
-            print("IDIV ");
-            print_asm_operand(inst.as.idiv);
-            print("\n");
-        case .LABEL;
-            print("%\n", inst.as.label);
-        case .SET_CC;
-            print("SETCC ");
-            print("%", inst.as.set_cc.cond_code);
-            print(", ");
-            print_asm_operand(inst.as.set_cc.operand);
-            print("\n");
-        case .JMP_CC;
-            print("JMPCC ");
-            print("%", inst.as.jmp_cc.cond_code);
-            print(", ");
-            print(inst.as.jmp_cc.ident);
-            print("\n");
-        case .JMP; 
-            print("JMP ");
-            print(inst.as.jmp);
-            print("\n");
-        case .CMP; 
-            print("CMP ");
-            print_asm_operand(inst.as.cmp.op1);
-            print(", ");
-            print_asm_operand(inst.as.cmp.op2);
-            print("\n");
-    }
-}
-print_asm_operand :: (operand: Operand_Asm) {
-    if #complete operand.type == {
-        case .IMM;
-            print("imm(%)", operand.as.imm);
-        case .REG;
-            print("reg(%)", operand.as.reg);
-        case .PSEUDO;
-            print("pseudo(%)",operand.as.pseudo);
-        case .STACK;
-            print("stack(%)", operand.as.stack);
-    }
-}
 
 
-#scope_module
-Hash_Table :: #import "Hash_Table";
-#import "Basic";
-#import "Tacky_IR";
 
 #scope_export
 
