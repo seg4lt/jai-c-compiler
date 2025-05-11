@@ -8,6 +8,8 @@ Simple implementation of c-compiler using Jai
 - [ ] Parse typedef - Read more on context sentitive grammer.
 - [ ] Update to support arm64 assembly
 - [ ] Revamp output printer and add tests
+- [ ] Function pointers
+    - Implement after arrays are added
 
 
 # Notes

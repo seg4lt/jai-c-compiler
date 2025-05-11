@@ -11,7 +11,7 @@ ce_program :: (writer: *Writer, using program: *Program_Asm) {
     if program == null return;
     defer {
         #if OS == .LINUX { 
-            progbits := "\t.section .note.GNU-stack,\"\",@progbits";
+            progbits := "\t.section .note.GNU-stack,\"\",@progbits\n";
             write(writer, progbits);
         }
     };
@@ -34,7 +34,7 @@ ce_inst :: (writer: *Writer, using inst: Instruction_Asm) {
             write(writer, "\tmovl\t%, %\n", ce_fmt_operand(as.mov.src), ce_fmt_operand(as.mov.dst));
         case .RET;
             {   // epilogue
-                write(writer, "\t;˯˯˯\tEpilogue\n");
+                write(writer, "\t# vv\tEpilogue\n");
                 write(writer, "\tmovq\t%, %\n", ce_fmt_reg(.RBP), ce_fmt_reg(.RSP));
                 write(writer, "\tpopq\t%\n", ce_fmt_reg(.RBP));
             }
@@ -82,7 +82,7 @@ ce_inst :: (writer: *Writer, using inst: Instruction_Asm) {
             write(writer, "\t%\t%\n", cmd, ce_fmt_operand(as.set_cc.operand));
         case .ALLOCATE_STACK;
             write(writer, "\tsubq\t%, %\n", as.allocate_stack, ce_fmt_reg(.RSP));
-            write(writer, "\t;˄˄˄\tPrologue\n");
+            write(writer, "\t# ^^^\tPrologue\n");
 
     }
 }
