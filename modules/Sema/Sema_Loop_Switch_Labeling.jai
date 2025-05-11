@@ -130,6 +130,10 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             // saving references to all cases switch has
             // Need this on tacky gen phase to know what cases we have so we can jump to right location
             stmt.as.switch.cases_label = switch_label_info.as.switch.cases_label;
+            // print("\n-----asdfadsf----------\n"); for stmt.as.switch.cases_label {
+            //     print("case: label=%,value=%", it.label,it.value);
+            // }
+            // print("\n---------------\n");
         case .IF;
             if_stmt := stmt.as.if_stmt;
             sema_loop_labeling_stmt(if_stmt.if_block, label_info, error_reporter);
