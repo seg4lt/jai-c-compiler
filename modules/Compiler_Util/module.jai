@@ -1,3 +1,7 @@
+Output_Type :: enum {
+    EXE;
+    OBJ;
+}
 
 run_preprocessor :: (src_path: string) -> src_content: string = "", success: bool = true, msg: string = "" {
     preprocessor(src_path);
@@ -8,13 +12,25 @@ run_preprocessor :: (src_path: string) -> src_content: string = "", success: boo
     return src_content = src_content;
 }
 
-assember_and_linker :: (src_path_without_ext: string)  {
-    command: [..] string;
-    array_add(*command, "gcc");
-    array_add(*command, tprint("%.i", src_path_without_ext));
-    array_add(*command, "-o");
-    array_add(*command, src_path_without_ext);
-    result := Process.run_command(..command);
+assember_and_linker :: (src_path_without_ext: string, output_type: Output_Type)  {
+    if #complete output_type == {
+        case .EXE;
+            command: [..] string;
+            array_add(*command, "gcc");
+            // array_add(*command, tprint("%.i", src_path_without_ext));
+            array_add(*command, tprint("%.s", src_path_without_ext));
+            array_add(*command, "-o");
+            array_add(*command, src_path_without_ext);
+            result := Process.run_command(..command);
+        case .OBJ;
+            command: [..] string;
+            array_add(*command, "gcc");
+            array_add(*command, "-c");
+            array_add(*command, tprint("%.s", src_path_without_ext));
+            array_add(*command, "-o");
+            array_add(*command, tprint("%.o", src_path_without_ext));
+            result := Process.run_command(..command);
+    }
 }
 
 // pp:

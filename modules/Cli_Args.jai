@@ -1,7 +1,8 @@
 Cli_Args :: struct {
-    src_path: string;
-    src_path_without_ext: string;
-    flags: Cli_Args_Flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
+    src_path              : string;
+    src_path_without_ext  : string;
+    output_type           : Output_Type    = .EXE;
+    flags                 : Cli_Args_Flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
 }
 
 Cli_Args_Flags :: enum_flags {
@@ -19,7 +20,6 @@ get_cli_args :: () -> Cli_Args {
 
     using cli_args := Cli_Args.{};
 
-
     for args {
         if it == {
             case "--lex";          flags = .LEX;
@@ -28,6 +28,7 @@ get_cli_args :: () -> Cli_Args {
             case "--tacky";        flags = .LEX | .PARSE | .SEMA | .TACKY;
             case "--code-gen";     #through;
             case "--codegen";      flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN; 
+            case "-c";             output_type = .OBJ;
             case; src_path = it;
         }
     }
