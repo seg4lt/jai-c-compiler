@@ -1,4 +1,3 @@
-
 Program_Tacky :: struct {
     fn: Fn_Tacky;
 }
@@ -67,12 +66,17 @@ Tacky_Ctx :: struct {
     label_index: int = 0;
 }
 
-gen_program_tacky :: (program_ast: *Program_Ast) -> *Program_Tacky {
+gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
     tc : Tacky_Ctx;
     fn := gen_fn_tacky(*tc, program_ast.fn);
     program := New(Program_Tacky);
     program.* = .{ fn };
-    print_tacky(program);
+
+    if do_print {
+        writer := make_stdout_writer();
+        print_tacky(program, *writer);
+    }
+
     return program;
 }
 
@@ -462,94 +466,3 @@ make_label :: (tc : *Tacky_Ctx, label: string) -> Instruction_Tacky {
     defer tc.label_index += 1;
     return .{.LABEL, .{label = tprint("L_%.%",label, tc.label_index) }};
 }
-
-print_tacky :: (program: *Program_Tacky) {
-    print("\n\n-- Tacky --\n");
-    print("    .program\n");
-    print_tacky_fn(*program.fn);
-    print("\n");
-}
-
-print_tacky_fn :: (fn: *Fn_Tacky) {
-    print(".%:", fn.ident);
-    for fn.instructions print_tacky_inst(*it);
-}
-
-print_tacky_inst :: (inst: *Instruction_Tacky) {
-    print("\n    ");
-    if #complete inst.type == {
-        case .RETURN;
-            print("Return(");
-            print_tacky_val(*inst.as.ret);
-            print(")");
-        case .UNARY;
-            print("Unary(op: %", inst.as.unary.op);
-            print(", src: ");
-            print_tacky_val(*inst.as.unary.src);
-            print(", dst: ");
-            print_tacky_val(*inst.as.unary.dst);
-            print(")");
-        case .BINARY;
-            print("Binary(op: %", inst.as.binary.op);
-            print(", src1: ");
-            print_tacky_val(*inst.as.binary.src1);
-            print(", src2: ");
-            print_tacky_val(*inst.as.binary.src2);
-            print(", dst: ");
-            print_tacky_val(*inst.as.binary.dst);
-            print(")");
-        case .LABEL;
-            print("Label(%)", inst.as.label);
-        case .JUMP_IF_NOT_ZERO; 
-            print("JumpIfNotZero(condition: ");
-            print_tacky_val(*inst.as.jump_if_zero.condition);
-            print(", label: %", inst.as.jump_if_zero.ident);
-            print(")");
-        case .JUMP_IF_ZERO; 
-            print("JumpIfZero(condition: ");
-            print_tacky_val(*inst.as.jump_if_zero.condition);
-            print(", label: %", inst.as.jump_if_zero.ident);
-            print(")");
-        case .COPY; 
-            print("Copy(src: ");
-            print_tacky_val(*inst.as.copy.src);
-            print(", dst: ");
-            print_tacky_val(*inst.as.copy.dst);
-            print(")");
-        case .JUMP;
-            print("Jump(%)", inst.as.jump);
-    }
-}
-
-print_tacky_val :: (val: *Val_Tacky) {
-    if #complete val.type == {
-        case .CONSTANT; print("Constant(%)", val.as.constant);
-        case .VARIABLE; print("Var(%)", val.as.variable);
-    }
-}
-
-#scope_module
-#import "Parser";
-#import "Basic";
-
-/* -- ADSL for TACKY IR -- 
-
-program             = Program(function_definition)
-function_definition = Function(identifier, instruction* body)
-instruction         = Return(val) 
-                    | Unary(unary_operator, val src, val dst)
-                    | Binary(binary_operator, val src1, val src2, val dst)
-                    | Copy(val src, val dst)
-                    | Jump(identifier target)
-                    | JumpIfZero(val condition, identifier target)
-                    | JumpIfNotZero(val condition, identifier target)
-                    | Label(identifier)
-val                 = Constant(int) | Var(identifier)
-unary_operator      = Complement | Negate | Not
-binary_operator     = Add | Subtract | Multiply | Divide | Remainder 
-                    | And | Or
-                    | Equal | Not Equal
-                    | LessThan | LessOrEqual 
-                    | GreaterThan | GreaterOrEqual 
-
-*/
