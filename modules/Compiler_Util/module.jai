@@ -2,6 +2,7 @@
 run_preprocessor :: (src_path: string) -> src_content: string = "", success: bool = true, msg: string = "" {
     preprocessor(src_path);
     path := ifx ends_with(src_path, ".c") slice(src_path, 0, src_path.count - 2) else src_path;
+
     src_content, success := read_entire_file(tprint("%.i", path));
     if !success return success=false, msg=tprint("Unable to read file: %", path);
     return src_content = src_content;
