@@ -13,7 +13,7 @@ main :: () {
     if args.flags                   & .SEMA         sema(ast, *error_reporter, do_print=true);
     tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast);
     asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky);
-    if args.flags                   & .CODE_GEN     code_emm(args.src_path_without_ext, asm_construct); 
+    if args.flags                   & .ALL          code_emm(args.src_path_without_ext, asm_construct); 
     if args.flags                   & .ALL          assember_and_linker(args.src_path_without_ext);
 }
 
