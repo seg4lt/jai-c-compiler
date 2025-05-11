@@ -1,4 +1,11 @@
+#ifdef SUPPRESS_WARNINGS
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+#else
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+#endif
+
 int main(void) {
-    int a = 20;
-    return a;
+    return 8 << 1;
 }
