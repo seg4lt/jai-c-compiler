@@ -7,7 +7,7 @@ Simple implementation of c-compiler using Jai
 - [ ] SETCC needs only 1 byte, but today we are using 4 bytes. Need to fix this
 - [ ] Parse typedef - Read more on context sentitive grammer.
 - [ ] Update to support arm64 assembly
-
+- [ ] Revamp output printer and add tests
 
 
 # Notes
