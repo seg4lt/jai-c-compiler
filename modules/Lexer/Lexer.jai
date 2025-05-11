@@ -28,7 +28,10 @@ scan :: (using lexer: *Lexer) {
         start = current;
         current_char := consume(lexer);
 
-        if is_space(current_char) continue;
+        if is_space(current_char) {
+            if current_char == #char "\n" line += 1;
+            continue;
+        }
         if is_alpha(current_char) || current_char == #char "_" { ident_or_keyword(lexer); continue; }
         if is_digit(current_char) { number(lexer); continue; }
 
