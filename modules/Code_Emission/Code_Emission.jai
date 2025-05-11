@@ -136,6 +136,16 @@ ce_fmt_reg :: (r: Reg_Asm) -> string {
         case .R11; return "%r11d"; 
         case .RSP; return "%rsp";
         case .RBP; return "%rbp";
+        // @note
+        // Bits:  63                             32 31        16 15       8 7        0
+        //        +-------------------------------+-------------+----------+----------+
+        // rcx:   |         High 32 bits          |   ecx (32)  | cx (16)  | cl (8)   |
+        //        +-------------------------------+-------------+----------+----------+
+        //                                                      | ch (8)   | cl (8)   |
+        //                                                      +----------+----------+
+        // Using ecx as SAR and SAL needs 32-bit register
+        // probably need to do this dynamically later
+        case .RCX; return "%ecx";
     }
 }
 

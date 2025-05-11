@@ -46,7 +46,7 @@ Bin_Op_Asm :: enum {
     LESS;
     LESS_EQUAL;
 }; 
-Reg_Asm :: enum { AX; DX; R10; R11; RSP; RBP; }
+Reg_Asm :: enum { AX; DX; R10; R11; RSP; RBP; RCX; }
 
 asm_gen :: (pgt: *Program_Tacky, do_print: bool = false) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
@@ -122,7 +122,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                 case .RIGHT_SHIFT; 
                     src1 := asm_gen_val_to_operand(*basm.src1);
                     dst := asm_gen_val_to_operand(*basm.dst);
-                    array_add(insts, .{.MOV,.{ mov = .{ src1, dst }}});
+                    array_add(insts, .{.MOV, .{ mov = .{ src1, dst }}});
 
                     op := from_tacky_to_asm_binop(basm.op);
                     src2 := asm_gen_val_to_operand(*basm.src2);
@@ -198,12 +198,12 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
 
 from_relational_to_cond_code :: (op: Bin_Op_Type_Tacky) -> Cond_Code_Asm {
     if op == {
-        case .EQUAL_EQUAL; return .EE;
-        case .GREATER; return .G;
+        case .EQUAL_EQUAL;   return .EE;
+        case .GREATER;       return .G;
         case .GREATER_EQUAL; return .GE;
-        case .LESS; return .L;
-        case .LESS_EQUAL; return .LE;
-        case .NOT_EQUAL; return .NE;
+        case .LESS;          return .L;
+        case .LESS_EQUAL;    return .LE;
+        case .NOT_EQUAL;     return .NE;
     }
     assert(false, "not relational operator: %", op);
     return .EE; // unreachable
@@ -211,21 +211,20 @@ from_relational_to_cond_code :: (op: Bin_Op_Type_Tacky) -> Cond_Code_Asm {
 
 from_tacky_to_asm_binop :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -> type_of(Instruction_Asm.as.binary.op) {
     if #complete tacky_op == {
-        case .ADD; return .ADD;
-        case .SUB; return .SUB;
-        case .MUL; return .MUL;
-        case .BITWISE_OR; return .BITWISE_OR;
-        case .BITWISE_XOR; return .BITWISE_XOR;
-        case .BITWISE_AND; return .BITWISE_AND;
-        case .LEFT_SHIFT; return .LEFT_SHIFT;
-        case .RIGHT_SHIFT; return .RIGHT_SHIFT;
-
-        case .GREATER; return .GREATER;
+        case .ADD;           return .ADD;
+        case .SUB;           return .SUB;
+        case .MUL;           return .MUL;
+        case .BITWISE_OR;    return .BITWISE_OR;
+        case .BITWISE_XOR;   return .BITWISE_XOR;
+        case .BITWISE_AND;   return .BITWISE_AND;
+        case .LEFT_SHIFT;    return .LEFT_SHIFT;
+        case .RIGHT_SHIFT;   return .RIGHT_SHIFT;
+        case .GREATER;       return .GREATER;
         case .GREATER_EQUAL; return .GREATER_EQUAL;
-        case .LESS; return .LESS;
-        case .LESS_EQUAL; return .LESS_EQUAL;
-        case .EQUAL_EQUAL; return .EQUAL_EQUAL;
-        case .NOT_EQUAL; return .NOT_EQUAL;
+        case .LESS;          return .LESS;
+        case .LESS_EQUAL;    return .LESS_EQUAL;
+        case .EQUAL_EQUAL;   return .EQUAL_EQUAL;
+        case .NOT_EQUAL;     return .NOT_EQUAL;
 
         case .DIV; #through;
         case .MOD; 
@@ -332,11 +331,14 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                 }
             case .BINARY;
                 if #complete oi.as.binary.op == {
+                    case .LEFT_SHIFT; #through;
+                    case .RIGHT_SHIFT;
+                        ireg := Operand_Asm.{.REG,.{reg = .RCX }};
+                        array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src1, ireg }}});
+                        array_add(*insts, .{.BINARY, .{binary = .{ oi.as.binary.op, ireg, oi.as.binary.src2}}});
                     case .BITWISE_AND; #through;
                     case .BITWISE_OR; #through;
                     case .BITWISE_XOR; #through;
-                    case .LEFT_SHIFT; #through;
-                    case .RIGHT_SHIFT; #through;
                     case .ADD; #through;
                     case .SUB;
                         // both src and dst can't be memory address
