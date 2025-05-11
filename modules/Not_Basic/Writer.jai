@@ -1,4 +1,3 @@
-#import "Basic";
 
 Writer :: struct {
     ctx   : *void;
@@ -24,6 +23,13 @@ make_sb_writer :: (sb: *String_Builder) -> Writer {
     return writer;
 }
 
+make_file_writer :: (file: *File.File) -> Writer {
+    writer: Writer;
+    writer.ctx = file;
+    writer.write = file_write;
+    return writer;
+}
+
 #scope_module
 
 stdout_write :: (ctx: *void, format_string: string, args: .. Any) -> success: bool {
@@ -40,4 +46,19 @@ sb_write :: (ctx: *void, format_string: string, args: .. Any) -> success: bool {
 
     return success=true;
 }
+
+file_write :: (ctx: *void, format_string: string, args: .. Any) -> success: bool {
+    if !ctx return success=false;
+
+    file := cast(*File.File) ctx;
+    string_to_write := tprint(format_string, .. args);
+    File.file_write(file, string_to_write);
+
+    return success=true;
+}
+
+#scope_module
+
+#import "Basic";
+File :: #import "File";
 
