@@ -13,8 +13,11 @@ Simple implementation of c-compiler using Jai
 
 
 # Notes
-`arch -x86_64` - run x86_64 binaries on M1 mac
-`arch -x86_64 fish` - run x86_64 binaries on M1 mac
+- Run on docker - `docker-compose exec box bash -c 'jai build.jai && ./out/jaicc -- ./c/main.c && ./c/main && echo $?'`
+
+# Run on Mac - (ld doesn't work on M1)
+- `arch -x86_64` - run x86_64 binaries on M1 mac
+- `arch -x86_64 fish` - run x86_64 binaries on M1 mac
 
 # Test Flags
 Command: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
