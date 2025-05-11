@@ -74,15 +74,19 @@ ce_inst :: (writer: *Writer, using inst: Instruction_Asm) {
             if #complete as.set_cc.cond_code == {
                 case .EE; cmd = "sete";
                 case .NE; cmd = "setne";
-                case .G; cmd = "setg";
+                case .G;  cmd = "setg";
                 case .GE; cmd = "setge";
-                case .L; cmd = "setl";
+                case .L;  cmd = "setl";
                 case .LE; cmd = "setle";
             }
             write(writer, "\t%\t%\n", cmd, ce_fmt_operand(as.set_cc.operand));
         case .ALLOCATE_STACK;
-            write(writer, "\tsubq\t%, %\n", as.allocate_stack, ce_fmt_reg(.RSP));
-            write(writer, "\t# ^^^\tPrologue\n");
+            if as.allocate_stack != 0 {
+                write(writer, "\tsubq\t$%, %\n", as.allocate_stack, ce_fmt_reg(.RSP));
+                write(writer, "\t# ^^^\tPrologue\n");
+            } else {
+                write(writer, "\t# ^^^\tPrologue (no stack allocation needed)\n");
+            }
 
     }
 }

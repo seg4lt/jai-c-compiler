@@ -1,3 +1,4 @@
 int main(void) {
-    return 69;
+    int a = 20;
+    return a;
 }
