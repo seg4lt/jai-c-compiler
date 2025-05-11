@@ -93,7 +93,11 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast) -> Fn_Tacky {
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast) {
-    for block_ast.items {
+    gen_instructions(tc, instructions, block_ast.items);
+}
+
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_item_ast: [..]*Block_Item_Ast) {
+    for block_item_ast {
         if #complete it.type == {
             case .STMT;
                 gen_instructions(tc, instructions, it.as.stmt);
@@ -102,6 +106,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block
         }
     }
 }
+
 gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast) {
     if (decl_ast.init == null) {
         // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
@@ -115,14 +120,18 @@ gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast) {
     if #complete stmt_ast.type == {
         case .DEFAULT;
-            assert(false, "UNIMPLEMENTED");
+            label := stmt_ast.as.default;
+            default_label := Instruction_Tacky.{.LABEL, .{label = label }};
+            array_add(instructions, default_label);
         case .CASE;
-            assert(false, "UNIMPLEMENTED");
+            label := stmt_ast.as.case_stmt.label;
+            case_label := Instruction_Tacky.{.LABEL, .{label = label }};
+            array_add(instructions, case_label);
         case .RETURN;
             src := gen_instructions(tc, instructions, stmt_ast.as.return_stmt.expr);
             array_add(instructions, .{.RETURN, .{ret = src}});
         case .SWITCH;
-            assert(false, "UNIMPLEMENTED");
+            gen_instructions_for_switch(tc, instructions, stmt_ast.as.switch);
         case .EXPR;
             gen_instructions(tc, instructions, stmt_ast.as.expr);
         case .IF;
@@ -228,9 +237,50 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
                 // pass through - nothing to do when null stmt is received
     }
 }
+
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
     val := gen_instructions_expr(tc, instructions, expr_ast);
     return gen_inst_for_possible_postfix(tc, instructions, expr_ast, val);
+}
+
+gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast) {
+    s_expr := switch_ast.condition;
+
+    // @note
+    // Add jump instruction for all cases first
+    // We still don't emit the instruction for each case
+
+    // handle non-default first
+    for switch_ast.cases_label {
+        if it.is_default continue;
+
+        // we create an expression to check if matches case we have
+        constant_expr := create_constant_expr(string_to_int(it.value), 0, 0);
+        condition_expr_ast := create_binary_expr(.EQUAL_EQUAL, s_expr, constant_expr, 0, 0);
+        defer free(condition_expr_ast);
+
+        // we gen the instruction for the expr we created
+        // if it mathces, we jump the the case label
+        condition := gen_instructions(tc, instructions, condition_expr_ast);
+        array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, it.label } } });
+    }
+    // handling default case separately as this is if nothing matches
+    for switch_ast.cases_label {
+        if !it.is_default continue;
+        default_label := it.label;
+        array_add(instructions, .{.JUMP, .{ jump = default_label }});
+    }
+
+    // by this point we have added required jump instructions to correct cases
+    // if nothing maches we need to go to end to the switch
+    switch_end_label := make_label(tc, "switch_end");
+    array_add(instructions, .{.JUMP, .{  jump = switch_end_label.as.label }});
+
+    // now add instruction for all cases
+    gen_instructions(tc, instructions, switch_ast.body);
+
+    // this is to mark end of switch to jump if nothing matches
+    array_add(instructions, switch_end_label);
 }
 
 gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {

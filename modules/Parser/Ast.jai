@@ -54,13 +54,20 @@ Stmt_Ast :: struct {
         while_stmt: struct { condition: *Expr_Ast; body: *Stmt_Ast; label: string; };
         do_while: struct {  body: *Stmt_Ast; condition: *Expr_Ast; label: string;};
         for_stmt: struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; };
-        switch: struct { condition: *Expr_Ast; body: [..]*Block_Item_Ast; label: string; cases_label: [..]Case_Label_Info;};
+        switch: Switch_Stmt_Ast;
         case_stmt: struct { value: string; label: string; }; 
         default: string;
         // null : doesn't need value
     };
     loc: Source_Location;
 }
+
+Switch_Stmt_Ast :: struct { 
+    condition: *Expr_Ast; 
+    body: [..]*Block_Item_Ast; 
+    label: string; 
+    cases_label: [..]Case_Label_Info;
+};
 
 Case_Label_Info :: struct {
     label: string;
@@ -269,13 +276,7 @@ create_assignment_expr :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int
     return expr;
 }
 
-create_binary_expr :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
-    assert(left != null, "left cannot be null");
-    assert(right != null, "right cannot be null");
-    expr := New(Expr_Ast);
-    expr.* = .{.BINARY, .{ binary = .{ op, left, right }}, postfix, .{line, start}};
-    return expr;
-}
+
 
 create_ternary_expr :: (condition: *Expr_Ast, true_block: *Expr_Ast, false_block: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(condition != null, "condition cannot be null");
@@ -300,11 +301,7 @@ create_var_expr :: (ident: string, line: int, start: int, postfix: type_of(Expr_
     return expr;
 }
 
-create_constant_expr :: (constant: int, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
-    expr := New(Expr_Ast);
-    expr.* = .{.CONSTANT, .{ constant = constant }, postfix, .{line, start}};
-    return expr;
-}
+
 
 create_group_expr :: (expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(expr != null, "expr cannot be null");
@@ -321,3 +318,17 @@ create_default_stmt :: (line: int, start: int) -> *Stmt_Ast {
 
 
 #scope_export
+
+create_binary_expr :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+    assert(left != null, "left cannot be null");
+    assert(right != null, "right cannot be null");
+    expr := New(Expr_Ast);
+    expr.* = .{.BINARY, .{ binary = .{ op, left, right }}, postfix, .{line, start}};
+    return expr;
+}
+
+create_constant_expr :: (constant: int, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+    expr := New(Expr_Ast);
+    expr.* = .{.CONSTANT, .{ constant = constant }, postfix, .{line, start}};
+    return expr;
+}
