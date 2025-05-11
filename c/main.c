@@ -1,5 +1,5 @@
 int main(void) {
-    switch(6) {
+    switch(611) {
         case 3:
             return 200;
         case 1:
