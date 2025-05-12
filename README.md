@@ -20,7 +20,7 @@ Simple implementation of c-compiler using Jai
 - `arch -x86_64 fish` - run x86_64 binaries on M1 mac
 
 # Test Flags
-Command: `./test_compiler ../jai/out/target --chapter 1 --stage lex`
+Command: `./test_compiler ../out/jaicc --chapter 1 --stage lex`
 - Lex: `--stage lex` - for lex
 - Parse: `--stage parse` ,  
 - Validate: `--stage validate`

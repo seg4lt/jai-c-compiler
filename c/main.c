@@ -1,4 +1,4 @@
 int main(void) {
-    // return (20 >> 4) <= (3 << 1);
-    return 1 < 6;
+    if (1 + 2 == 4)
+        return 5;
 }
