@@ -1,11 +1,4 @@
-#ifdef SUPPRESS_WARNINGS
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
-#else
-#pragma GCC diagnostic ignored "-Wparentheses"
-#endif
-#endif
-
 int main(void) {
-    return 8 << 1;
+    // return (20 >> 4) <= (3 << 1);
+    return 1 < 6;
 }
