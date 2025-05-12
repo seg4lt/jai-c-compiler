@@ -159,16 +159,16 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     dst := asm_gen_val_to_operand(*basm.dst);
                     array_add(insts, .{.MOV, .{mov = .{.{.IMM, .{imm = 0}}, dst}}});
 
-                    src1 := asm_gen_val_to_operand(*basm.src1);
+                    src2 := asm_gen_val_to_operand(*basm.src2);
 
-                    if basm.src2.type == {
+                    if basm.src1.type == {
                         case .CONSTANT; 
-                            src2 := asm_gen_val_to_operand(*basm.src2);
+                            src1 := asm_gen_val_to_operand(*basm.src1);
                             ireg := Operand_Asm.{.REG,.{reg = .R11}};
-                            array_add(insts, Instruction_Asm.{.MOV, .{mov = .{src = src2, dst = ireg }}});
-                            array_add(insts, Instruction_Asm.{.CMP, .{cmp = .{src1, ireg}}});
+                            array_add(insts, Instruction_Asm.{.MOV, .{mov = .{src = src1, dst = ireg }}});
+                            array_add(insts, Instruction_Asm.{.CMP, .{cmp = .{src2, ireg}}});
                         case .VARIABLE; 
-                            src2 := asm_gen_val_to_operand(*basm.src2);
+                            src1 := asm_gen_val_to_operand(*basm.src1);
                             array_add(insts, .{.CMP, .{cmp = .{src2, src1}}});
                     }
 
