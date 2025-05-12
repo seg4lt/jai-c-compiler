@@ -83,15 +83,9 @@ gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Pro
 gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
     gen_instructions(tc, *instructions, fn_ast.block);
-
-    has_return := false;
-    for instructions  {
-        if (it.type == .RETURN) { 
-            has_return = true; 
-            break;
-        }
-    }
-    if !has_return array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
+    // Always add return 0 as there might be case where we don't have one
+    // Potentially we can optimize this away later.
+    array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
 
     return .{ fn_ast.ident, instructions };
 }
@@ -333,6 +327,7 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
             return dst;
         case .CONDITIONAL;
             ternary := expr_ast.as.conditional;
+            dst := make_var(tc);
             result : Val_Tacky = ---;
 
             ternary_end := make_label(tc, "ternary_end");
@@ -344,16 +339,17 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
 
             { // true
                 result = gen_instructions(tc, instructions, ternary.true_block);
+                array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
                 array_add(instructions, .{.JUMP, .{jump = ternary_end.as.label}});
             }
 
             { // false
                 array_add(instructions, ternary_else);
                 result = gen_instructions(tc, instructions, ternary.false_block);
+                array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             }
-            //  array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             array_add(instructions, ternary_end); 
-            return result;
+            return dst;
     }
 }
 
