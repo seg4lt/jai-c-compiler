@@ -49,25 +49,38 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporte
             compound := stmt.as.compound;
             sema_var_resolution_block(compound, block_store, error_reporter);
         case .FOR;
-            new_block_store : Store;
-            defer deinit(*new_block_store);
-            new_block_store = table_clone_owing_entry(block_store);
+            new_block_store_for_init : Store;
+            defer deinit(*new_block_store_for_init);
+            new_block_store_for_init = table_clone_owing_entry(block_store);
             for_stmt := stmt.as.for_stmt;
             if #complete for_stmt.init.type == {
                 case .INIT_DECL;
-                    sema_var_resolution_decl(for_stmt.init.as.decl, *new_block_store, error_reporter);
+                    sema_var_resolution_decl(for_stmt.init.as.decl, *new_block_store_for_init, error_reporter);
                 case .INIT_EXPR;
                     if for_stmt.init.as.expr != null {
-                        sema_var_resolution_expr(for_stmt.init.as.expr, *new_block_store, error_reporter);
+                        sema_var_resolution_expr(for_stmt.init.as.expr, *new_block_store_for_init, error_reporter);
                     }
             }
             if for_stmt.condition != null {
-                sema_var_resolution_expr(for_stmt.condition, *new_block_store, error_reporter);
+                sema_var_resolution_expr(for_stmt.condition, *new_block_store_for_init, error_reporter);
             }
             if for_stmt.post != null {
-                sema_var_resolution_expr(for_stmt.post, *new_block_store, error_reporter);
+                sema_var_resolution_expr(for_stmt.post, *new_block_store_for_init, error_reporter);
             }
-            sema_var_resolution_stmt(for_stmt.body, *new_block_store, error_reporter);
+            {
+                for new_block_store_for_init {
+                    print("key = (%), value = (%)\n", it_index, it);
+                }
+                print("-------");
+                print("new block store for body ... \n");
+                new_block_store_for_body : Store;
+                defer deinit(*new_block_store_for_body);
+                new_block_store_for_body = table_clone_owing_entry(*new_block_store_for_init);
+                for new_block_store_for_body {
+                    print("key = (%), value = (%)\n", it_index, it);
+                }
+                sema_var_resolution_stmt(for_stmt.body, *new_block_store_for_body, error_reporter);
+            }
         case .DO_WHILE;
             do_while_stmt := stmt.as.do_while;
             sema_var_resolution_stmt(do_while_stmt.body, block_store, error_reporter);
@@ -93,7 +106,7 @@ sema_var_resolution_decl:: (decl: *Decl_Ast, block_store: *Store, error_reporter
     if success && entry.owing_block {
         error_report(error_reporter, decl.loc.line, decl.loc.start, "duplicate variable declaration! : %", decl.ident);
     } 
-    new_ident := make_variable(decl.ident, block_store.count);
+    new_ident := make_variable(decl.ident);
     table_set(block_store, decl.ident, .{true, new_ident});
 
     ifx decl.init sema_var_resolution_expr(decl.init, block_store, error_reporter);

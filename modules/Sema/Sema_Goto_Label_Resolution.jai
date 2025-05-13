@@ -74,12 +74,7 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error
             if table_contains(label_store, stmt.as.label.label) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "duplicate label declaration! : %", stmt.as.label);
             }
-            // next_block_item := block_items.data + index + 1; 
-            // if (index + 1) >= block_items.count || next_block_item.*.type == .DECL { 
-            //     error_report(error_reporter, stmt.loc.line, stmt.loc.start, "label '%': must be followed by a statement, not a declaration or end of block.", stmt.as.label);
-            // }
-           
-            new_label := make_goto_label(stmt.as.label.label, label_store.count);
+            new_label := make_goto_label(stmt.as.label.label);
             table_set(label_store, stmt.as.label.label, .{true, new_label, stmt.loc});
             stmt.* = .{ .LABEL, .{ label = .{new_label, stmt.as.label.stmt }}, stmt.loc};
             sema_label_resolution_stmt(stmt.as.label.stmt, label_store, error_reporter);

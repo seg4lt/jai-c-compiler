@@ -22,7 +22,7 @@
       {
         "label": "Compile Current Jai File",
         "type": "shell",
-        "command": "jai build.jai && ./out/target ./c/main.c",
+        "command": "jai build.jai && ./out/jaicc ./c/main.c",
         "group": {
           "kind": "build",
           "isDefault": false
