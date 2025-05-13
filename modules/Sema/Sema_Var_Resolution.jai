@@ -76,10 +76,11 @@ sema_var_resolution_stmt :: (stmt: *Stmt_Ast, block_store: *Store, error_reporte
             while_stmt := stmt.as.while_stmt;
             sema_var_resolution_expr(while_stmt.condition, block_store, error_reporter);
             sema_var_resolution_stmt(while_stmt.body, block_store, error_reporter);
+        case .LABEL;
+            sema_var_resolution_stmt(stmt.as.label.stmt, block_store, error_reporter);
         case .CONTINUE; #through;
         case .BREAK; #through;
         case .GOTO; #through;
-        case .LABEL; #through;
         case .DEFAULT; #through;
         case .CASE; #through;
         case .NULL;

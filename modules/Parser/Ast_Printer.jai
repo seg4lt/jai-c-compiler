@@ -2,6 +2,7 @@ print_program_ast :: (writer: *Writer, program: *Program_Ast, depth: int = 0) {
     write(writer, "-- AST --\n");
     write(writer, "[PROGRAM]・");
     print_fn_ast(writer, program.fn, depth + 1);
+    write(writer, "\n");
 }
 
 print_fn_ast :: (writer: *Writer, fn: *Fn_Ast, depth: int = 0) {
@@ -75,9 +76,12 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
                 print_stmt_ast(writer, stmt.as.if_stmt.else_block, depth + 2); 
             }
         case .LABEL;
-            write(writer, "[LABEL]・%", stmt.as.label);
+            write(writer, "[LABEL]・%", stmt.as.label.label);
+            print_space(writer, depth + 1);
+            print_stmt_ast(writer, stmt.as.label.stmt, depth + 1);
         case .GOTO;
             write(writer, "[GOTO]・%", stmt.as.goto);
+            print_space(writer, depth + 1);
         case .COMPOUND;
             write(writer, "[COMPOUND]");
             print_block_ast(writer, stmt.as.compound, depth + 2);
