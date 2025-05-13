@@ -7,7 +7,7 @@
         "request": "launch",
         "program": "./out/jaicc",
         "args": ["./c/main.c"],
-        "preLaunchTask": "Compile Current Jai File",
+        "preLaunchTask": "Jai Build",
         "console": "integratedTerminal"
       }
     ]

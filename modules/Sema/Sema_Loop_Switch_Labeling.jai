@@ -106,7 +106,7 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Default case already defined");
             }
 
-            label := tprint("L.switch_default_case_%.%", switch_label_info.label, switch_label_info.cases_label.count);
+            label := tprint("L.switch_default_case_%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
             stmt.as.default = label;
             array_add(*switch_label_info.cases_label, .{label = label, value = "", is_default = true});
         case .CASE;
@@ -117,11 +117,11 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             if has_same_case(*switch_label_info.cases_label, stmt.as.case_stmt.value) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Case already defined");
             }
-            label := tprint("L.switch_case_%.%", switch_label_info.label, switch_label_info.cases_label.count);
+            label := tprint("L.c%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
             array_add(*switch_label_info.cases_label, .{label = label, value = stmt.as.case_stmt.value, is_default = false});
             stmt.as.case_stmt.label = label;
         case .SWITCH;
-            label := tprint("L.switch.%",label_info.count);
+            label := tprint("L.switch.%.r%",label_info.count, get_4_digit_random());
             stmt.as.switch.label = label;
             array_add(label_info, .{.SWITCH, .{ switch = .{ label = label }}});
             sema_loop_labeling_block_item(*stmt.as.switch.body, label_info, error_reporter);
@@ -130,10 +130,6 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             // saving references to all cases switch has
             // Need this on tacky gen phase to know what cases we have so we can jump to right location
             stmt.as.switch.cases_label = switch_label_info.as.switch.cases_label;
-            // print("\n-----asdfadsf----------\n"); for stmt.as.switch.cases_label {
-            //     print("case: label=%,value=%", it.label,it.value);
-            // }
-            // print("\n---------------\n");
         case .IF;
             if_stmt := stmt.as.if_stmt;
             sema_loop_labeling_stmt(if_stmt.if_block, label_info, error_reporter);
@@ -143,7 +139,7 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             compound := stmt.as.compound;
             sema_loop_labeling_block(compound, label_info, error_reporter);
         case .WHILE;
-            label := tprint("L.wloop.%", label_info.count);
+            label := tprint("L.wloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.while_stmt.label = label;
             array_add(label_info, .{.LOOP, .{ loop = .{label} }});
             sema_loop_labeling_stmt(stmt.as.while_stmt.body, label_info, error_reporter);
@@ -160,7 +156,7 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
             }
             stmt.as.break_stmt = get_any_closest_label(label_info);
         case .FOR;
-            label := tprint("L.forloop.%", label_info.count);
+            label := tprint("L.forloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.for_stmt.label = label;
             {
                 array_add(label_info, .{ .LOOP, .{loop = .{label}}});
@@ -169,14 +165,15 @@ sema_loop_labeling_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_
                 sema_loop_labeling_stmt(stmt.as.for_stmt.body,label_info, error_reporter);
             }
         case .DO_WHILE;
-            label := tprint("L.dwloop.%", label_info.count);
+            label := tprint("L.dwloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.do_while.label = label;
             array_add(label_info, .{ .LOOP, .{loop = .{label}}});
             sema_loop_labeling_stmt(stmt.as.do_while.body,label_info, error_reporter);
             pop(label_info);
+        case .LABEL; 
+            sema_loop_labeling_stmt(stmt.as.label.stmt, label_info, error_reporter);
         case .RETURN; #through;
         case .EXPR; #through;
-        case .LABEL; #through;
         case .GOTO; #through;
         case .NULL;
             // noop
@@ -199,3 +196,4 @@ sema_loop_labeling_expr :: (expr: *Expr_Ast, label_stack: *[..]Label_Info, error
             sema_loop_labeling_expr(conditional.false_block, label_stack, error_reporter);
     }
 }
+
