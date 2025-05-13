@@ -162,8 +162,9 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             }
         case .LABEL;
             label := stmt_ast.as.label;
-            goto_label := Instruction_Tacky.{.LABEL, .{label = label }};
+            goto_label := Instruction_Tacky.{.LABEL, .{label = label.label }};
             array_add(instructions, goto_label);
+            gen_instructions(tc, instructions, label.stmt);
         case .GOTO;
             goto := stmt_ast.as.goto;
             array_add(instructions, .{.JUMP, .{ jump = goto }});

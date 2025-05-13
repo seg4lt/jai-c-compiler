@@ -142,7 +142,8 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
     if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
         token := consume(parser, .IDENT);
         consume(parser, .COLON);
-        return create_label_stmt(token.value, token.line, token.start);
+        l_stmt := parse_stmt_ast(parser);
+        return create_label_stmt(token.value, l_stmt, token.line, token.start);
     }
     expr := parse_expr(parser, 0);
     consume(parser, .SEMICOLON);

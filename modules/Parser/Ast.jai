@@ -45,8 +45,8 @@ Stmt_Ast :: struct {
     as: union {
         return_stmt: struct { expr: *Expr_Ast; };
         expr: *Expr_Ast;
-        if_stmt: struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: * /* Optional */ Stmt_Ast;  };
-        label: string;
+        if_stmt: struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: /* Optional */ *Stmt_Ast;  };
+        label: struct {label: string; stmt: *Stmt_Ast;};
         goto: string;
         compound: *Block_Ast; 
         break_stmt: string;
@@ -181,10 +181,10 @@ create_goto_stmt :: (label: string, line: int, start: int) -> *Stmt_Ast {
     return stmt;
 }
 
-create_label_stmt :: (label: string, line: int, start: int) -> *Stmt_Ast {
+create_label_stmt :: (label: string, l_stmt: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(label != "", "label cannot be null");
     stmt := New(Stmt_Ast);
-    stmt.* = .{.LABEL, .{ label = label }, .{line, start}};
+    stmt.* = .{.LABEL, .{ label = .{label, l_stmt } }, .{line, start}};
     return stmt;
 }
 
@@ -245,13 +245,6 @@ create_case_stmt :: (value: string, line: int, start: int) -> *Stmt_Ast {
     stmt.* = .{.CASE, .{ case_stmt = .{ value, "$$UNPROCESSED$$" }}, .{line, start}};
     return stmt;
 }
-
-// create_switch_case_stmt :: (condition: *Expr_Ast, body: [..]*Stmt_Ast, default: bool, line: int, start: int) ->  *Switch_Case_Stmt_Ast {
-//     if !default assert(condition != null, "condition cannot be null");
-//     case_stmt := New(Switch_Case_Stmt_Ast);
-//     case_stmt.* = .{ condition, body, default };
-//     return case_stmt;
-// }
 
 create_if_stmt :: (condition: *Expr_Ast, if_block: *Stmt_Ast, else_block: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast {
     assert(condition != null, "condition cannot be null");
