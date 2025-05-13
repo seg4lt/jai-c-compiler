@@ -5,7 +5,7 @@
         "name": "Run Current Jai File",
         "type": "lldb",
         "request": "launch",
-        "program": "./out/target",
+        "program": "./out/jaicc",
         "args": ["./c/main.c"],
         "preLaunchTask": "Compile Current Jai File",
         "console": "integratedTerminal"
