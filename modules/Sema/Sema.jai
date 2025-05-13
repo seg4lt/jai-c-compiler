@@ -11,12 +11,16 @@ sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter, do_print: bool = fa
     }
 }
 
-make_variable :: (name: string, n: int) -> string {
-    return tprint("var_%.%", name, n);
+get_4_digit_random :: () -> u64 {
+    return random_get() % 10000;
 }
 
-make_goto_label :: (name: string, n: int) -> string {
-    return tprint("goto_l_%.%", name, n);
+make_variable :: (name: string) -> string {
+    return tprint("var_%.r%", name, get_4_digit_random());
+}
+
+make_goto_label :: (name: string) -> string {
+    return tprint("goto_l_%.r%", name, get_4_digit_random());
 }
 
 #scope_module

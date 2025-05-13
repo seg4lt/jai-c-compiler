@@ -173,6 +173,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
         case .FOR;
             for_stmt := stmt_ast.as.for_stmt;
             loop_start_label := tprint("%_start", for_stmt.label);
+            loop_post_expr_label := tprint("%_post_expr", for_stmt.label);
             loop_end_label := tprint("%_end", for_stmt.label);
 
             if #complete for_stmt.init.type == {
@@ -183,8 +184,14 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
                         gen_instructions(tc, instructions, for_stmt.init.as.expr);
                     }
             }
-            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+            // jump to loop start - as first time you come into this phase, you don't want to run post expr
+            array_add(instructions, .{.JUMP, .{ jump = loop_start_label}});
 
+            array_add(instructions, .{.LABEL, .{label = loop_post_expr_label}});
+            if for_stmt.post != null  gen_instructions(tc, instructions, for_stmt.post);
+
+            // Loop start - includes the condition and jump to body if needed
+            array_add(instructions, .{.LABEL, .{label = loop_start_label}});
             if for_stmt.condition != null {
                 condition := gen_instructions(tc, instructions, for_stmt.condition);
                 array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, loop_end_label } } });
@@ -192,19 +199,20 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
 
             gen_instructions(tc, instructions, for_stmt.body);
 
-            if for_stmt.post != null gen_instructions(tc, instructions, for_stmt.post);
 
-            array_add(instructions, .{.JUMP, .{ jump = loop_start_label}});
+            array_add(instructions, .{.JUMP, .{ jump = loop_post_expr_label}});
             array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .DO_WHILE;
             do_while_stmt := stmt_ast.as.do_while;
             loop_start_label := tprint("%_start", do_while_stmt.label);
             loop_end_label := tprint("%_end", do_while_stmt.label);
+            loop_post_expr_label := tprint("%_post_expr", do_while_stmt.label);
 
             array_add(instructions, .{.LABEL, .{label = loop_start_label}});
 
             gen_instructions(tc, instructions, do_while_stmt.body);
 
+            array_add(instructions, .{.LABEL, .{label = loop_post_expr_label}});
             condition := gen_instructions(tc, instructions, do_while_stmt.condition);
             array_add(instructions, .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{ condition, loop_start_label } } });
 
@@ -213,8 +221,10 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             while_stmt := stmt_ast.as.while_stmt;
             loop_start_label := tprint("%_start", while_stmt.label);
             loop_end_label := tprint("%_end", while_stmt.label);
+            loop_post_expr_label := tprint("%_post_expr", while_stmt.label);
 
             array_add(instructions, .{.LABEL, .{label = loop_start_label}});
+            array_add(instructions, .{.LABEL, .{label = loop_post_expr_label}});
 
             condition := gen_instructions(tc, instructions, while_stmt.condition);
             array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, loop_end_label } } });
@@ -226,11 +236,11 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .BREAK;
             break_stmt := stmt_ast.as.break_stmt;
-            loop_end_label := tprint("%_end",break_stmt);
+            loop_end_label := tprint("%_end", break_stmt);
             array_add(instructions, .{.JUMP, .{ jump = loop_end_label }});
         case .CONTINUE;
             continue_stmt := stmt_ast.as.continue_stmt;
-            loop_start_label := tprint("%_start", continue_stmt);
+            loop_start_label := tprint("%_post_expr", continue_stmt);
             array_add(instructions, .{.JUMP, .{ jump = loop_start_label }});
         case .NULL;
                 // pass through - nothing to do when null stmt is received
@@ -244,6 +254,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_
 
 gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast) {
     s_expr := switch_ast.condition;
+    switch_expr_val := gen_instructions(tc, instructions, s_expr);
 
     // @note
     // Add jump instruction for all cases first
@@ -254,14 +265,19 @@ gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
         if it.is_default continue;
 
         // we create an expression to check if matches case we have
-        constant_expr := create_constant_expr(string_to_int(it.value), 0, 0);
-        condition_expr_ast := create_binary_expr(.EQUAL_EQUAL, s_expr, constant_expr, 0, 0);
-        defer free(condition_expr_ast);
+        /**
+        // constant_expr := create_constant_expr(string_to_int(it.value), 0, 0);
+        // condition_expr_ast := create_binary_expr(.EQUAL_EQUAL, create_constant_expr(), constant_expr, 0, 0);
+        // defer free(condition_expr_ast);
+        **/
+        case_value := Val_Tacky.{.CONSTANT, .{constant = string_to_int(it.value) }};
+        condition := make_var(tc);
+        array_add(instructions, .{.BINARY, .{binary= .{ .EQUAL_EQUAL, switch_expr_val, case_value, condition}}});
 
         // we gen the instruction for the expr we created
         // if it mathces, we jump the the case label
-        condition := gen_instructions(tc, instructions, condition_expr_ast);
-        array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, it.label } } });
+        // condition := gen_instructions(tc, instructions, condition_expr_ast);
+        array_add(instructions, .{ .JUMP_IF_NOT_ZERO, .{ jump_if_zero = .{ condition, it.label } } });
     }
     // handling default case separately as this is if nothing matches
     for switch_ast.cases_label {
@@ -272,14 +288,14 @@ gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
 
     // by this point we have added required jump instructions to correct cases
     // if nothing maches we need to go to end to the switch
-    switch_end_label := make_label(tc, "switch_end");
-    array_add(instructions, .{.JUMP, .{  jump = switch_end_label.as.label }});
+    switch_end_label := tprint("%_end", switch_ast.label);
+    array_add(instructions, .{.JUMP, .{  jump = switch_end_label }});
 
     // now add instruction for all cases
     gen_instructions(tc, instructions, switch_ast.body);
 
     // this is to mark end of switch to jump if nothing matches
-    array_add(instructions, switch_end_label);
+    array_add(instructions, .{.LABEL, .{label =switch_end_label}});
 }
 
 gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {

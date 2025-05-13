@@ -39,6 +39,9 @@ Extras
 - https://docs.oracle.com/cd/E19253-01/817-5477/index.html
 - https://www.jdoodle.com/compile-assembler-gcc-online
 - https://www.onlinegdb.com/online_c_compiler
+- https://docs.oracle.com/cd/E19695-01/802-1948/802-1948.pdf
+- https://www.felixcloutier.com/x86/
+- https://web.stanford.edu/class/cs107/guide/x86-64.html
 - Reference book: https://nostarch.com/writing-c-compiler
 - Test was copied from : https://github.com/nlsandler/writing-a-c-compiler-tests
 
