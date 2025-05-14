@@ -19,10 +19,6 @@ parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = f
     if do_print {
         writer := make_stdout_writer();
         print_program_ast(*writer, program);
-        // sb: String_Builder;
-        // writer := make_sb_writer(*sb);
-        // print_program_ast(*writer, program);
-        // print("%", builder_to_string(*sb));
     }
     return program;
 }
@@ -45,7 +41,7 @@ parse_program_ast :: (parser: *Parser) -> *Program_Ast {
     return create_program_ast(fn);
 }
 
-parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
+parse_fn_ast :: (parser: *Parser) -> *Fn_Decl_Ast {
     consume(parser, .INT);
     ident_token := consume(parser, .IDENT);
 
@@ -55,7 +51,7 @@ parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
 
     body := parse_block_ast(parser);
 
-    return create_fn_ast(ident_token.value, body, ident_token.line, ident_token.start);
+    return create_fn_decl_ast(ident_token.value, body, ident_token.line, ident_token.start);
 }
 
 
@@ -97,7 +93,7 @@ parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
     } else null;
 
     consume(parser, .SEMICOLON);
-    return create_decl_ast(ident, expr, ident_tok.line, ident_tok.start);
+    return create_var_decl_ast(ident, expr, ident_tok.line, ident_tok.start);
 }
 
 parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
@@ -139,6 +135,7 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
             null_tok := consume(parser, .SEMICOLON);
             return create_null_stmt(null_tok.line, null_tok.start);
     }
+    // .LABEL;
     if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
         token := consume(parser, .IDENT);
         consume(parser, .COLON);
@@ -153,9 +150,7 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
 parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
     switch_tok := consume(parser, .SWITCH);
     consume(parser, .LPAREN);
-    //@todo
-    // add check to verify that condition is of correct type (i.e. int)
-    // should we do that on sema phase?
+
     condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
 
@@ -346,7 +341,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             return create_assignment_expr(var_clone, binary, postfix_op_token.line, postfix_op_token.start);
         case .LPAREN;
             grp_start_tok := consume(parser, .LPAREN);
-            inner_expr := parse_expr(parser, 0); // grp resets precedence level for its internal expr
+            inner_expr := parse_expr(parser, 0);
             expr := create_group_expr(inner_expr, grp_start_tok.line, grp_start_tok.start);
             consume(parser, .RPAREN);
             parse_postfix_expr_ast(parser, expr);
@@ -560,7 +555,7 @@ consume :: (using parser: *Parser) -> Token {
     return peek(parser);
 }
 
-consume:: (parser: *Parser, token_type: Token_Type) -> Token {
+consume :: (parser: *Parser, token_type: Token_Type) -> Token {
     tok := peek(parser);
     if tok.type != token_type parse_err(parser, "Expected % found %", token_type, tok.type);
     parser.current += 1;

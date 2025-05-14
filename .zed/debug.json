@@ -1,0 +1,14 @@
+[
+  {
+    "label": "Debug jaicc",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "./out/jaicc",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "build": {
+      "label": "Compile jaicc",
+      "command": "jai",
+      "args": ["build.jai"]
+    }
+  }
+]

@@ -1,12 +1,19 @@
 sema_label_resolution :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
-    sema_label_res_fn(ast.fn, error_reporter);
+    label_fn(ast.fn, error_reporter);
 }
 
 #scope_file
 
-Label_Store :: Table(string, struct { owing_block: bool; processed_label: string; loc: Source_Location; });
+Label_Store :: Table(
+    string,
+    struct {
+        owing_block: bool; 
+        processed_label: string; 
+        loc: Source_Location; 
+    }
+);
 
-sema_label_res_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
+label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     label_store : Label_Store;
     init(*label_store);
     defer deinit(*label_store);
@@ -14,7 +21,7 @@ sema_label_res_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
     // @note
     // find all labels in source code
     // doing this so we can make sure goto is pointing to correct label
-    sema_label_resolution_block(fn.block, *label_store, error_reporter);
+    label_block(fn.block, *label_store, error_reporter);
 
     goto_labels: Label_Store;
     init(*goto_labels);
@@ -22,7 +29,7 @@ sema_label_res_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
 
     // @note
     // resolve all goto with correct label
-    sema_goto_resolution_block(fn.block, *goto_labels, *label_store, error_reporter);
+    resolve_block(fn.block, *goto_labels, *label_store, error_reporter);
  
     // @note
     // any ghost labels?
@@ -33,43 +40,42 @@ sema_label_res_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
     }
 }
 
-sema_goto_resolution_block :: (block: *Block_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
+resolve_block :: (block: *Block_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     for block.items {
         if #complete it.type == {
             case .DECL; // noop
-            case .STMT; sema_goto_resolution_stmt(it.as.stmt, goto_labels, label_store, error_reporter);
+            case .STMT; resolve_stmt(it.as.stmt, goto_labels, label_store, error_reporter);
         }
     }
 }
 
-sema_label_resolution_block :: (block: *Block_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
-    sema_label_resolution_block_item(*block.items, label_store, error_reporter);
+label_block :: (block: *Block_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
+    label_block_item(*block.items, label_store, error_reporter);
 }
 
-sema_label_resolution_block_item :: (block_items: *[..]*Block_Item_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
-    // gather all labels
+label_block_item :: (block_items: *[..]*Block_Item_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     for block_items.* {
         if #complete it.type == {
             case .DECL; // noop
             case .STMT; 
-                sema_label_resolution_stmt(it.as.stmt, label_store, error_reporter);
+                label_stmt(it.as.stmt, label_store, error_reporter);
         }
     }
    
 }
 
-sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
+label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
         case .RETURN;
-            sema_label_resolution_expr(stmt.as.return_stmt.expr, label_store, error_reporter);
+            label_expr(stmt.as.return_stmt.expr, label_store, error_reporter);
         case .EXPR;
-            sema_label_resolution_expr(stmt.as.expr, label_store, error_reporter);
+            label_expr(stmt.as.expr, label_store, error_reporter);
         case .IF;
             if_stmt := stmt.as.if_stmt;
-            sema_label_resolution_expr(if_stmt.condition, label_store, error_reporter);
-            sema_label_resolution_stmt(if_stmt.if_block, label_store, error_reporter);
+            label_expr(if_stmt.condition, label_store, error_reporter);
+            label_stmt(if_stmt.if_block, label_store, error_reporter);
             if stmt.as.if_stmt.else_block != null
-                sema_label_resolution_stmt(if_stmt.else_block, label_store, error_reporter);
+                label_stmt(if_stmt.else_block, label_store, error_reporter);
         case .LABEL; 
             if table_contains(label_store, stmt.as.label.label) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "duplicate label declaration! : %", stmt.as.label);
@@ -77,21 +83,21 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error
             new_label := make_goto_label(stmt.as.label.label);
             table_set(label_store, stmt.as.label.label, .{true, new_label, stmt.loc});
             stmt.* = .{ .LABEL, .{ label = .{new_label, stmt.as.label.stmt }}, stmt.loc};
-            sema_label_resolution_stmt(stmt.as.label.stmt, label_store, error_reporter);
+            label_stmt(stmt.as.label.stmt, label_store, error_reporter);
         case .COMPOUND; 
             compound := stmt.as.compound;
-            sema_label_resolution_block(compound, label_store, error_reporter);
+            label_block(compound, label_store, error_reporter);
         case .FOR;
             for_stmt := stmt.as.for_stmt;
-            sema_label_resolution_stmt(for_stmt.body, label_store, error_reporter);
+            label_stmt(for_stmt.body, label_store, error_reporter);
         case .DO_WHILE;
             do_while_stmt := stmt.as.do_while;
-            sema_label_resolution_stmt(do_while_stmt.body, label_store, error_reporter);
+            label_stmt(do_while_stmt.body, label_store, error_reporter);
         case .WHILE;
             while_stmt := stmt.as.while_stmt;
-            sema_label_resolution_stmt(while_stmt.body, label_store, error_reporter);
+            label_stmt(while_stmt.body, label_store, error_reporter);
         case .SWITCH;
-            sema_label_resolution_block_item(*stmt.as.switch.body, label_store, error_reporter);
+            label_block_item(*stmt.as.switch.body, label_store, error_reporter);
         case .GOTO; #through;
         case .CONTINUE; #through;
         case .BREAK; #through;
@@ -102,23 +108,23 @@ sema_label_resolution_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error
     }
 }
 
-sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
+resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete stmt.type == {
         case .SWITCH;
             for stmt.as.switch.body {
                 if #complete it.type == {
                     case .DECL; // noop
-                    case .STMT; sema_goto_resolution_stmt(it.as.stmt, goto_labels, label_store, error_reporter);
+                    case .STMT; resolve_stmt(it.as.stmt, goto_labels, label_store, error_reporter);
                 }
             }
         case .RETURN;
-            sema_goto_resolution_expr(stmt.as.return_stmt.expr, goto_labels, label_store, error_reporter);
+            resolve_expr(stmt.as.return_stmt.expr, goto_labels, label_store, error_reporter);
         case .EXPR;
-            sema_goto_resolution_expr(stmt.as.expr, goto_labels, label_store, error_reporter);
+            resolve_expr(stmt.as.expr, goto_labels, label_store, error_reporter);
         case .IF;
-            sema_goto_resolution_expr(stmt.as.if_stmt.condition, goto_labels, label_store, error_reporter);
-            sema_goto_resolution_stmt(stmt.as.if_stmt.if_block, goto_labels,label_store, error_reporter);
-            if stmt.as.if_stmt.else_block != null sema_goto_resolution_stmt(stmt.as.if_stmt.else_block, goto_labels, label_store, error_reporter);
+            resolve_expr(stmt.as.if_stmt.condition, goto_labels, label_store, error_reporter);
+            resolve_stmt(stmt.as.if_stmt.if_block, goto_labels,label_store, error_reporter);
+            if stmt.as.if_stmt.else_block != null resolve_stmt(stmt.as.if_stmt.else_block, goto_labels, label_store, error_reporter);
         case .GOTO; 
             value, success := table_find(label_store, stmt.as.goto);
             if !success {
@@ -128,18 +134,18 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_
             stmt.* = .{.GOTO, .{goto = value.processed_label}, .{stmt.loc.line, stmt.loc.start}};
         case .COMPOUND; 
             compound := stmt.as.compound;
-            sema_goto_resolution_block(compound, goto_labels, label_store, error_reporter);
+            resolve_block(compound, goto_labels, label_store, error_reporter);
         case .FOR;
             for_stmt := stmt.as.for_stmt;
-            sema_goto_resolution_stmt(stmt.as.for_stmt.body, goto_labels, label_store, error_reporter);
+            resolve_stmt(stmt.as.for_stmt.body, goto_labels, label_store, error_reporter);
         case .DO_WHILE;
-            sema_goto_resolution_expr(stmt.as.do_while.condition, goto_labels, label_store, error_reporter);
-            sema_goto_resolution_stmt(stmt.as.do_while.body, goto_labels, label_store, error_reporter);
+            resolve_expr(stmt.as.do_while.condition, goto_labels, label_store, error_reporter);
+            resolve_stmt(stmt.as.do_while.body, goto_labels, label_store, error_reporter);
         case .WHILE;
-            sema_goto_resolution_expr(stmt.as.while_stmt.condition, goto_labels, label_store, error_reporter);
-            sema_goto_resolution_stmt(stmt.as.while_stmt.body, goto_labels, label_store, error_reporter);
+            resolve_expr(stmt.as.while_stmt.condition, goto_labels, label_store, error_reporter);
+            resolve_stmt(stmt.as.while_stmt.body, goto_labels, label_store, error_reporter);
         case .LABEL;
-            sema_goto_resolution_stmt(stmt.as.label.stmt, goto_labels, label_store, error_reporter);
+            resolve_stmt(stmt.as.label.stmt, goto_labels, label_store, error_reporter);
         case .CONTINUE; #through;
         case .BREAK; #through;
         case .DEFAULT; #through;
@@ -149,24 +155,23 @@ sema_goto_resolution_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_
     }
 }
 
-sema_goto_resolution_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, error_reporter: *Error_Reporter) {
+resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
+        case .GROUP; 
+            resolve_expr(expr.as.group, goto_labels, label_store, error_reporter);
+        case .TERNARY;
+            ternary := expr.as.ternary;
+            resolve_expr(ternary.true_expr, goto_labels, label_store, error_reporter);
+            resolve_expr(ternary.false_expr, goto_labels, label_store, error_reporter);
         case .CONSTANT; #through;
         case .UNARY;  #through;
         case .BINARY; #through;
         case .ASSIGNMENT; #through;
         case .VAR; // noop
-
-        case .GROUP; 
-            sema_goto_resolution_expr(expr.as.group, goto_labels, label_store, error_reporter);
-        case .CONDITIONAL;
-            conditional := expr.as.conditional;
-            sema_goto_resolution_expr(conditional.true_block, goto_labels, label_store, error_reporter);
-            sema_goto_resolution_expr(conditional.false_block, goto_labels, label_store, error_reporter);
     }
 }
 
-sema_label_resolution_expr :: (expr: *Expr_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
+label_expr :: (expr: *Expr_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
         case .CONSTANT; #through;
         case .UNARY;  #through;
@@ -175,10 +180,10 @@ sema_label_resolution_expr :: (expr: *Expr_Ast, label_store: *Label_Store, error
         case .VAR; // noop
 
         case .GROUP; 
-            sema_label_resolution_expr(expr.as.group, label_store, error_reporter);
-        case .CONDITIONAL;
-            conditional := expr.as.conditional;
-            sema_label_resolution_expr(conditional.true_block, label_store, error_reporter);
-            sema_label_resolution_expr(conditional.false_block, label_store, error_reporter);
+            label_expr(expr.as.group, label_store, error_reporter);
+        case .TERNARY;
+            ternary := expr.as.ternary;
+            label_expr(ternary.true_expr, label_store, error_reporter);
+            label_expr(ternary.false_expr, label_store, error_reporter);
     }
 }
