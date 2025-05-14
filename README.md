@@ -10,6 +10,7 @@ Simple implementation of c-compiler using Jai
 - [ ] Revamp output printer and add tests
 - [ ] Function pointers
     - Implement after arrays are added
+- [ ] Support sending multiple files
 
 
 # Notes

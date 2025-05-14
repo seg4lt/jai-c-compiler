@@ -7,6 +7,8 @@ code_emm :: (src_path_no_ext: string, program: *Program_Asm) {
     ce_program(*writer, program);
 }
 
+#scope_module
+
 ce_program :: (writer: *Writer, using program: *Program_Asm) {
     if program == null return;
     defer {
