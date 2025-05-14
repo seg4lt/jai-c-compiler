@@ -33,7 +33,12 @@ Extras
 - `--bitwise --compound --increment`
 
 
-# References;
+# Clone Repo Notes
+- Initial clone: `git clone --recurse-submodules <repository_url>`
+- If you already cloned the repository without `--recurse-submodules`, you can initialize and update the submodules afterward: `git submodule update --init --recursive`
+
+
+# References
 - https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 - https://web.stanford.edu/class/cs107/resources/x86-64-reference.pdf
 - https://docs.oracle.com/cd/E19253-01/817-5477/index.html
