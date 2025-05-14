@@ -1,3 +1,4 @@
+#load "Asm_Nodes.jai";
 #load "Asm_Gen.jai";
 #load "Asm_Gen_Printer.jai";
 

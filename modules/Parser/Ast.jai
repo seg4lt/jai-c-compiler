@@ -76,7 +76,7 @@ Case_Label_Info :: struct {
 }
 
 Expr_Ast :: struct {
-    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; CONDITIONAL;}
+    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; TERNARY;}
     as: union {
         constant: int;
         unary: struct { op: Unary_Operator; expr: *Expr_Ast; };
@@ -84,7 +84,7 @@ Expr_Ast :: struct {
         group: *Expr_Ast;
         var: string; // this is when we use a variable
         assignment: struct { dst: *Expr_Ast; src: *Expr_Ast; };
-        conditional: struct {condition: *Expr_Ast; true_block: *Expr_Ast; false_block: *Expr_Ast;};
+        ternary: struct {condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast;};
     };
     postfix:  enum {NONE;INCR;DECR;} = .NONE;
     loc: Source_Location;
@@ -271,12 +271,12 @@ create_assignment_expr :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int
 
 
 
-create_ternary_expr :: (condition: *Expr_Ast, true_block: *Expr_Ast, false_block: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+create_ternary_expr :: (condition: *Expr_Ast, true_expr: *Expr_Ast, false_expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(condition != null, "condition cannot be null");
-    assert(true_block != null, "true_block cannot be null");
-    assert(false_block != null, "false_block cannot be null");
+    assert(true_expr != null, "true_expr cannot be null");
+    assert(false_expr != null, "false_expr cannot be null");
     expr := New(Expr_Ast);
-    expr.* = .{.CONDITIONAL, .{ conditional = .{ condition, true_block, false_block }}, postfix, .{line, start}};
+    expr.* = .{.TERNARY, .{ ternary = .{ condition, true_expr, false_expr }}, postfix, .{line, start}};
     return expr;
 }
 

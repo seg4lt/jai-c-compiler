@@ -158,16 +158,16 @@ print_expr_ast :: (writer: *Writer, expr: *Expr_Ast, depth: int = 0) {
             print_expr_ast(writer, expr.as.assignment.dst, depth);
             write(writer, "・=・");
             print_expr_ast(writer, expr.as.assignment.src, depth);
-        case .CONDITIONAL;
+        case .TERNARY;
             write(writer, "[TERNARY]");
             print_space(writer, depth + 1);
-            print_expr_ast(writer, expr.as.conditional.condition, depth);
+            print_expr_ast(writer, expr.as.ternary.condition, depth);
             print_space(writer, depth + 1);
             write(writer, "・?・");
-            print_expr_ast(writer, expr.as.conditional.true_block, depth+2);
+            print_expr_ast(writer, expr.as.ternary.true_expr, depth+2);
             print_space(writer, depth + 1);
             write(writer, "・:・");
-            print_expr_ast(writer, expr.as.conditional.false_block, depth+2);
+            print_expr_ast(writer, expr.as.ternary.false_expr, depth+2);
     }
     if #complete expr.postfix  == {
         case .INCR; write(writer, "[POSTFIX]・++");

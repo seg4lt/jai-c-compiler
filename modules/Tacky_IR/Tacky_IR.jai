@@ -1,71 +1,3 @@
-Program_Tacky :: struct {
-    fn: Fn_Tacky;
-}
-
-Fn_Tacky :: struct {
-    ident: string;
-    instructions: []Instruction_Tacky;
-}
-
-Instruction_Type_Tacky :: enum {
-    RETURN; 
-    UNARY; 
-    BINARY;
-    COPY;
-    JUMP;
-    JUMP_IF_ZERO;
-    JUMP_IF_NOT_ZERO;
-    LABEL;
-}
-
-Instruction_Tacky :: struct {
-    type: Instruction_Type_Tacky;
-    as : union {
-        ret: Val_Tacky;
-        unary: struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky;};
-        binary: struct { op: Bin_Op_Type_Tacky; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; };
-        copy: struct {src: Val_Tacky; dst: Val_Tacky;};
-        jump: string;
-        jump_if_zero: struct {condition: Val_Tacky; ident: string;};
-        jump_if_not_zero: struct {condition: Val_Tacky; ident: string;};
-        label: string;
-    };
-}
-
-Unary_Op_Type_Tacky :: enum {
-  BITWISE_NOT; NEGATE; NOT;
-}
-
-Bin_Op_Type_Tacky ::enum {
-    ADD;
-    SUB;
-    MUL;
-    DIV;
-    MOD;
-    BITWISE_AND;
-    BITWISE_OR;
-    BITWISE_XOR;
-    LEFT_SHIFT;
-    RIGHT_SHIFT;
-
-    EQUAL_EQUAL; NOT_EQUAL;
-    LESS; LESS_EQUAL;
-    GREATER; GREATER_EQUAL;
-}
-
-Val_Tacky :: struct {
-    type: enum { CONSTANT; VARIABLE; };
-    as: union {
-        constant: int;
-        variable: string;
-    };
-}
-
-Tacky_Ctx :: struct {
-    temp_var_index: int = 0;
-    label_index: int = 0;
-}
-
 gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
     tc : Tacky_Ctx;
     fn := gen_fn_tacky(*tc, program_ast.fn);
@@ -199,13 +131,16 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
 
             gen_instructions(tc, instructions, for_stmt.body);
 
-
             array_add(instructions, .{.JUMP, .{ jump = loop_post_expr_label}});
             array_add(instructions, .{.LABEL, .{label = loop_end_label}});
         case .DO_WHILE;
             do_while_stmt := stmt_ast.as.do_while;
             loop_start_label := tprint("%_start", do_while_stmt.label);
             loop_end_label := tprint("%_end", do_while_stmt.label);
+            // @refactor
+            // adding post expr just because I am handling continue to go to post expr
+            // this makes it easier to model for loop
+            // Maybe there is a better way to do this but..... this is what we have for now
             loop_post_expr_label := tprint("%_post_expr", do_while_stmt.label);
 
             array_add(instructions, .{.LABEL, .{label = loop_start_label}});
@@ -221,6 +156,10 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             while_stmt := stmt_ast.as.while_stmt;
             loop_start_label := tprint("%_start", while_stmt.label);
             loop_end_label := tprint("%_end", while_stmt.label);
+            // @refactor
+            // adding post expr just because I am handling continue to go to post expr
+            // this makes it easier to model for loop
+            // Maybe there is a better way to do this but..... this is what we have for now
             loop_post_expr_label := tprint("%_post_expr", while_stmt.label);
 
             array_add(instructions, .{.LABEL, .{label = loop_start_label}});
@@ -256,20 +195,13 @@ gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
     s_expr := switch_ast.condition;
     switch_expr_val := gen_instructions(tc, instructions, s_expr);
 
-    // @note
     // Add jump instruction for all cases first
     // We still don't emit the instruction for each case
-
     // handle non-default first
     for switch_ast.cases_label {
         if it.is_default continue;
 
         // we create an expression to check if matches case we have
-        /**
-        // constant_expr := create_constant_expr(string_to_int(it.value), 0, 0);
-        // condition_expr_ast := create_binary_expr(.EQUAL_EQUAL, create_constant_expr(), constant_expr, 0, 0);
-        // defer free(condition_expr_ast);
-        **/
         case_value := Val_Tacky.{.CONSTANT, .{constant = string_to_int(it.value) }};
         condition := make_var(tc);
         array_add(instructions, .{.BINARY, .{binary= .{ .EQUAL_EQUAL, switch_expr_val, case_value, condition}}});
@@ -331,19 +263,18 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
         case .CONSTANT;
             return .{.CONSTANT, .{constant = expr_ast.as.constant}};
         case .VAR;
-            expr_value := Val_Tacky.{.VARIABLE, .{variable = expr_ast.as.var}};
-            // return gen_inst_for_possible_postfix(tc, instructions, expr_ast, expr_value);
-            return expr_value;
+            return .{.VARIABLE, .{variable = expr_ast.as.var}};
         case .ASSIGNMENT; 
-            result := gen_instructions(tc, instructions, expr_ast.as.assignment.src);
+            assignment := expr_ast.as.assignment;
+            result := gen_instructions(tc, instructions, assignment.src);
+            if assignment.dst.type != .VAR
+                assert(false, "What!! dst has to be variable. sema didn't catch this!!! : %", assignment.dst);
 
-            if expr_ast.as.assignment.dst.type != .VAR assert(false, "What!! dst has to be variable. sema didn't catch this!!! : %", expr_ast.as.assignment.dst);
-
-            dst := Val_Tacky.{.VARIABLE, .{ variable = expr_ast.as.assignment.dst.as.var}};
+            dst := Val_Tacky.{.VARIABLE, .{ variable = assignment.dst.as.var}};
             array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             return dst;
-        case .CONDITIONAL;
-            ternary := expr_ast.as.conditional;
+        case .TERNARY;
+            ternary := expr_ast.as.ternary;
             dst := make_var(tc);
             result : Val_Tacky = ---;
 
@@ -355,14 +286,14 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
             array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, ternary_else.as.label } } });
 
             { // true
-                result = gen_instructions(tc, instructions, ternary.true_block);
+                result = gen_instructions(tc, instructions, ternary.true_expr);
                 array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
                 array_add(instructions, .{.JUMP, .{jump = ternary_end.as.label}});
             }
 
             { // false
                 array_add(instructions, ternary_else);
-                result = gen_instructions(tc, instructions, ternary.false_block);
+                result = gen_instructions(tc, instructions, ternary.false_expr);
                 array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
             }
             array_add(instructions, ternary_end); 
@@ -371,7 +302,8 @@ gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
 }
 
 gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast, expr_val_tacky: Val_Tacky) -> Val_Tacky {
-    if (expr_ast.postfix == .NONE) return expr_val_tacky;
+    if expr_ast.postfix == .NONE return expr_val_tacky;
+
     old_value_dst := make_var(tc);
     old_value := Instruction_Tacky.{.COPY, .{copy = .{src = expr_val_tacky, dst = old_value_dst }}};
     array_add(instructions, old_value);
@@ -386,7 +318,8 @@ gen_inst_for_possible_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction
             dst := make_var(tc);
             array_add(instructions, .{.BINARY, .{binary= .{ .SUB, expr_val_tacky, one, dst}}});
             array_add(instructions, .{.COPY, .{copy = .{src = dst, dst = expr_val_tacky}}});
-        case .NONE; assert(false, "unreachable");
+        case .NONE; 
+            assert(false, "unreachable");
     }
     return old_value_dst;
 }
@@ -427,18 +360,15 @@ gen_logical_or_instruction :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
     array_add(instructions, .{.JUMP_IF_NOT_ZERO, .{jump_if_not_zero = .{src2,label_false.as.label}}});
 
     result_var := make_var(tc);
-    one := Val_Tacky.{.CONSTANT, .{constant = 1 }};
-    zero := Val_Tacky.{.CONSTANT, .{constant = 0 }};
+    one := Val_Tacky.{.CONSTANT, .{ constant = 1 }};
+    zero := Val_Tacky.{.CONSTANT, .{ constant = 0 }};
     array_add(instructions, .{.COPY, .{copy = .{zero, result_var}}});
 
     label_end := make_label(tc, "logical_cmp_end");
 
     array_add(instructions,.{.JUMP, .{jump = label_end.as.label}});
-
     array_add(instructions, label_false);
-
     array_add(instructions, .{.COPY, .{copy = .{one, result_var}}});
-
     array_add(instructions, label_end);
 
     return result_var;
