@@ -41,7 +41,7 @@ parse_program_ast :: (parser: *Parser) -> *Program_Ast {
     return create_program_ast(fn);
 }
 
-parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
+parse_fn_ast :: (parser: *Parser) -> *Fn_Decl_Ast {
     consume(parser, .INT);
     ident_token := consume(parser, .IDENT);
 
@@ -51,7 +51,7 @@ parse_fn_ast :: (parser: *Parser) -> *Fn_Ast {
 
     body := parse_block_ast(parser);
 
-    return create_fn_ast(ident_token.value, body, ident_token.line, ident_token.start);
+    return create_fn_decl_ast(ident_token.value, body, ident_token.line, ident_token.start);
 }
 
 
@@ -93,7 +93,7 @@ parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
     } else null;
 
     consume(parser, .SEMICOLON);
-    return create_decl_ast(ident, expr, ident_tok.line, ident_tok.start);
+    return create_var_decl_ast(ident, expr, ident_tok.line, ident_tok.start);
 }
 
 parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {

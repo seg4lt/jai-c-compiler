@@ -42,6 +42,7 @@ scan :: (using lexer: *Lexer) {
             case #char "}"; add_token(lexer, .RCURLY);
             case #char ";"; add_token(lexer, .SEMICOLON);
             case #char "~"; add_token(lexer, .BITWISE_NOT);
+            case #char ","; add_token(lexer, .COMMA);
             case #char "+"; 
                 if peek(lexer) == #char "=" {
                     consume(lexer);

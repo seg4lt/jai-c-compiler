@@ -13,7 +13,7 @@ Label_Store :: Table(
     }
 );
 
-label_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
+label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     label_store : Label_Store;
     init(*label_store);
     defer deinit(*label_store);

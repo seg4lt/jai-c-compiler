@@ -12,7 +12,7 @@ gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Pro
     return program;
 }
 
-gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Ast) -> Fn_Tacky {
+gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
     gen_instructions(tc, *instructions, fn_ast.block);
     // Always add return 0 as there might be case where we don't have one
@@ -38,13 +38,21 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block
 }
 
 gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast) {
-    if (decl_ast.init == null) {
-        // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
-        return;
+
+    if #complete decl_ast.type == {
+        case .VAR;
+            var_decl := decl_ast.as.var;
+            if (var_decl.init == null) {
+                // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
+                return;
+            }
+            result := gen_instructions(tc, instructions, var_decl.init);
+            dst := Val_Tacky.{.VARIABLE, .{ variable = var_decl.ident}};
+            array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+        case .FN;
+            assert(false, "NOT IMPLEMENTED");
     }
-    result := gen_instructions(tc, instructions, decl_ast.init);
-    dst := Val_Tacky.{.VARIABLE, .{ variable = decl_ast.ident}};
-    array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
+
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_ast: *Stmt_Ast) {

@@ -1,11 +1,11 @@
 print_program_ast :: (writer: *Writer, program: *Program_Ast, depth: int = 0) {
     write(writer, "-- AST --\n");
     write(writer, "[PROGRAM]・");
-    print_fn_ast(writer, program.fn, depth + 1);
+    print_fn_decl_ast(writer, program.fn, depth + 1);
     write(writer, "\n");
 }
 
-print_fn_ast :: (writer: *Writer, fn: *Fn_Ast, depth: int = 0) {
+print_fn_decl_ast :: (writer: *Writer, fn: *Fn_Decl_Ast, depth: int = 0) {
     print_space(writer, depth);
     write(writer, "[FN]・%", fn.ident);
     print_block_ast(writer, fn.block, depth + 1);
@@ -24,11 +24,17 @@ print_block_ast :: (writer: *Writer, block: *Block_Ast, depth: int = 0) {
 }
 
 print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int = 0)  {
-    write(writer, "[DECL]・");
-    write(writer, "%", ident);
-    if init != null {
-        write(writer, "・=・");
-        print_expr_ast(writer, init, depth + 1);
+    if decl.type == {
+        case .VAR;
+            var_decl := as.var;
+            write(writer, "[DECL]・");
+            write(writer, "%", var_decl.ident);
+            if var_decl.init != null {
+                write(writer, "・=・");
+                print_expr_ast(writer, var_decl.init, depth + 1);
+            }
+        case .FN;
+            assert(false, "NOT IMPLEMENTED");
     }
 }
 

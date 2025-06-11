@@ -64,4 +64,6 @@ Token_Type :: enum {
     SWITCH;
     CASE;
     DEFAULT;
+
+    COMMA;
 }

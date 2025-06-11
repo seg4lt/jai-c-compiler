@@ -4,14 +4,9 @@ Source_Location :: struct {
 }
 
 Program_Ast :: struct { 
-    fn: *Fn_Ast; 
+    fn: *Fn_Decl_Ast; 
 }
 
-Fn_Ast :: struct {
-    ident: string;
-    block: *Block_Ast;
-    loc: Source_Location;
-}
 
 Block_Ast :: struct {
     items: [..]*Block_Item_Ast;
@@ -27,10 +22,26 @@ Block_Item_Ast :: struct {
 }
 
 Decl_Ast :: struct {
+    type: enum {
+        FN;
+        VAR;
+    };
+    as: union {
+        fn: *Fn_Decl_Ast;
+        var : *Var_Decl_Ast;
+    }
+}
+
+Fn_Decl_Ast :: struct {
+    ident: string;
+    block: *Block_Ast;
+    loc: Source_Location;
+}
+Var_Decl_Ast :: struct {
     ident: string;
     init: * /*Optional */ Expr_Ast;
     loc: Source_Location;
-}
+} 
 
 For_Init_Ast :: struct {
     type: enum { INIT_DECL; INIT_EXPR; };
@@ -76,7 +87,15 @@ Case_Label_Info :: struct {
 }
 
 Expr_Ast :: struct {
-    type: enum { CONSTANT; UNARY; BINARY; GROUP; VAR; ASSIGNMENT; TERNARY;}
+    type: enum { 
+        CONSTANT;
+        UNARY;
+        BINARY;
+        GROUP;
+        VAR;
+        ASSIGNMENT;
+        TERNARY;
+    }
     as: union {
         constant: int;
         unary: struct { op: Unary_Operator; expr: *Expr_Ast; };
@@ -85,6 +104,7 @@ Expr_Ast :: struct {
         var: string; // this is when we use a variable
         assignment: struct { dst: *Expr_Ast; src: *Expr_Ast; };
         ternary: struct {condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast;};
+        fn_call: struct { ident: string; args: [..]*Expr_Ast; }
     };
     postfix:  enum {NONE;INCR;DECR;} = .NONE;
     loc: Source_Location;
@@ -106,18 +126,18 @@ Binary_Operator :: enum {
 
 #scope_module
 
-create_program_ast :: (fn: *Fn_Ast) -> *Program_Ast {
+create_program_ast :: (fn: *Fn_Decl_Ast) -> *Program_Ast {
     assert(fn != null, "fn cannot be null");
     pg := New(Program_Ast);
     pg.* = .{ fn = fn };
     return pg;
 }
 
-create_fn_ast :: (ident: string, block: *Block_Ast, line: int, start: int) -> *Fn_Ast {
+create_fn_decl_ast :: (ident: string, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast {
     assert(ident != "", "ident cann't be null");
     assert(block != null, "block cannot be null");
 
-    fn := New(Fn_Ast);
+    fn := New(Fn_Decl_Ast);
     fn.* = .{ident, block, .{line, start}};
     return fn;
 }
@@ -142,10 +162,12 @@ create_decl_block_item :: (decl: *Decl_Ast) -> *Block_Item_Ast {
     return item;
 }
 
-create_decl_ast :: (ident: string, init: *Expr_Ast, line: int, start: int) -> *Decl_Ast {
+create_var_decl_ast :: (ident: string, init: *Expr_Ast, line: int, start: int) -> *Decl_Ast {
     assert(ident != "", "ident can't be null");
     decl := New(Decl_Ast);
-    decl.* = .{ident, init, .{line, start}};
+    var := New(Var_Decl_Ast);
+    var.* = .{ident, init, .{line, start}};
+    decl.* = .{.VAR, .{ var = var }};
     return decl;
 }
 
@@ -293,8 +315,6 @@ create_var_expr :: (ident: string, line: int, start: int, postfix: type_of(Expr_
     expr.* = .{.VAR, .{ var = ident }, postfix, .{line, start}};
     return expr;
 }
-
-
 
 create_group_expr :: (expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
     assert(expr != null, "expr cannot be null");

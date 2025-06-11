@@ -69,15 +69,23 @@ resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, error_reporter: *Error_R
 }
 
 resolve_decl:: (decl: *Decl_Ast, scope: *Scope_Idents, error_reporter: *Error_Reporter) {
-    entry, success := table_find(scope, decl.ident);
-    if success && entry.owing_block {
-        error_report(error_reporter, decl.loc.line, decl.loc.start, "duplicate variable declaration! : %", decl.ident);
-    } 
-    new_ident := make_variable(decl.ident);
-    table_set(scope, decl.ident, .{owing_block = true, name = new_ident});
 
-    ifx decl.init resolve_expr(decl.init, scope, error_reporter);
-    decl.* = .{ new_ident, decl.init, decl.loc };
+    if #complete decl.type == {
+        case .VAR;
+            var_decl := decl.as.var;
+            entry, success := table_find(scope, var_decl.ident);
+            if success && entry.owing_block {
+                error_report(error_reporter,var_decl.loc.line, var_decl.loc.start, "duplicate variable declaration! : %", var_decl.ident);
+            } 
+            new_ident := make_variable(var_decl.ident);
+            table_set(scope, var_decl.ident, .{owing_block = true, name = new_ident});
+
+            ifx var_decl.init resolve_expr(var_decl.init, scope, error_reporter);
+            var_decl.* = .{ new_ident, var_decl.init, var_decl.loc };
+        case .FN;
+            unreachable("function declarations not yet supported");
+    }
+
 }
 
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, error_reporter: *Error_Reporter) {

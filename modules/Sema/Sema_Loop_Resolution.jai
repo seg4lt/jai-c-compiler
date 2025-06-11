@@ -4,7 +4,7 @@ sema_loop_labeling :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
 
 #scope_file
 
-label_fn :: (fn: *Fn_Ast, error_reporter: *Error_Reporter) {
+label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     label_info: [..]Label_Info;
     defer free(*label_info);
 
