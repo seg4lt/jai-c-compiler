@@ -7,9 +7,9 @@ sema_label_resolution :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
 Label_Store :: Table(
     string,
     struct {
-        owing_block: bool; 
-        processed_label: string; 
-        loc: Source_Location; 
+        owing_block: bool;
+        processed_label: string;
+        loc: Source_Location;
     }
 );
 
@@ -30,12 +30,12 @@ label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     // @note
     // resolve all goto with correct label
     resolve_block(fn.block, *goto_labels, *label_store, error_reporter);
- 
+
     // @note
     // any ghost labels?
     for goto_labels {
-        value, success := table_find(*label_store, it_index);
-        if !success 
+        success, value := table_find_new(*label_store, it_index);
+        if !success
             error_report(error_reporter, it.loc.line, it.loc.start, "undeclared label: '%'", it_index);
     }
 }
@@ -57,11 +57,11 @@ label_block_item :: (block_items: *[..]*Block_Item_Ast, label_store: *Label_Stor
     for block_items.* {
         if #complete it.type == {
             case .DECL; // noop
-            case .STMT; 
+            case .STMT;
                 label_stmt(it.as.stmt, label_store, error_reporter);
         }
     }
-   
+
 }
 
 label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
@@ -76,7 +76,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error_reporter: *Erro
             label_stmt(if_stmt.if_block, label_store, error_reporter);
             if stmt.as.if_stmt.else_block != null
                 label_stmt(if_stmt.else_block, label_store, error_reporter);
-        case .LABEL; 
+        case .LABEL;
             if table_contains(label_store, stmt.as.label.label) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "duplicate label declaration! : %", stmt.as.label);
             }
@@ -84,7 +84,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, error_reporter: *Erro
             table_set(label_store, stmt.as.label.label, .{true, new_label, stmt.loc});
             stmt.* = .{ .LABEL, .{ label = .{new_label, stmt.as.label.stmt }}, stmt.loc};
             label_stmt(stmt.as.label.stmt, label_store, error_reporter);
-        case .COMPOUND; 
+        case .COMPOUND;
             compound := stmt.as.compound;
             label_block(compound, label_store, error_reporter);
         case .FOR;
@@ -125,14 +125,14 @@ resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label
             resolve_expr(stmt.as.if_stmt.condition, goto_labels, label_store, error_reporter);
             resolve_stmt(stmt.as.if_stmt.if_block, goto_labels,label_store, error_reporter);
             if stmt.as.if_stmt.else_block != null resolve_stmt(stmt.as.if_stmt.else_block, goto_labels, label_store, error_reporter);
-        case .GOTO; 
-            value, success := table_find(label_store, stmt.as.goto);
+        case .GOTO;
+            success, value := table_find_new(label_store, stmt.as.goto);
             if !success {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "undeclared label: '%'", stmt.as.goto);
-            } 
+            }
             table_set(goto_labels, stmt.as.goto, value);
             stmt.* = .{.GOTO, .{goto = value.processed_label}, .{stmt.loc.line, stmt.loc.start}};
-        case .COMPOUND; 
+        case .COMPOUND;
             compound := stmt.as.compound;
             resolve_block(compound, goto_labels, label_store, error_reporter);
         case .FOR;
@@ -157,7 +157,7 @@ resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label
 
 resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
-        case .GROUP; 
+        case .GROUP;
             resolve_expr(expr.as.group, goto_labels, label_store, error_reporter);
         case .TERNARY;
             ternary := expr.as.ternary;
@@ -179,7 +179,7 @@ label_expr :: (expr: *Expr_Ast, label_store: *Label_Store, error_reporter: *Erro
         case .ASSIGNMENT; #through;
         case .VAR; // noop
 
-        case .GROUP; 
+        case .GROUP;
             label_expr(expr.as.group, label_store, error_reporter);
         case .TERNARY;
             ternary := expr.as.ternary;

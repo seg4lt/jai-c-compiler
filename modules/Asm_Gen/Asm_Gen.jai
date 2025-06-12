@@ -40,7 +40,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             src := asm_gen_val_to_operand(*instt.as.ret);
             dst := Operand_Asm.{.REG, .{ reg = .AX}};
             array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
-            array_add(insts, .{ .RET, .{} }); 
+            array_add(insts, .{ .RET, .{} });
         case .UNARY;
             if instt.as.unary.op == .NOT {
                 zero := Operand_Asm.{.IMM, .{imm = 0}};
@@ -59,7 +59,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     case .NEGATE; op = .NEG;
                     case .NOT; assert(false, "unreachable");
                 }
-                array_add(insts, .{ .UNARY, .{unary = .{op, dst}}});  
+                array_add(insts, .{ .UNARY, .{unary = .{op, dst}}});
             }
 
         case .BINARY;
@@ -72,7 +72,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                 case .BITWISE_OR; #through;
                 case .BITWISE_XOR; #through;
                 case .LEFT_SHIFT; #through;
-                case .RIGHT_SHIFT; 
+                case .RIGHT_SHIFT;
                     src1 := asm_gen_val_to_operand(*basm.src1);
                     dst := asm_gen_val_to_operand(*basm.dst);
                     array_add(insts, .{.MOV, .{ mov = .{ src1, dst }}});
@@ -115,12 +115,12 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     src2 := asm_gen_val_to_operand(*basm.src2);
 
                     if basm.src1.type == {
-                        case .CONSTANT; 
+                        case .CONSTANT;
                             src1 := asm_gen_val_to_operand(*basm.src1);
                             ireg := Operand_Asm.{.REG,.{reg = .R11}};
                             array_add(insts, Instruction_Asm.{.MOV, .{mov = .{src = src1, dst = ireg }}});
                             array_add(insts, Instruction_Asm.{.CMP, .{cmp = .{src2, ireg}}});
-                        case .VARIABLE; 
+                        case .VARIABLE;
                             src1 := asm_gen_val_to_operand(*basm.src1);
                             array_add(insts, .{.CMP, .{cmp = .{src2, src1}}});
                     }
@@ -130,7 +130,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             }
         case .LABEL;
             array_add(insts, .{.LABEL, .{label = instt.as.label}});
-        case .JUMP_IF_NOT_ZERO; 
+        case .JUMP_IF_NOT_ZERO;
             cond_var := asm_gen_val_to_operand(*instt.as.jump_if_zero.condition);
             zero := Operand_Asm.{.IMM, .{imm = 0}};
             array_add(insts, .{.CMP, .{cmp = .{zero, cond_var}}});
@@ -180,7 +180,7 @@ from_tacky_to_asm_binop :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -
         case .NOT_EQUAL;     return .NOT_EQUAL;
 
         case .DIV; #through;
-        case .MOD; 
+        case .MOD;
             assert(false, "Other binary operator are either handled differently, or not supported: %", tacky_op);
             return .MUL; // unreachable;
     }
@@ -225,10 +225,10 @@ asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
             case .IDIV;
                 div := asm_gen_stage_2_stack_offset(*table, inst.as.idiv);
                 inst.* = .{.IDIV, .{idiv=div}};
-            case .SET_CC; 
+            case .SET_CC;
                 set_cc := inst.as.set_cc;
                 set_cc.operand = asm_gen_stage_2_stack_offset(*table, set_cc.operand);
-                inst.* = .{.SET_CC, .{set_cc=set_cc}}; 
+                inst.* = .{.SET_CC, .{set_cc=set_cc}};
             case .CDQ; #through;
             case .RET; #through;
             case .ALLOCATE_STACK; continue;
@@ -245,7 +245,7 @@ asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
 asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> Operand_Asm {
     if op.type != .PSEUDO return op;
 
-    saved_offset, success := Hash_Table.table_find(table, op.as.pseudo);
+    success, saved_offset := Hash_Table.table_find_new(table, op.as.pseudo);
     if success return .{.STACK, .{ stack = saved_offset }};
 
     offset := (table.count + 1) * -4;
@@ -296,7 +296,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                     case .SUB;
                         // both src and dst can't be memory address
                         // addl   -4(%rbp), -8(%rbp)
-                        // -- to -- 
+                        // -- to --
                         // movl   -4(%rbp), %r10d
                         // addl   %r10d, -8(%rbp)
                         ireg := Operand_Asm.{.REG,.{reg = .R10}};
@@ -329,7 +329,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
             case .JMP_CC; array_add(*insts, oi);
             case .SET_CC;
                 array_add(*insts, oi);
-            case .CMP; 
+            case .CMP;
                 if oi.as.cmp.op1.type == .STACK && oi.as.cmp.op2.type == .STACK {
                     ireg := Operand_Asm.{.REG,.{reg = .R10}};
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op1, ireg }}});
@@ -339,7 +339,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                     ireg := Operand_Asm.{.REG,.{reg = .R11}};
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op2, ireg }}});
                     array_add(*insts, .{.CMP, .{cmp = .{ oi.as.cmp.op1, ireg}}});
-                } 
+                }
                 else {
                     array_add(*insts, oi);
                 }
@@ -374,4 +374,3 @@ reg                  = AX | DX | R10 | R11 | RSP | RBP
 cond_code            = EE | NE | G | GE | L | LE
 
 */
-

@@ -42,7 +42,7 @@ resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, error_reporter: *Error_R
             if_stmt := stmt.as.if_stmt;
             resolve_expr(if_stmt.condition, scope, error_reporter);
             resolve_stmt(if_stmt.if_block, scope, error_reporter);
-            if if_stmt.else_block != null 
+            if if_stmt.else_block != null
                 resolve_stmt(if_stmt.else_block, scope, error_reporter);
         case .COMPOUND;
             compound := stmt.as.compound;
@@ -73,10 +73,10 @@ resolve_decl:: (decl: *Decl_Ast, scope: *Scope_Idents, error_reporter: *Error_Re
     if #complete decl.type == {
         case .VAR;
             var_decl := decl.as.var;
-            entry, success := table_find(scope, var_decl.ident);
+            success, entry := table_find_new(scope, var_decl.ident);
             if success && entry.owing_block {
                 error_report(error_reporter,var_decl.loc.line, var_decl.loc.start, "duplicate variable declaration! : %", var_decl.ident);
-            } 
+            }
             new_ident := make_variable(var_decl.ident);
             table_set(scope, var_decl.ident, .{owing_block = true, name = new_ident});
 
@@ -91,7 +91,7 @@ resolve_decl:: (decl: *Decl_Ast, scope: *Scope_Idents, error_reporter: *Error_Re
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
         case .CONSTANT; // noop
-        case .UNARY; 
+        case .UNARY;
             resolve_expr(expr.as.unary.expr, scope, error_reporter);
         case .BINARY;
             resolve_expr(expr.as.binary.left, scope, error_reporter);
@@ -99,7 +99,7 @@ resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, error_reporter: *Error_R
         case .GROUP;
             resolve_expr(expr.as.group, scope, error_reporter);
         case .VAR;
-            ident, success := table_find(scope, expr.as.var);
+            success, ident := table_find_new(scope, expr.as.var);
             if !success {
                 error_report(error_reporter, expr.loc.line, expr.loc.start, "undeclared variable: %", expr.as.var);
             }
