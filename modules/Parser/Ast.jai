@@ -3,14 +3,14 @@ Source_Location :: struct {
     start: int;
 }
 
-Program_Ast :: struct { 
-    fn: *Fn_Decl_Ast; 
+Program_Ast :: struct {
+    fn: *Fn_Decl_Ast;
 }
 
 
 Block_Ast :: struct {
+    #as using loc: Source_Location;
     items: [..]*Block_Item_Ast;
-    loc: Source_Location;
 }
 
 Block_Item_Ast :: struct {
@@ -41,7 +41,7 @@ Var_Decl_Ast :: struct {
     ident: string;
     init: * /*Optional */ Expr_Ast;
     loc: Source_Location;
-} 
+}
 
 For_Init_Ast :: struct {
     type: enum { INIT_DECL; INIT_EXPR; };
@@ -59,24 +59,24 @@ Stmt_Ast :: struct {
         if_stmt: struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: /* Optional */ *Stmt_Ast;  };
         label: struct {label: string; stmt: *Stmt_Ast;};
         goto: string;
-        compound: *Block_Ast; 
+        compound: *Block_Ast;
         break_stmt: string;
         continue_stmt: string;
         while_stmt: struct { condition: *Expr_Ast; body: *Stmt_Ast; label: string; };
         do_while: struct {  body: *Stmt_Ast; condition: *Expr_Ast; label: string;};
         for_stmt: struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; };
         switch: Switch_Stmt_Ast;
-        case_stmt: struct { value: string; label: string; }; 
+        case_stmt: struct { value: string; label: string; };
         default: string;
         // null : doesn't need value
     };
     loc: Source_Location;
 }
 
-Switch_Stmt_Ast :: struct { 
-    condition: *Expr_Ast; 
-    body: [..]*Block_Item_Ast; 
-    label: string; 
+Switch_Stmt_Ast :: struct {
+    condition: *Expr_Ast;
+    body: [..]*Block_Item_Ast;
+    label: string;
     cases_label: [..]Case_Label_Info;
 };
 
@@ -87,7 +87,7 @@ Case_Label_Info :: struct {
 }
 
 Expr_Ast :: struct {
-    type: enum { 
+    type: enum {
         CONSTANT;
         UNARY;
         BINARY;
@@ -144,7 +144,7 @@ create_fn_decl_ast :: (ident: string, block: *Block_Ast, line: int, start: int) 
 
 create_block_ast :: (items: [..]*Block_Item_Ast, line: int, start: int) -> *Block_Ast {
     block := New(Block_Ast);
-    block.* = .{items, .{line, start}};
+    block.* = .{ .{line, start }, items};
     return block;
 }
 
