@@ -1,11 +1,11 @@
 version: "3.9"
 services:
   box:
-    image: ubuntu
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: >
-      bash -c "apt update &&
-      DEBIAN_FRONTEND=noninteractive apt install -y gcc make python3 binutils &&
-      cp /libs/jai/bin/jai-linux /libs/jai/bin/jai &&
+      bash -c "cp /libs/jai/bin/jai-linux /libs/jai/bin/jai &&
       echo 'Copy complete. Container started...' &&
       tail -f /dev/null"
     platform: linux/amd64
@@ -13,5 +13,5 @@ services:
     environment:
       - PATH=/libs/jai/bin:$PATH
     volumes:
-        - "./:/app"
-        - "/Users/babal/Code/libs/jai:/libs/jai"
+      - "./:/app"
+      - "/Users/babal/Code/libs/jai:/libs/jai"
