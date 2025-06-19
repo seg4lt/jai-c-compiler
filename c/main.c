@@ -1,3 +1,7 @@
-int foo(int a, int b) {
-    return 32;
+int main(void) {
+    /* Nested function definitions are not permitted */
+    int foo(void) {
+        return 1;
+    }
+    return foo();
 }

@@ -1,5 +1,5 @@
 sema_label_resolution :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
-    label_fn(ast.fn, error_reporter);
+    for fn: ast.fns label_fn(fn, error_reporter);
 }
 
 #scope_file
@@ -163,6 +163,7 @@ resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_
             ternary := expr.as.ternary;
             resolve_expr(ternary.true_expr, goto_labels, label_store, error_reporter);
             resolve_expr(ternary.false_expr, goto_labels, label_store, error_reporter);
+        case .FN_CALL; assert(false, "NOT IMPLEMENTED");
         case .CONSTANT; #through;
         case .UNARY;  #through;
         case .BINARY; #through;
@@ -173,6 +174,7 @@ resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_
 
 label_expr :: (expr: *Expr_Ast, label_store: *Label_Store, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
+        case .FN_CALL; assert(false, "NOT IMPLEMENTED");
         case .CONSTANT; #through;
         case .UNARY;  #through;
         case .BINARY; #through;
