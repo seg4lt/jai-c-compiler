@@ -14,7 +14,7 @@ build:: () {
     options.import_path = modules_paths;
 
     options.output_path =  "out" ;
-    options.output_executable_name = "jaicc";
+    options.output_executable_name = "jcc";
 
     set_optimization(*options, .VERY_DEBUG);
     set_build_options(options, w);

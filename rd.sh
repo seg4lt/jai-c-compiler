@@ -1,3 +1,3 @@
 #!/bin/sh
 
-docker-compose exec box bash -c "jai build.jai && ./out/jaicc -- ./c/main.c $1"
+docker-compose exec box bash -c "jai build.jai && ./out/jcc -- ./c/main.c $1"

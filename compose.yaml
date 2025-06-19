@@ -1,17 +1,14 @@
-version: "3.9"
+# This is used to compile for x86_64 system on apple silicon devices
 services:
   box:
     build:
       context: .
       dockerfile: Dockerfile
-    command: >
-      bash -c "cp /libs/jai/bin/jai-linux /libs/jai/bin/jai &&
-      echo 'Copy complete. Container started...' &&
-      tail -f /dev/null"
     platform: linux/amd64
     working_dir: /app
     environment:
       - PATH=/libs/jai/bin:$PATH
     volumes:
       - "./:/app"
-      - "/Users/babal/Code/libs/jai:/libs/jai"
+      # Hardcoding the value, but oh well!!! Jai is in closed beta
+      - "${HOME}/Code/libs/jai:/libs/jai"

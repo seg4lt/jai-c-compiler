@@ -1,6 +1,8 @@
 sema_var_resolution :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
-    block := ast.fn.block;
-    resolve_block(block, null, error_reporter);
+    for fn: ast.fns {
+        block := fn.block;
+        resolve_block(block, null, error_reporter);
+    }
 }
 
 #scope_file
@@ -90,6 +92,7 @@ resolve_decl:: (decl: *Decl_Ast, scope: *Scope_Idents, error_reporter: *Error_Re
 
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
+        case .FN_CALL; assert(false, "NOT IMPLEMENTED");
         case .CONSTANT; // noop
         case .UNARY;
             resolve_expr(expr.as.unary.expr, scope, error_reporter);
