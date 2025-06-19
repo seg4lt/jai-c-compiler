@@ -1,5 +1,5 @@
 sema_loop_labeling :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
-    label_fn(ast.fn, error_reporter);
+    for fn: ast.fns label_fn(fn, error_reporter);
 }
 
 #scope_file
@@ -19,11 +19,11 @@ label_block_item :: (block_items: *[..]*Block_Item_Ast, label_info: *[..]Label_I
     for block_items.* {
         if #complete it.type == {
             case .DECL; // noop
-            case .STMT; 
+            case .STMT;
                 label_stmt(it.as.stmt, label_info, error_reporter);
         }
     }
-   
+
 }
 
 label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Error_Reporter) {
@@ -66,7 +66,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             label_stmt(if_stmt.if_block, label_info, error_reporter);
             if stmt.as.if_stmt.else_block != null
                 label_stmt(if_stmt.else_block, label_info, error_reporter);
-        case .COMPOUND; 
+        case .COMPOUND;
             compound := stmt.as.compound;
             label_block(compound, label_info, error_reporter);
         case .WHILE;
@@ -101,7 +101,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             array_add(label_info, .{ .LOOP, .{loop = .{label}}});
             label_stmt(stmt.as.do_while.body,label_info, error_reporter);
             pop(label_info);
-        case .LABEL; 
+        case .LABEL;
             label_stmt(stmt.as.label.stmt, label_info, error_reporter);
         case .RETURN; #through;
         case .EXPR; #through;
@@ -119,7 +119,7 @@ label_expr :: (expr: *Expr_Ast, label_stack: *[..]Label_Info, error_reporter: *E
         case .ASSIGNMENT; #through;
         case .VAR; // noop
 
-        case .GROUP; 
+        case .GROUP;
             label_expr(expr.as.group, label_stack, error_reporter);
         case .CONDITIONAL;
             conditional := expr.as.conditional;
@@ -129,8 +129,8 @@ label_expr :: (expr: *Expr_Ast, label_stack: *[..]Label_Info, error_reporter: *E
 }
 
 
-Loop_Label :: struct { 
-    label: string; 
+Loop_Label :: struct {
+    label: string;
 };
 
 Switch_Label :: struct {
@@ -139,9 +139,9 @@ Switch_Label :: struct {
 }
 
 Label_Info :: struct {
-    type: enum { 
-        LOOP; 
-        SWITCH; 
+    type: enum {
+        LOOP;
+        SWITCH;
     };
     as: union {
         loop: Loop_Label;

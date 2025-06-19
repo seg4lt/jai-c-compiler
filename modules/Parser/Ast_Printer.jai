@@ -1,14 +1,25 @@
 print_program_ast :: (writer: *Writer, program: *Program_Ast, depth: int = 0) {
     write(writer, "-- AST --\n");
     write(writer, "[PROGRAM]・");
-    print_fn_decl_ast(writer, program.fn, depth + 1);
+    for fn: program.fns {
+        print_fn_decl_ast(writer, fn, depth + 1);
+    }
     write(writer, "\n");
 }
 
 print_fn_decl_ast :: (writer: *Writer, fn: *Fn_Decl_Ast, depth: int = 0) {
     print_space(writer, depth);
     write(writer, "[FN]・%", fn.ident);
-    print_block_ast(writer, fn.block, depth + 1);
+    write(writer, " ( ");
+    for fn.params {
+        write(writer, "int ");
+        write(writer, it);
+        if it_index != fn.params.count - 1 {
+            write(writer, " , ");
+        }
+    }
+    write(writer, " ) ");
+    if fn.block print_block_ast(writer, fn.block, depth + 1);
 }
 
 print_block_ast :: (writer: *Writer, block: *Block_Ast, depth: int = 0) {
@@ -27,14 +38,16 @@ print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int = 0)  {
     if decl.type == {
         case .VAR;
             var_decl := as.var;
-            write(writer, "[DECL]・");
+            write(writer, "[VAR DECL]・");
             write(writer, "%", var_decl.ident);
             if var_decl.init != null {
                 write(writer, "・=・");
                 print_expr_ast(writer, var_decl.init, depth + 1);
             }
         case .FN;
-            assert(false, "NOT IMPLEMENTED");
+            fn_decl := as.fn;
+            write(writer, "[FN DECL・]");
+            print_fn_decl_ast(writer, fn_decl, depth + 1);
     }
 }
 
@@ -43,7 +56,7 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
         case .DEFAULT;
             write(writer, "[DEFAULT]・%", stmt.as.default);
             print_space(writer, depth + 1);
-        case .CASE; 
+        case .CASE;
             write(writer, "[CASE]・%・% ", stmt.as.case_stmt.value, stmt.as.case_stmt.label);
         case .RETURN;
             write(writer, "[RETURN]・");
@@ -79,7 +92,7 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int = 0)  {
                 print_space(writer, depth);
                 write(writer, "[ELSE]");
                 print_space(writer, depth + 2);
-                print_stmt_ast(writer, stmt.as.if_stmt.else_block, depth + 2); 
+                print_stmt_ast(writer, stmt.as.if_stmt.else_block, depth + 2);
             }
         case .LABEL;
             write(writer, "[LABEL]・%", stmt.as.label.label);
@@ -174,6 +187,18 @@ print_expr_ast :: (writer: *Writer, expr: *Expr_Ast, depth: int = 0) {
             print_space(writer, depth + 1);
             write(writer, "・:・");
             print_expr_ast(writer, expr.as.ternary.false_expr, depth+2);
+        case .FN_CALL;
+            fn_call := expr.as.fn_call;
+            write(writer, "[FN_CALL] % ( ", fn_call.ident);
+
+            for fn_call.args {
+                print_expr_ast(writer, it, depth + 1);
+                if it_index != fn_call.args.count - 1 {
+                    write(writer, " , ");
+                }
+            }
+
+            write(writer, " ) ");
     }
     if #complete expr.postfix  == {
         case .INCR; write(writer, "[POSTFIX]・++");

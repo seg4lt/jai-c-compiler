@@ -1,10 +1,10 @@
 Lexer :: struct {
-    src: string;
-    tokens: [..]Token;
-    error_reporter: *Error_Reporter;
-    line: int = 1;
-    start: int = 0; // current token start position
-    current : int = 0; // where is cursor right now
+    src            : string;
+    tokens         : [..]Token;
+    error_reporter : *Error_Reporter;
+    line           : int = 1;
+    start          : int = 0; // current token start position
+    current        : int = 0; // where is cursor right now
 }
 
 Token :: struct {

@@ -4,9 +4,8 @@ Source_Location :: struct {
 }
 
 Program_Ast :: struct {
-    fn: *Fn_Decl_Ast;
+    fns: [..]*Fn_Decl_Ast;
 }
-
 
 Block_Ast :: struct {
     #as using loc: Source_Location;
@@ -22,24 +21,23 @@ Block_Item_Ast :: struct {
 }
 
 Decl_Ast :: struct {
-    type: enum {
-        FN;
-        VAR;
-    };
-    as: union {
-        fn: *Fn_Decl_Ast;
+    type : enum { FN; VAR; };
+    as   : union {
+        fn  : *Fn_Decl_Ast;
         var : *Var_Decl_Ast;
     }
 }
 
 Fn_Decl_Ast :: struct {
     ident: string;
+    params: [..]string;
     block: *Block_Ast;
     loc: Source_Location;
 }
+
 Var_Decl_Ast :: struct {
     ident: string;
-    init: * /*Optional */ Expr_Ast;
+    init: * /*Optional*/ Expr_Ast;
     loc: Source_Location;
 }
 
@@ -95,6 +93,7 @@ Expr_Ast :: struct {
         VAR;
         ASSIGNMENT;
         TERNARY;
+        FN_CALL;
     }
     as: union {
         constant: int;
@@ -126,19 +125,25 @@ Binary_Operator :: enum {
 
 #scope_module
 
-create_program_ast :: (fn: *Fn_Decl_Ast) -> *Program_Ast {
-    assert(fn != null, "fn cannot be null");
+create_program_ast :: (fns: [..]*Fn_Decl_Ast) -> *Program_Ast {
     pg := New(Program_Ast);
-    pg.* = .{ fn = fn };
+    pg.* = .{ fns };
     return pg;
 }
 
-create_fn_decl_ast :: (ident: string, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast {
-    assert(ident != "", "ident cann't be null");
-    assert(block != null, "block cannot be null");
+create_decl_ast_fn :: (fn: *Fn_Decl_Ast) -> *Decl_Ast {
+    assert(fn != null, "fn cannot be null");
+    // assert(fn.block == null, "fn decl cannot have body");
+    decl := New(Decl_Ast);
+    decl.* = .{.FN, .{ fn }};
+    return decl;
+}
+
+create_fn_decl_ast :: (ident: string, params: [..]string, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast {
+    assert(ident != "", "ident can't be null");
 
     fn := New(Fn_Decl_Ast);
-    fn.* = .{ident, block, .{line, start}};
+    fn.* = .{ident, params, block, .{line, start}};
     return fn;
 }
 
@@ -313,6 +318,13 @@ create_var_expr :: (ident: string, line: int, start: int, postfix: type_of(Expr_
     assert(ident != "", "ident cannot be null");
     expr := New(Expr_Ast);
     expr.* = .{.VAR, .{ var = ident }, postfix, .{line, start}};
+    return expr;
+}
+
+create_fn_call_expr :: (ident: string, args_list: [..]*Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast {
+    assert(ident != "", "ident cannot be null");
+    expr := New(Expr_Ast);
+    expr.* = .{.FN_CALL, .{ fn_call = .{ ident, args_list } }, postfix, .{line, start}};
     return expr;
 }
 

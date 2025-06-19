@@ -5,9 +5,9 @@
 #import "Compiler_Util";
 #import "Not_Basic";
 
-Parser :: struct { 
-    tokens: []Token; 
-    start: int = 0; 
+Parser :: struct {
+    tokens: []Token;
+    start: int = 0;
     current: int = 0;
     error_reporter: *Error_Reporter;
 }
@@ -37,23 +37,55 @@ parse_err :: (parser: *Parser, tok: Token, msg_fmt: string, args: .. Any) #expan
 #scope_file
 
 parse_program_ast :: (parser: *Parser) -> *Program_Ast {
-    fn := parse_fn_ast(parser);
-    return create_program_ast(fn);
+    fns: [..]*Fn_Decl_Ast;
+
+    while !is_at_end(parser) {
+        // TODO(Aman) - parse multiple functions decls here
+        fn := parse_fn_ast(parser);
+        array_add(*fns, fn);
+    }
+
+    return create_program_ast(fns);
 }
 
-parse_fn_ast :: (parser: *Parser) -> *Fn_Decl_Ast {
+parse_fn_ast :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl_Ast {
     consume(parser, .INT);
     ident_token := consume(parser, .IDENT);
 
     consume(parser, .LPAREN);
-    if peek(parser).*.type == .VOID consume(parser, .VOID);
+    params := parse_params_list(parser);
     consume(parser, .RPAREN);
 
-    body := parse_block_ast(parser);
+    if peek(parser).*.type == .SEMICOLON {
+        consume(parser, .SEMICOLON);
+        return create_fn_decl_ast(ident_token.value, params, null, ident_token.line, ident_token.start);
+    }
+    if only_decl parse_err(parser, "fn decl expected, found body");
 
-    return create_fn_decl_ast(ident_token.value, body, ident_token.line, ident_token.start);
+    body := parse_block_ast(parser);
+    return create_fn_decl_ast(ident_token.value, params, body, ident_token.line, ident_token.start);
 }
 
+parse_params_list :: (parser: *Parser) -> [..]string {
+    params: [..]string;
+    if peek(parser).type == .VOID {
+        consume(parser, .VOID);
+        return params;
+    }
+    while peek(parser).type != .RPAREN {
+        type := consume(parser, .INT); // we only support int type for now
+        ident := consume(parser, .IDENT);
+        array_add(*params, ident.value);
+        // maybe we need to break if we can't find comma?
+        if peek(parser).type == .COMMA {
+            consume(parser, .COMMA);
+            if peek(parser).*.type == .RPAREN {
+                parse_err(parser, "trailing command on parameter list is not allowed");
+            }
+        }
+    }
+    return params;
+}
 
 parse_block_ast :: (parser: *Parser) -> *Block_Ast {
     start_tok := consume(parser, .LCURLY);
@@ -78,9 +110,20 @@ parse_block_item :: (parser: *Parser) -> *Block_Item_Ast {
     return create_stmt_block_item(parse_stmt_ast(parser));
 }
 
+is_maybe_fn_decl :: (parser: *Parser) -> bool {
+    return peek(parser).type == .INT && peek(parser, 1).type == .IDENT && peek(parser, 2).type == .LPAREN;
+}
 
 parse_decl_ast :: (parser: *Parser) -> *Decl_Ast {
+    // .INT because we only suppor int data type, but
     if peek(parser).type != .INT parse_err(parser, "Expected int found %", peek(parser).type);
+
+    if is_maybe_fn_decl(parser) {
+        // fn_decl_ast := parse_fn_ast(parser, only_decl = true);
+        fn_decl_ast := parse_fn_ast(parser, only_decl = false);
+        return create_decl_ast_fn(fn_decl_ast);
+    }
+    // normal variable decl
 
     consume(parser, .INT);
     ident_tok := consume(parser);
@@ -126,7 +169,7 @@ parse_stmt_ast :: (parser: *Parser) -> *Stmt_Ast {
             token := consume(parser, .DEFAULT);
             consume(parser, .COLON);
             return create_default_stmt(token.line, token.start);
-        case .GOTO; 
+        case .GOTO;
             consume(parser, .GOTO);
             token := consume(parser, .IDENT);
             consume(parser, .SEMICOLON);
@@ -206,9 +249,16 @@ parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
 }
 
 parse_for_init :: (parser: *Parser) -> *For_Init_Ast {
-    if peek(parser).type == .INT 
-        return create_decl_for_init(parse_decl_ast(parser));
-        
+    peek_token := peek(parser);
+    if peek_token.*.type == .INT {
+        decl := parse_decl_ast(parser);
+        if decl.type != .VAR {
+            parse_err(parser, peek_token, "Expected variable declaration in for loop init, found %", decl.type);
+            return null;
+        }
+        return create_decl_for_init(decl);
+    }
+
     expr := parse_optional_expr(parser, 0);
     return create_expr_for_init(expr);
 }
@@ -223,7 +273,7 @@ parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
     condition := parse_optional_expr(parser, 0);
     consume(parser, .SEMICOLON);
 
-    post := ifx peek(parser).type == .RPAREN null 
+    post := ifx peek(parser).type == .RPAREN null
             else parse_expr(parser, 0);
 
     consume(parser, .RPAREN);
@@ -264,7 +314,7 @@ parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr_Ast {
 parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
     left := parse_factor(parser);
     next_token := peek(parser);
-    
+
     while is_binary_operator(next_token.type) && precedence(parser, next_token.type) >= min_prec {
         if next_token.type == .ASSIGN {
             assign_tok := consume(parser);
@@ -318,7 +368,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             op_tok := consume(parser);
             op := parse_unary_op(parser, op_tok.type);
             inner_expr := parse_factor(parser);
-            expr := create_unary_expr(op, inner_expr, op_tok.line, op_tok.start); 
+            expr := create_unary_expr(op, inner_expr, op_tok.line, op_tok.start);
             return expr;
         case .MINUS_MINUS; #through;
         case .PLUS_PLUS;
@@ -336,7 +386,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             var_clone := create_var_expr(ident, ident_expr.loc.line, ident_expr.loc.start);
 
             one := create_constant_expr(1, postfix_op_token.line, postfix_op_token.start);
-            op := parse_postfix_binary_op(parser, postfix_op_token.type); 
+            op := parse_postfix_binary_op(parser, postfix_op_token.type);
             binary := create_binary_expr(op, var, one, postfix_op_token.line, postfix_op_token.start);
             return create_assignment_expr(var_clone, binary, postfix_op_token.line, postfix_op_token.start);
         case .LPAREN;
@@ -348,12 +398,31 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             return expr;
         case .IDENT;
             ident := consume(parser);
-            var_expr := create_var_expr(ident.value, ident.line, ident.start);
-            parse_postfix_expr_ast(parser, var_expr);
-            return var_expr;
+            expr := ifx peek(parser).*.type != .LPAREN  create_var_expr(ident.value, ident.line, ident.start)
+            else create_fn_call_expr(ident.value, parse_args_list(parser), ident.line, ident.start);
+
+            parse_postfix_expr_ast(parser, expr);
+            return expr;
     }
     parse_err(parser, "This expression is not something I can handle. Duh!! %", peek(parser).*);
     return null;
+}
+
+parse_args_list :: (parser: *Parser) -> [..]*Expr_Ast {
+    args: [..]*Expr_Ast;
+    consume(parser, .LPAREN);
+    while peek(parser).type != .RPAREN {
+        expr := parse_expr(parser, 0);
+        array_add(*args, expr);
+        if peek(parser).type == .COMMA {
+            consume(parser, .COMMA);
+            if peek(parser).*.type == .RPAREN {
+                parse_err(parser, "trailing comma in function call is not allowed");
+            }
+        }
+    }
+    consume(parser, .RPAREN);
+    return args;
 }
 
 parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
@@ -366,7 +435,7 @@ parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
     }
 
     postfix_op_token := consume(parser);
-    op := parse_postfix_enum(parser, postfix_op_token.type); 
+    op := parse_postfix_enum(parser, postfix_op_token.type);
     expr.postfix = op;
 }
 
@@ -381,7 +450,7 @@ is_compound_assignment_operator :: (token_type: Token_Type) -> bool {
         case .RIGHT_SHIFT_EQUAL; #through;
         case .BITWISE_AND_EQUAL; #through;
         case .BITWISE_OR_EQUAL; #through;
-        case .BITWISE_XOR_EQUAL; 
+        case .BITWISE_XOR_EQUAL;
             return true;
         case; return false;
     }
@@ -393,7 +462,7 @@ parse_postfix_binary_op :: (parser: *Parser, tt: Token_Type) -> Binary_Operator 
         case; parse_err(parser, "Wanted postfix unary operator found %", tt);
     }
     parse_err(parser, "Wanted postfix unary operator found %", tt);
-    return .ADD; 
+    return .ADD;
 }
 
 parse_postfix_enum :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.postfix) {
@@ -403,7 +472,7 @@ parse_postfix_enum :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.post
         case; parse_err(parser, "Wanted postfix unary operator found %", tt);
     }
     parse_err(parser, "Wanted postfix unary operator found %", tt);
-    return .NONE; 
+    return .NONE;
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
@@ -414,7 +483,7 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .MULTIPLY; #through;
         case .MOD; #through;
         case .LEFT_SHIFT; #through;
-        case .RIGHT_SHIFT; #through; 
+        case .RIGHT_SHIFT; #through;
         case .BITWISE_AND; #through;
         case .BITWISE_XOR; #through;
         case .BITWISE_OR; #through;
@@ -431,7 +500,7 @@ is_binary_operator :: (tt: Token_Type) -> bool {
         case .BITWISE_XOR_EQUAL; #through;
         case .BITWISE_OR_EQUAL; #through;
         case .LEFT_SHIFT_EQUAL; #through;
-        case .RIGHT_SHIFT_EQUAL; #through; 
+        case .RIGHT_SHIFT_EQUAL; #through;
         case .PLUS_EQUAL; #through;
         case .MINUS_EQUAL; #through;
         case .MULTIPLY_EQUAL; #through;
@@ -458,7 +527,7 @@ precedence :: (parser: *Parser, tt: Token_Type) -> int {
         case .PLUS; return 45;
 
         case .LEFT_SHIFT; #through;
-        case .RIGHT_SHIFT; return 40; 
+        case .RIGHT_SHIFT; return 40;
 
         case .LESS; #through;
         case .LESS_EQUAL; #through;
@@ -483,15 +552,15 @@ precedence :: (parser: *Parser, tt: Token_Type) -> int {
         case .MULTIPLY_EQUAL; #through;
         case .DIVIDE_EQUAL; #through;
         case .LEFT_SHIFT_EQUAL; #through;
-        case .RIGHT_SHIFT_EQUAL; #through; 
+        case .RIGHT_SHIFT_EQUAL; #through;
         case .BITWISE_AND_EQUAL; #through;
         case .BITWISE_XOR_EQUAL; #through;
-        case .BITWISE_OR_EQUAL; #through; 
+        case .BITWISE_OR_EQUAL; #through;
         case .MOD_EQUAL;
             return 1;
     }
     parse_err(parser, "precendence calc for any other token is currently not supported: %", tt);
-    return 0; 
+    return 0;
 }
 
 parse_unary_op :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.as.unary.op) {
