@@ -59,8 +59,8 @@ get_error_item :: (src: string, src_path: string, line: int, start: int, detail_
 }
 
 find_line_start :: (src: string, start: int) -> int, int {
-    previous_line_start := start;
-    current_line_start := start;
+    previous_line_start := 0;
+    current_line_start := 0;
     cur := start;
     count := 0;
     while cur >= 0 && count <= 2 {

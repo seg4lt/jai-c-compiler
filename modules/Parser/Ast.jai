@@ -30,15 +30,20 @@ Decl_Ast :: struct {
 
 Fn_Decl_Ast :: struct {
     ident: string;
-    params: [..]string;
+    params: [..]*Fn_Param;
     block: *Block_Ast;
-    loc: Source_Location;
+    using loc: Source_Location;
+}
+
+Fn_Param :: struct {
+    ident: string;
+    using loc: Source_Location;
 }
 
 Var_Decl_Ast :: struct {
     ident: string;
     init: * /*Optional*/ Expr_Ast;
-    loc: Source_Location;
+    using loc: Source_Location;
 }
 
 For_Init_Ast :: struct {
@@ -105,12 +110,14 @@ Expr_Ast :: struct {
         ternary: struct {condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast;};
         fn_call: struct { ident: string; args: [..]*Expr_Ast; }
     };
-    postfix:  enum {NONE;INCR;DECR;} = .NONE;
-    loc: Source_Location;
+    postfix:  enum { NONE; INCR; DECR; } = .NONE;
+    using loc: Source_Location;
 }
 
 Unary_Operator :: enum {
-    BITWISE_NOT; NEGATE; NOT;
+    BITWISE_NOT;
+    NEGATE;
+    NOT;
 }
 
 Binary_Operator :: enum {
@@ -139,7 +146,7 @@ create_decl_ast_fn :: (fn: *Fn_Decl_Ast) -> *Decl_Ast {
     return decl;
 }
 
-create_fn_decl_ast :: (ident: string, params: [..]string, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast {
+create_fn_decl_ast :: (ident: string, params: [..]*Fn_Param, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast {
     assert(ident != "", "ident can't be null");
 
     fn := New(Fn_Decl_Ast);
