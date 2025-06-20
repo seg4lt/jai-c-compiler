@@ -8,10 +8,11 @@ label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     label_info: [..]Label_Info;
     defer free(*label_info);
 
-    label_block(fn.block, *label_info, error_reporter);
+    if fn.block != null label_block(fn.block, *label_info, error_reporter);
 }
 
 label_block :: (block: *Block_Ast, label_info: *[..]Label_Info, error_reporter: *Error_Reporter) {
+    assert(block != null, "Block cannot be null");
     label_block_item(*block.items, label_info, error_reporter);
 }
 
