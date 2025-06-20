@@ -4,10 +4,10 @@
     "adapter": "CodeLLDB",
     "request": "launch",
     "program": "./out/jcc",
-    "args": ["./c/main.c", "--parse"],
+    "args": ["./c/main.c", "--validate"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "build": {
-      "label": "Compile jaicc",
+      "label": "Compile jcc",
       "command": "jai",
       "args": ["build.jai"]
     }

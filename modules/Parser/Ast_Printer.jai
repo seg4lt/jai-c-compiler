@@ -13,7 +13,7 @@ print_fn_decl_ast :: (writer: *Writer, fn: *Fn_Decl_Ast, depth: int = 0) {
     write(writer, " ( ");
     for fn.params {
         write(writer, "int ");
-        write(writer, it);
+        write(writer, it.ident);
         if it_index != fn.params.count - 1 {
             write(writer, " , ");
         }

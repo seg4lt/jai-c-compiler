@@ -1,5 +1,4 @@
 main :: () {
-    // everything on temporary allocator, don't wanna manage memory for now
     push_allocator(temp);
     defer { report_memory_leaks(); };
 
@@ -11,10 +10,10 @@ main :: () {
     lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *error_reporter, do_print=true);
     ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *error_reporter, do_print=true);
     if args.flags                   & .SEMA         sema(ast, *error_reporter, do_print=true);
-    tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast, do_print=true);
-    asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky, do_print=true);
-    if args.flags                   & .ALL          code_emm(args.src_path_without_ext, asm_construct); 
-    if args.flags                   & .ALL          assember_and_linker(args.src_path_without_ext, args.output_type);
+    // tacky         := ifx args.flags & .TACKY        gen_program_tacky(ast, do_print=true);
+    // asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky, do_print=true);
+    // if args.flags                   & .ALL          code_emm(args.src_path_without_ext, asm_construct);
+    // if args.flags                   & .ALL          assember_and_linker(args.src_path_without_ext, args.output_type);
 }
 
 

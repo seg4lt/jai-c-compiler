@@ -1,5 +1,5 @@
 sema :: (ast: *Program_Ast, error_reporter: *Error_Reporter, do_print: bool = false) {
-    sema_var_resolution(ast, error_reporter);
+    sema_ident_resolution(ast, error_reporter);
     sema_label_resolution(ast, error_reporter);
     sema_loop_labeling(ast, error_reporter);
 

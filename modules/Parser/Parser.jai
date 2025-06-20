@@ -40,7 +40,6 @@ parse_program_ast :: (parser: *Parser) -> *Program_Ast {
     fns: [..]*Fn_Decl_Ast;
 
     while !is_at_end(parser) {
-        // TODO(Aman) - parse multiple functions decls here
         fn := parse_fn_ast(parser);
         array_add(*fns, fn);
     }
@@ -66,8 +65,8 @@ parse_fn_ast :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl_Ast {
     return create_fn_decl_ast(ident_token.value, params, body, ident_token.line, ident_token.start);
 }
 
-parse_params_list :: (parser: *Parser) -> [..]string {
-    params: [..]string;
+parse_params_list :: (parser: *Parser) -> [..]*Fn_Param {
+    params: [..]*Fn_Param;
     if peek(parser).type == .VOID {
         consume(parser, .VOID);
         return params;
@@ -75,7 +74,9 @@ parse_params_list :: (parser: *Parser) -> [..]string {
     while peek(parser).type != .RPAREN {
         type := consume(parser, .INT); // we only support int type for now
         ident := consume(parser, .IDENT);
-        array_add(*params, ident.value);
+        fn_param := New(Fn_Param);
+        fn_param.* = .{ ident = ident.value, line = ident.line, start = ident.start };
+        array_add(*params, fn_param);
         // maybe we need to break if we can't find comma?
         if peek(parser).type == .COMMA {
             consume(parser, .COMMA);
