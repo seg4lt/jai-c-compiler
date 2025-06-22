@@ -8,7 +8,7 @@ Program_Ast :: struct {
 }
 
 Block_Ast :: struct {
-    #as using loc: Source_Location;
+    using loc: Source_Location;
     items: [..]*Block_Item_Ast;
 }
 
