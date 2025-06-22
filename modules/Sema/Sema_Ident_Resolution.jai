@@ -123,20 +123,21 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
     scope_for_fn_param := create_new_scope(scope);
     defer deinit(*scope_for_fn_param);
     
-    for param: fn_decl.params  {
-        success, entry := table_find_new(*scope_for_fn_param, param.ident);
+    for * param: fn_decl.params  {
+        success, entry := table_find_new(*scope_for_fn_param, param.*.ident);
         if success && entry.from_current_scope {
-            error_report(erp, param.line, param.start, "duplicate param name found: %", param.ident);
+            error_report(erp, param.*.line, param.*.start, "duplicate param name found: %", param.*.ident);
         }
         
-        mapped_ident := make_variable(param.ident);
+        mapped_ident := make_variable(param.*.ident);
         ident := Ident(string).{
             from_current_scope  = true,
             type                = .VAR,
             external_linkage    = false,
             name                = mapped_ident,
         };
-        table_set(*scope_for_fn_param, param.ident, ident);
+        table_set(*scope_for_fn_param, param.*.ident, ident);
+        param.*.ident = mapped_ident;
     }
     
     if !can_have_body && fn_decl.block != null {
@@ -144,7 +145,6 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
     }
     
     if fn_decl.block resolve_block(fn_decl.block, *scope_for_fn_param, erp);
-    // mark
 }
 
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
@@ -164,14 +164,18 @@ resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
             }
             expr.as.var = ident.name;
         case .FN_CALL; 
-            fn_call := expr.as.fn_call;
+            fn_call := expr.*.as.fn_call;
             success, ident := table_find_new(scope, fn_call.ident);
             if !success {
                 error_report(erp, expr.line, expr.start, "undeclared function: %", fn_call.ident);
             }
+            print("fn_call_ident: %\n", fn_call.ident);
+            print("ident: %\n", ident);
+            if success && ident.from_current_scope {
+                fn_call.ident = ident.name;
+                expr.as.fn_call = fn_call;
+            }
             for fn_call.args resolve_expr(it, scope, erp);
-            // TODO(Aman) still need to validate type checking? here or maybe tye checking pass?
-            // mark
         case .ASSIGNMENT; resolve_assignment_expr(expr, scope, erp);
         case .TERNARY;
             ternary := expr.as.ternary;
