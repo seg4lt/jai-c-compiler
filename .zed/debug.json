@@ -4,7 +4,7 @@
     "adapter": "CodeLLDB",
     "request": "launch",
     "program": "./out/jcc",
-    "args": ["./c/main.c", "--validate"],
+    "args": ["./c/main.c", "--tacky"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "build": {
       "label": "Compile jcc",
