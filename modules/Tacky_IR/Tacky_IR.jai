@@ -1,8 +1,15 @@
-gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
+gen_program_tacky :: (pg: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
     tc : Tacky_Ctx;
-    fn := gen_fn_tacky(*tc, program_ast.fn);
+    
+    fns: [..]Fn_Tacky;
+    for fn_ast: pg.fns {
+        if fn_ast.block {
+            fn := gen_fn_tacky(*tc, fn_ast);
+            array_add(*fns, fn);
+        }
+    }
     program := New(Program_Tacky);
-    program.* = .{ fn };
+    program.* = .{ fns };
 
     if do_print {
         writer := make_stdout_writer();
@@ -14,11 +21,12 @@ gen_program_tacky :: (program_ast: *Program_Ast, do_print: bool = false) -> *Pro
 
 gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
-    gen_instructions(tc, *instructions, fn_ast.block);
-    // Always add return 0 as there might be case where we don't have one
-    // Potentially we can optimize this away later.
-    array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
-
+    if fn_ast.block  {
+        gen_instructions(tc, *instructions, fn_ast.block);
+        // Always add return 0 as there might be case where we don't have one
+        // Potentially we can optimize this away later.
+        array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
+    }
     return .{ fn_ast.ident, instructions };
 }
 
@@ -93,7 +101,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
                 array_add(instructions, .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, else_label.as.label } } });
 
                 gen_instructions(tc, instructions, if_stmt.if_block);
-                array_add(instructions, .{.JUMP, .{jump = if_end_label.as.label}});
+                array_add(instructions, .{.JUMP, .{ jump = if_end_label.as.label}});
 
                 array_add(instructions, else_label);
                 gen_instructions(tc, instructions, if_stmt.else_block);
@@ -240,6 +248,19 @@ gen_instructions_for_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Ta
 
 gen_instructions_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
     if #complete expr_ast.type == {
+        case .FN_CALL;
+            // fn_call: struct { ident: string; args: [..]*Expr_Ast; }
+            // fn_call: struct { ident: string; args: [..]Val_Tacky; dst: Val_Tacky; };
+            fn_call := expr_ast.as.fn_call;
+            
+            args: [..]Val_Tacky;
+            for fn_call.args {
+                arg_val := gen_instructions(tc, instructions, it);
+                array_add(*args, arg_val);
+            }
+            dst := make_var(tc);
+            array_add(instructions, .{.FN_CALL, .{ fn_call = .{ fn_call.ident, args, dst }}});
+            return dst;
         case .UNARY;
             src := gen_instructions(tc, instructions, expr_ast.as.unary.expr);
             dst := make_var(tc);

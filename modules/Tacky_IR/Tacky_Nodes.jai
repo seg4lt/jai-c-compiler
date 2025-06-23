@@ -1,5 +1,5 @@
 Program_Tacky :: struct {
-    fn: Fn_Tacky;
+    fns: [..]Fn_Tacky;
 }
 
 Fn_Tacky :: struct {
@@ -16,6 +16,7 @@ Instruction_Type_Tacky :: enum {
     JUMP_IF_ZERO;
     JUMP_IF_NOT_ZERO;
     LABEL;
+    FN_CALL;
 }
 
 Instruction_Tacky :: struct {
@@ -29,6 +30,7 @@ Instruction_Tacky :: struct {
         jump_if_zero: struct {condition: Val_Tacky; ident: string;};
         jump_if_not_zero: struct {condition: Val_Tacky; ident: string;};
         label: string;
+        fn_call: struct { ident: string; args: [..]Val_Tacky; dst: Val_Tacky; };
     };
 }
 
