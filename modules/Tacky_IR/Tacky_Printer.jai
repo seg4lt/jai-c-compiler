@@ -1,8 +1,10 @@
 print_tacky :: (program: *Program_Tacky, writer: *Writer) {
     write(writer, "\n\n-- Tacky --\n");
     write(writer, "    .program\n");
-    print_tacky_fn(*program.fn, writer);
-    write(writer, "\n");
+    for fn: program.fns {
+        print_tacky_fn(*fn, writer);
+        write(writer, "\n");
+    }
 }
 
 print_tacky_fn :: (fn: *Fn_Tacky, writer: *Writer) {
@@ -13,6 +15,15 @@ print_tacky_fn :: (fn: *Fn_Tacky, writer: *Writer) {
 print_tacky_inst :: (inst: *Instruction_Tacky, writer: *Writer) {
     write(writer, "\n    ");
     if #complete inst.type == {
+        case .FN_CALL;
+            write(writer, "FnCall(ident: %, args: [", inst.as.fn_call.ident);
+            for arg: inst.as.fn_call.args {
+                print_tacky_val(*arg, writer);
+                if it_index != inst.as.fn_call.args.count - 1 write(writer, ", ");
+            }
+            write(writer, "], dst: ");
+            print_tacky_val(*inst.as.fn_call.dst, writer);
+            write(writer, ")");
         case .RETURN;
             write(writer, "Return(");
             print_tacky_val(*inst.as.ret, writer);
