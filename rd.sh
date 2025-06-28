@@ -3,7 +3,7 @@
 
 if [ -n "$TC" ]; then
   echo "Running tests..."
-  docker-compose exec box bash -c "jai build.jai && tests/test_compiler ./out/jcc $1"
+  docker-compose exec box bash -c "jai build.jai && tests/test_compiler ./out/jcc --verbose --failfast $1"
   exit 0
 fi
 
