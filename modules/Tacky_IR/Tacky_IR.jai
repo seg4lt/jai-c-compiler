@@ -46,7 +46,6 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block
 }
 
 gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, decl_ast: *Decl_Ast) {
-
     if #complete decl_ast.type == {
         case .VAR;
             var_decl := decl_ast.as.var;
@@ -58,7 +57,10 @@ gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
             dst := Val_Tacky.{.VARIABLE, .{ variable = var_decl.ident}};
             array_add(instructions, .{.COPY, .{copy = .{src = result, dst = dst}}});
         case .FN;
-            assert(false, "NOT IMPLEMENTED");
+            fn_decl := decl_ast.as.fn;
+            if fn_decl.block != null {
+                assert(false, "Hmm.. this should not have happened - fn decl can't have body.");
+            }
     }
 
 }
