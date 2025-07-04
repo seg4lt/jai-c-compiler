@@ -1,14 +1,15 @@
 Program_Asm :: struct {
-    fn: Fn_Asm;
+    fns: [..]Fn_Asm;
 }
 
 Fn_Asm :: struct {
     ident: string;
     instructions: [..]Instruction_Asm;
+    stack_size: int = 0;
 }
 
 Instruction_Asm :: struct {
-    type : Instruction_Asm_Type;
+    type: Instruction_Asm_Type;
     as: union {
         mov: struct {src: Operand_Asm; dst: Operand_Asm;};
         unary: struct {op: Unary_Op_Asm; operand: Operand_Asm;}
@@ -20,17 +21,36 @@ Instruction_Asm :: struct {
         set_cc: struct {cond_code: Cond_Code_Asm; operand: Operand_Asm;};
         label: string;
         allocate_stack: int;
+        deallocate_stack: int;
+        push: Operand_Asm;
+        call: string;
         // cdq: no value needed
         // ret : no value needed
     };
 }
 
-Instruction_Asm_Type :: enum {MOV; UNARY; BINARY; IDIV; CDQ; ALLOCATE_STACK; RET; CMP; JMP; JMP_CC;SET_CC;LABEL; };
+Instruction_Asm_Type :: enum {
+    MOV;
+    UNARY;
+    BINARY;
+    IDIV;
+    CDQ;
+    ALLOCATE_STACK;
+    RET;
+    CMP;
+    JMP;
+    JMP_CC;
+    SET_CC;
+    LABEL;
+    DEALLOCATE_STACK;
+    PUSH;
+    CALL;
+};
 
-Cond_Code_Asm :: enum {EE; NE; G; GE; L; LE;}; 
+Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; }; 
 
 Operand_Asm :: struct {
-    type: enum {IMM; REG; PSEUDO; STACK;};
+    type: enum { IMM; REG; PSEUDO; STACK; };
     as: union { imm: int; reg: Reg_Asm; pseudo: string; stack: int; }; 
 };
 
@@ -53,4 +73,16 @@ Bin_Op_Asm :: enum {
     LESS_EQUAL;
 }; 
 
-Reg_Asm :: enum { AX; DX; R10; R11; RSP; RBP; RCX; }
+Reg_Asm :: enum { 
+    AX;
+    CX;
+    DX;
+    DI;
+    SI;
+    R8;
+    R9;
+    R10;
+    R11;
+    RSP;
+    RBP;
+}

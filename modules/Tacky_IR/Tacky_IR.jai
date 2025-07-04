@@ -27,7 +27,9 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast) -> Fn_Tacky {
         // Potentially we can optimize this away later.
         array_add(*instructions, .{.RETURN, .{ret = .{.CONSTANT, .{constant = 0}}}});
     }
-    return .{ fn_ast.ident, instructions };
+    params : [..]string;
+    for fn_ast.params array_add(*params, it.ident);
+    return .{ fn_ast.ident, params, instructions };
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast) {

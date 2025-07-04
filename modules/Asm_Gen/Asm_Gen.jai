@@ -1,38 +1,55 @@
-
 asm_gen :: (pgt: *Program_Tacky, do_print: bool = false) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt);
     if do_print {
         writer := make_stdout_writer();
         print_asm(*writer, pasm_st_1, 1);
     }
-    stack_size := asm_gen_stage_2(pasm_st_1.fn.instructions);
+    asm_gen_stage_2(pasm_st_1);
     if do_print {
         writer := make_stdout_writer();
-        write(*writer, "\n Stack Size: %\n", stack_size);
         print_asm(*writer, pasm_st_1, 2);
     }
 
-    new_insts := asm_gen_stage_3(pasm_st_1.fn.instructions, stack_size);
-    pasm_st_1.fn.instructions = new_insts;
+    pg_stage_3 := asm_gen_stage_3(pasm_st_1);
     if do_print {
         writer := make_stdout_writer();
-        print_asm(*writer, pasm_st_1, 3);
+        print_asm(*writer, pg_stage_3, 3);
     }
-    return pasm_st_1;
+    return  pg_stage_3;
 }
 
 #scope_file
 
 asm_gen_state_1 :: (pgt: *Program_Tacky) -> *Program_Asm {
     pg := New(Program_Asm);
-    fn := asm_gen_fn(*pgt.fn);
-    pg.* = .{fn};
+    fns : [..]Fn_Asm;
+    for pgt.fns {
+        fn := asm_gen_fn(*it);
+        array_add(*fns, fn);
+    }
+    pg.* = .{fns};
     return pg;
 }
 asm_gen_fn :: (fnt: *Fn_Tacky) -> Fn_Asm {
     instructions : [..]Instruction_Asm;
+    
+    args_registers : []Reg_Asm = .[.DI, .SI, .DX, .CX, .R8, .R9];
+    register_args := array_view(fnt.params, 0, min(fnt.params.count, 6));
+    stack_args := ifx fnt.params.count > 6 array_view(fnt.params, 6, fnt.params.count - 6) else .[];
+    
+    for register_args {
+        register_to_use := args_registers[it_index];
+        assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it}};
+        array_add(*instructions, mov(reg(register_to_use), assembly_arg));
+    }
+    for stack_args {
+        assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it}};
+        src := Operand_Asm.{ .STACK, .{ stack = 16 + (it_index * 8 )}};
+        array_add(*instructions, mov(src, assembly_arg));
+    }
+    
     for fnt.instructions asm_gen_inst(*instructions, *it);
-    return .{fnt.ident, instructions};
+    return .{fnt.ident, instructions, 0};
 }
 asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
@@ -61,7 +78,6 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                 }
                 array_add(insts, .{ .UNARY, .{unary = .{op, dst}}});
             }
-
         case .BINARY;
             basm := instt.as.binary;
             if #complete basm.op == {
@@ -146,7 +162,50 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             array_add(insts, .{.MOV, .{mov = .{src, dst}}});
         case .JUMP;
             array_add(insts, .{.JMP, .{jmp = instt.as.jump}});
+        case .FN_CALL;
+            fn_call := instt.as.fn_call;
+            args_registers : []Reg_Asm = .[.DI, .SI, .DX, .CX, .R8, .R9];
+            
+            register_args := array_view(fn_call.args, 0, min(fn_call.args.count, 6));
+            stack_args := ifx fn_call.args.count > 6 array_view(fn_call.args, 6, fn_call.args.count - 6) else .[];
+            
+            stack_padding := ifx stack_args.count % 2 == 0 then 0 else 8;
+            
+            if stack_padding != 0 array_add(insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_padding}});
+            
+            for * register_args {
+                register_to_use := args_registers[it_index];
+                assembly_arg := asm_gen_val_to_operand(it);
+                array_add(insts, mov(assembly_arg, reg(register_to_use)));
+            }
+            
+            for * < stack_args {
+                assembly_arg := asm_gen_val_to_operand(it);
+                if assembly_arg.type == .REG || assembly_arg.type == .IMM {
+                    array_add(insts, .{.PUSH, .{push = assembly_arg}}); 
+                } else {
+                    array_add(insts, mov(assembly_arg, reg(.AX)));
+                    array_add(insts, .{.PUSH, .{push = reg(.AX)}});
+                }
+            }
+            
+            array_add(insts, .{.CALL, .{call = fn_call.ident}});
+            bytes_to_remove := (stack_args.count * 8) + stack_padding;
+            if bytes_to_remove > 0 {
+                array_add(insts, .{.DEALLOCATE_STACK, .{deallocate_stack = bytes_to_remove}});
+            }
+            
+            assembly_dst := asm_gen_val_to_operand(*fn_call.dst);
+            array_add(insts, mov(reg(.AX), assembly_dst));
     }
+}
+
+mov :: (src: Operand_Asm, dst: Operand_Asm) -> Instruction_Asm {
+    return .{ .MOV, .{ mov = .{ src, dst } } };
+}
+
+reg :: (r: Reg_Asm) -> Operand_Asm {
+  return .{ type = .REG, as = .{ reg = r } };
 }
 
 from_relational_to_cond_code :: (op: Bin_Op_Type_Tacky) -> Cond_Code_Asm {
@@ -196,13 +255,29 @@ asm_gen_val_to_operand :: (using val: *Val_Tacky) -> Operand_Asm {
 }
 
 // replace pseudo register, with offset relative to stack
-asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
+asm_gen_stage_2 :: (pg: *Program_Asm) {
+    stack_size: int;
+    
+    for *fn: pg.fns {
+        stack_size = asmgen_stage_2(fn.instructions);
+        fn.stack_size = stack_size;
+    }
+}
+
+// replace pseudo register, with offset relative to stack
+asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
     table : Hash_Table.Table(string, int);
     Hash_Table.init(*table);
     defer Hash_Table.deinit(*table);
 
     for *inst: insts {
         if #complete inst.type == {
+            case .CALL;
+                continue;
+            case .PUSH;
+                continue;
+            case .DEALLOCATE_STACK;
+                continue;
             case .MOV;
                 mov := inst.as.mov;
                 mov.src = asm_gen_stage_2_stack_offset(*table, mov.src);
@@ -237,9 +312,13 @@ asm_gen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
             case .JMP; continue;
         }
     }
-    stack_size := (table.count * -4);
-    // making it positive as this is size of stack
-    return -1 * stack_size;
+    // -4 because we only support 32-bit int at the moment
+    stack_size := (table.count * 4);
+    if stack_size % 16 != 0 {
+        // stack size should be multiple of 16
+        stack_size += (16 - (stack_size % 16));
+    }
+    return stack_size;
 }
 
 asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> Operand_Asm {
@@ -254,12 +333,32 @@ asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> O
 }
 
 // Fix assembly instruction
+asm_gen_stage_3 :: (pg: *Program_Asm) -> *Program_Asm {
+    new_pg := New(Program_Asm);
+    fns : [..]Fn_Asm;
+    
+    for fn: pg.fns {
+        stack_size := fn.stack_size;
+        old_insts := fn.instructions;
+        new_insts := asm_gen_stage_3(old_insts, stack_size);
+        array_add(*fns, .{fn.ident, new_insts, stack_size});
+    }
+    new_pg.* = .{fns};
+    return new_pg;
+}
+
 asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
     array_add(*insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_size}});
 
     for oi: old_insts {
         if #complete oi.type == {
+            case .CALL; 
+                array_add(*insts, oi);
+            case .PUSH;
+                array_add(*insts, oi);
+            case .DEALLOCATE_STACK;
+                array_add(*insts, oi);
             case .MOV;
                 if oi.as.mov.src.type == .STACK && oi.as.mov.dst.type == .STACK {
                     // both src and dst can't be memory address
@@ -286,7 +385,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                 if #complete oi.as.binary.op == {
                     case .LEFT_SHIFT; #through;
                     case .RIGHT_SHIFT;
-                        ireg := Operand_Asm.{.REG,.{reg = .RCX }};
+                        ireg := Operand_Asm.{.REG,.{reg = .CX }};
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{ oi.as.binary.op, ireg, oi.as.binary.src2}}});
                     case .BITWISE_AND; #through;
