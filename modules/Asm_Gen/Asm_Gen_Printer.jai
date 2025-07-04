@@ -1,7 +1,7 @@
 print_asm :: (writer: *Writer, pg: *Program_Asm, stage: int) {
     write(writer, "\n\n---- ASM GEN % --- \n", stage);
     write(writer, ".program\n");
-    print_asm_fn(writer, pg.fn);
+    for pg.fns print_asm_fn(writer, it);
 }
 
 print_asm_fn :: (writer: *Writer, fn: Fn_Asm) {
@@ -67,6 +67,17 @@ print_asm_inst :: (writer: *Writer, inst: Instruction_Asm) {
             print_asm_operand(writer, inst.as.cmp.op1);
             write(writer, ", ");
             print_asm_operand(writer, inst.as.cmp.op2);
+            write(writer, "\n");
+        case .CALL;
+            write(writer, "CALL ");
+            write(writer, inst.as.call);
+            write(writer, "\n");
+        case .PUSH;
+            write(writer, "PUSH ");
+            print_asm_operand(writer, inst.as.push);
+            write(writer, "\n");
+        case .DEALLOCATE_STACK;
+            write(writer, "DSTK %", inst.as.deallocate_stack);
             write(writer, "\n");
     }
 }
