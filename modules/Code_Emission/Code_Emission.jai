@@ -21,7 +21,12 @@ ce_program :: (writer: *Writer, using program: *Program_Asm) {
 }
 ce_fn :: (writer: *Writer, using fn: Fn_Asm) {
     write(writer, "\t.globl\t%\n", ident);
-    write(writer, "%:\n", ident);
+    #if OS == .LINUX {
+        write(writer, "%:\n", ident);
+    } 
+    #if OS == .MACOS {
+        write(writer, "_%:\n", ident);
+    }
 
     { // save caller stack pointer: prologue
         write(writer, "\tpushq\t%\n", ce_fmt_reg(.RBP));

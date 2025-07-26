@@ -4,7 +4,6 @@ Program_Tacky :: struct {
 
 Fn_Tacky :: struct {
     ident: string;
-    params: [..]string;
     instructions: []Instruction_Tacky;
 }
 
