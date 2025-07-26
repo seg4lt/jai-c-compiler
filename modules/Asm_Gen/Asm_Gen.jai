@@ -122,7 +122,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     fin_mov_src : Operand_Asm = ---;
                     if basm.op == {
                         case .DIV; fin_mov_src = reg(.AX, .DWORD);
-                        case .MOD; fin_mov_src = reg(.AX, .DWORD);
+                        case .MOD; fin_mov_src = reg(.DX, .DWORD);
                         case; assert(false, "Div shouldn't get any other operator: %", basm.op);
                     }
                     fin_mov_dst := asm_gen_val_to_operand(*basm.dst);
@@ -177,7 +177,6 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             register_args := array_view(fn_call.args, 0, min(fn_call.args.count, 6));
             stack_args := ifx fn_call.args.count > 6 array_view(fn_call.args, 6, fn_call.args.count - 6) else .[];
             
-            // 8 bytes for return address
             stack_padding := ifx stack_args.count % 2 == 0 then 0 else 8;
             
             if stack_padding != 0 array_add(insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_padding}});
@@ -194,7 +193,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     array_add(insts, .{.PUSH, .{push = assembly_arg}}); 
                 } else {
                     array_add(insts, mov(assembly_arg, reg(.AX, .DWORD)));
-                    array_add(insts, .{.PUSH, .{push = reg(.AX, .DWORD)}});
+                    array_add(insts, .{.PUSH, .{push = reg(.AX, .QWORD)}});
                 }
             }
             
@@ -268,7 +267,6 @@ asm_gen_stage_2 :: (pg: *Program_Asm) {
     stack_size: int;
     
     for *fn: pg.fns {
-        print("stage2: ============ %", fn.ident);
         stack_size = asmgen_stage_2(fn.instructions);
         fn.stack_size = stack_size;
     }
@@ -324,7 +322,6 @@ asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
     }
     // 4 because we only support 32-bit int at the moment
     stack_size := (table.count * 4);
-    print("======== %", table);
    
     return stack_size;
 }
@@ -348,7 +345,6 @@ asm_gen_stage_3 :: (pg: *Program_Asm) -> *Program_Asm {
     for fn: pg.fns {
         stack_size := fn.stack_size;
         old_insts := fn.instructions;
-        print("============= % \n", fn.ident);
         new_insts := asm_gen_stage_3(old_insts, stack_size);
         array_add(*fns, .{fn.ident, new_insts, stack_size});
     }
@@ -359,7 +355,6 @@ asm_gen_stage_3 :: (pg: *Program_Asm) -> *Program_Asm {
 
 asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
-    print("-================ %\n", stack_size);
     if stack_size % 16 != 0 {
         // stack size should be multiple of 16
         stack_size += (16 - (stack_size % 16));
