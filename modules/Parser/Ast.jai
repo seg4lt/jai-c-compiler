@@ -73,7 +73,7 @@ Stmt_Ast :: struct {
         default: string;
         // null : doesn't need value
     };
-    loc: Source_Location;
+    using loc: Source_Location;
 }
 
 Switch_Stmt_Ast :: struct {

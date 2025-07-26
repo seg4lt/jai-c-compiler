@@ -98,6 +98,13 @@ typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
             typecheck_stmt(stmt.as.for_stmt.body, st, erp);
         case .SWITCH;
             switch_stmt := stmt.as.switch;
+            if switch_stmt.condition.type == .VAR {
+                var_stmt := switch_stmt.condition.as.var;
+                success, entry := table_find_new(st, var_stmt);
+                if success && entry.type == .FN {
+                    error_report(erp, stmt.line, stmt.start, "switch condition % must be a variable", var_stmt);
+                }
+            }
             for switch_stmt.body typecheck_block_item(it, st, erp);
         case .CASE; #through;
         case .DEFAULT; #through;
