@@ -1,15 +1,15 @@
-code_emm :: (src_path_no_ext: string, program: *Program_Asm) {
+code_emm :: (src_path_no_ext: string, program: *Program_Asm, st: Symbol_Table) {
     file, success := file_open(tprint("%.s", src_path_no_ext), for_writing=true, keep_existing_content=false);
     if !success return;
     defer file_close(*file);
 
     writer := make_file_writer(*file);
-    ce_program(*writer, program);
+    ce_program(*writer, program, st);
 }
 
 #scope_module
 
-ce_program :: (writer: *Writer, using program: *Program_Asm) {
+ce_program :: (writer: *Writer, using program: *Program_Asm, st: Symbol_Table) {
     if program == null return;
     defer {
         #if OS == .LINUX { 
@@ -17,33 +17,50 @@ ce_program :: (writer: *Writer, using program: *Program_Asm) {
             write(writer, progbits);
         }
     };
-    ce_fn(writer, fn);
+    for *fn: program.fns {
+        ce_fn(writer, fn, st);
+    }
 }
-ce_fn :: (writer: *Writer, using fn: Fn_Asm) {
+ce_fn :: (writer: *Writer, using fn: Fn_Asm, st: Symbol_Table) {
     write(writer, "\t.globl\t%\n", ident);
+    
     #if OS == .LINUX {
         write(writer, "%:\n", ident);
-    } 
-    #if OS == .MACOS {
+    } else #if OS == .MACOS {
         write(writer, "_%:\n", ident);
     }
 
     { // save caller stack pointer: prologue
-        write(writer, "\tpushq\t%\n", ce_fmt_reg(.RBP));
-        write(writer, "\tmovq\t%, %\n", ce_fmt_reg(.RSP), ce_fmt_reg(.RBP));
+        write(writer, "\tpushq\t%\n", ce_fmt_reg(.{.RBP, .QWORD}));
+        write(writer, "\tmovq\t%, %\n", ce_fmt_reg(.{.RSP, .QWORD}), ce_fmt_reg(.{.RBP, .QWORD}));
     }
-    for fn.instructions ce_inst(writer, *it); 
+    for fn.instructions ce_inst(writer, *it, st); 
 }
 
-ce_inst :: (writer: *Writer, using inst: Instruction_Asm) {
+ce_inst :: (writer: *Writer, using inst: Instruction_Asm, st: Symbol_Table) {
     if #complete type == {
+        case .CALL;
+            fn_name := inst.as.call;
+            #if OS == .LINUX {
+                success := table_find_new(*st, fn_name);
+                write(writer, "\tcall\t%", fn_name); 
+                write(writer, "%\n", ifx success "" else "@PLT");
+            } else #if OS == .MACOS {
+                write(writer, "\tcall\t_%\n", fn_name);
+            }
+        case .DEALLOCATE_STACK;
+            size := inst.as.deallocate_stack;
+            write(writer, "\taddq\t$%, %\n", size, ce_fmt_reg(.{.RSP,.QWORD}));
+        case .PUSH;
+            size := inst.as.push;
+            write(writer, "\tpushq\t%\n", ce_fmt_operand(size));
         case .MOV;
             write(writer, "\tmovl\t%, %\n", ce_fmt_operand(as.mov.src), ce_fmt_operand(as.mov.dst));
         case .RET;
             {   // epilogue
                 write(writer, "\t# vv\tEpilogue\n");
-                write(writer, "\tmovq\t%, %\n", ce_fmt_reg(.RBP), ce_fmt_reg(.RSP));
-                write(writer, "\tpopq\t%\n", ce_fmt_reg(.RBP));
+                write(writer, "\tmovq\t%, %\n", ce_fmt_reg(.{.RBP, .QWORD}), ce_fmt_reg(.{.RSP, .QWORD}));
+                write(writer, "\tpopq\t%\n", ce_fmt_reg(.{.RBP, .QWORD}));
             }
             write(writer, "\tret\n");
         case .UNARY;
@@ -89,7 +106,7 @@ ce_inst :: (writer: *Writer, using inst: Instruction_Asm) {
             write(writer, "\t%\t%\n", cmd, ce_fmt_operand(as.set_cc.operand));
         case .ALLOCATE_STACK;
             if as.allocate_stack != 0 {
-                write(writer, "\tsubq\t$%, %\n", as.allocate_stack, ce_fmt_reg(.RSP));
+                write(writer, "\tsubq\t$%, %\n", as.allocate_stack, ce_fmt_reg(.{.RSP, .QWORD}));
                 write(writer, "\t# ^^^\tPrologue\n");
             } else {
                 write(writer, "\t# ^^^\tPrologue (no stack allocation needed)\n");
@@ -129,30 +146,91 @@ ce_fmt_operand :: (operand: Operand_Asm) -> string {
     if #complete operand.type == {
         case .IMM; return tprint("$%", operand.as.imm);
         case .REG; return ce_fmt_reg(operand.as.reg);
-        case .STACK; return tprint("%(%)", operand.as.stack, ce_fmt_reg(.RBP));
+        case .STACK; return tprint("%(%)", operand.as.stack, ce_fmt_reg(.{.RBP, .QWORD}));
         case .PSEUDO; assert(false, "pseudo operand shouldn't exist anymore"); return "";
     }
 }
 
-ce_fmt_reg :: (r: Reg_Asm) -> string {
+ce_fmt_reg :: (using r: Register_Asm) -> string {
     // TODO: Figure out register size??
-    if #complete r == {
-        case .AX; return "%eax"; 
-        case .DX; return "%edx"; 
-        case .R10; return "%r10d"; 
-        case .R11; return "%r11d"; 
-        case .RSP; return "%rsp";
-        case .RBP; return "%rbp";
-        // @note
-        // Bits:  63                             32 31        16 15       8 7        0
-        //        +-------------------------------+-------------+----------+----------+
-        // rcx:   |         High 32 bits          |   ecx (32)  | cx (16)  | cl (8)   |
-        //        +-------------------------------+-------------+----------+----------+
-        //                                                      | ch (8)   | cl (8)   |
-        //                                                      +----------+----------+
-        // Using ecx as SAR and SAL needs 32-bit register
-        // probably need to do this dynamically later
-        case .RCX; return "%ecx";
+    if #complete register == {
+        case .AX; 
+            if #complete size == {
+                case .QWORD; return "%rax"; 
+                case .DWORD; return "%eax"; 
+                case .WORD; return "%ax"; 
+                case .BYTE; return "%al"; 
+            };
+        case .DX;  
+            if #complete size == {
+                case .QWORD; return "%rdx"; 
+                case .DWORD; return "%edx"; 
+                case .WORD; return "%dx"; 
+                case .BYTE; return "%dl"; 
+            };
+        case .R10;
+            if #complete size  == {
+                case .QWORD; return "%r10"; 
+                case .DWORD; return "%r10d"; 
+                case .WORD; return "%r10w"; 
+                case .BYTE; return "%r10b"; 
+            };
+        case .R11; 
+            if #complete size  == {
+                case .QWORD; return "%r11"; 
+                case .DWORD; return "%r11d"; 
+                case .WORD; return "%r11w"; 
+                case .BYTE; return "%r11b"; 
+            };
+        case .RSP; 
+            if #complete size  == {
+                case .QWORD; return "%rsp"; 
+                case .DWORD; return "%esp"; 
+                case .WORD; return "%sp"; 
+                case .BYTE; return "%spl"; 
+            };
+        case .RBP;
+            if #complete size == {
+                case .QWORD; return "%rbp"; 
+                case .DWORD; return "%ebp"; 
+                case .WORD; return "%bp"; 
+                case .BYTE; return "%bpl"; 
+            };
+        case .CX; 
+            if #complete size == {
+                case .QWORD; return "%rcx"; 
+                case .DWORD; return "%ecx"; 
+                case .WORD; return "%cx"; 
+                case .BYTE; return "%cl"; 
+            };
+        case .R8;
+            if #complete size  == {
+                case .QWORD; return "%r8"; 
+                case .DWORD; return "%r8d"; 
+                case .WORD; return "%r8w"; 
+                case .BYTE; return "%r8b"; 
+            };
+        case .SI; 
+            if #complete size  == {
+                case .QWORD; return "%rsi"; 
+                case .DWORD; return "%esi"; 
+                case .WORD; return "%si"; 
+                case .BYTE; return "%sil"; 
+            };
+        case .R9;
+            if #complete size == {
+                case .QWORD; return "%r9"; 
+                case .DWORD; return "%r9d"; 
+                case .WORD; return "%r9w"; 
+                case .BYTE; return "%r9b"; 
+            };
+        case .DI;
+            if #complete size == {
+                case .QWORD; return "%rdi"; 
+                case .DWORD; return "%edi"; 
+                case .WORD; return "%di"; 
+                case .BYTE; return "%dil"; 
+            };
     }
 }
 

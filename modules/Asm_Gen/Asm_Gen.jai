@@ -41,14 +41,14 @@ asm_gen_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
     // we need to move value as per System V calling convention to respective pseudo registers
     fn_symbol := entry.as.fn;
     fn_params := fn_symbol.params;
-    args_registers : []Reg_Asm = .[.DI, .SI, .DX, .CX, .R8, .R9];
+    args_registers : []Register = .[.DI, .SI, .DX, .CX, .R8, .R9];
     register_args := array_view(fn_params, 0, min(fn_params.count, 6));
     stack_args := ifx fn_params.count > 6 array_view(fn_params, 6, fn_params.count - 6) else .[];
     
     for register_args {
         register_to_use := args_registers[it_index];
         assembly_arg := Operand_Asm.{ .PSEUDO, .{pseudo = it.ident }};
-        array_add(*instructions, mov(reg(register_to_use), assembly_arg));
+        array_add(*instructions, mov(reg(register_to_use, .DWORD), assembly_arg));
     }
     for stack_args {
         assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it.ident }};
@@ -63,7 +63,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
         case .RETURN;
             src := asm_gen_val_to_operand(*instt.as.ret);
-            dst := Operand_Asm.{.REG, .{ reg = .AX}};
+            dst := reg(.AX, .DWORD);
             array_add(insts, .{.MOV,.{ mov = .{ src, dst }}});
             array_add(insts, .{ .RET, .{} });
         case .UNARY;
@@ -108,7 +108,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                 case .MOD;
                     // load divident to AX register
                     src1 := asm_gen_val_to_operand(*basm.src1);
-                    fst_move_dst := Operand_Asm.{.REG, .{ reg = .AX}};
+                    fst_move_dst := reg(.AX, .DWORD);
                     array_add(insts, .{.MOV,.{ mov = .{ src1, fst_move_dst }}});
 
                     // Sign-extend EAX into RDX;RAX
@@ -121,8 +121,8 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     // move the result from specified register to dst
                     fin_mov_src : Operand_Asm = ---;
                     if basm.op == {
-                        case .DIV; fin_mov_src = .{.REG, .{reg = .AX}};
-                        case .MOD; fin_mov_src = .{.REG, .{reg = .DX}};
+                        case .DIV; fin_mov_src = reg(.AX, .DWORD);
+                        case .MOD; fin_mov_src = reg(.AX, .DWORD);
                         case; assert(false, "Div shouldn't get any other operator: %", basm.op);
                     }
                     fin_mov_dst := asm_gen_val_to_operand(*basm.dst);
@@ -141,7 +141,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     if basm.src1.type == {
                         case .CONSTANT;
                             src1 := asm_gen_val_to_operand(*basm.src1);
-                            ireg := Operand_Asm.{.REG,.{reg = .R11}};
+                            ireg := reg(.R11, .DWORD);
                             array_add(insts, Instruction_Asm.{.MOV, .{mov = .{src = src1, dst = ireg }}});
                             array_add(insts, Instruction_Asm.{.CMP, .{cmp = .{src2, ireg}}});
                         case .VARIABLE;
@@ -172,11 +172,12 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             array_add(insts, .{.JMP, .{jmp = instt.as.jump}});
         case .FN_CALL;
             fn_call := instt.as.fn_call;
-            args_registers : []Reg_Asm = .[.DI, .SI, .DX, .CX, .R8, .R9];
+            args_registers : []Register = .[.DI, .SI, .DX, .CX, .R8, .R9];
             
             register_args := array_view(fn_call.args, 0, min(fn_call.args.count, 6));
             stack_args := ifx fn_call.args.count > 6 array_view(fn_call.args, 6, fn_call.args.count - 6) else .[];
             
+            // 8 bytes for return address
             stack_padding := ifx stack_args.count % 2 == 0 then 0 else 8;
             
             if stack_padding != 0 array_add(insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_padding}});
@@ -184,7 +185,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             for * register_args {
                 register_to_use := args_registers[it_index];
                 assembly_arg := asm_gen_val_to_operand(it);
-                array_add(insts, mov(assembly_arg, reg(register_to_use)));
+                array_add(insts, mov(assembly_arg, reg(register_to_use, .DWORD)));
             }
             
             for * < stack_args {
@@ -192,8 +193,8 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                 if assembly_arg.type == .REG || assembly_arg.type == .IMM {
                     array_add(insts, .{.PUSH, .{push = assembly_arg}}); 
                 } else {
-                    array_add(insts, mov(assembly_arg, reg(.AX)));
-                    array_add(insts, .{.PUSH, .{push = reg(.AX)}});
+                    array_add(insts, mov(assembly_arg, reg(.AX, .DWORD)));
+                    array_add(insts, .{.PUSH, .{push = reg(.AX, .DWORD)}});
                 }
             }
             
@@ -204,7 +205,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             }
             
             assembly_dst := asm_gen_val_to_operand(*fn_call.dst);
-            array_add(insts, mov(reg(.AX), assembly_dst));
+            array_add(insts, mov(reg(.AX, .DWORD), assembly_dst));
     }
 }
 
@@ -212,8 +213,8 @@ mov :: (src: Operand_Asm, dst: Operand_Asm) -> Instruction_Asm {
     return .{ .MOV, .{ mov = .{ src, dst } } };
 }
 
-reg :: (r: Reg_Asm) -> Operand_Asm {
-  return .{ type = .REG, as = .{ reg = r } };
+reg :: (register: Register, size: Register_Size) -> Operand_Asm {
+    return .{.REG, .{reg = .{register, size }}};
 }
 
 from_relational_to_cond_code :: (op: Bin_Op_Type_Tacky) -> Cond_Code_Asm {
@@ -267,6 +268,7 @@ asm_gen_stage_2 :: (pg: *Program_Asm) {
     stack_size: int;
     
     for *fn: pg.fns {
+        print("stage2: ============ %", fn.ident);
         stack_size = asmgen_stage_2(fn.instructions);
         fn.stack_size = stack_size;
     }
@@ -320,12 +322,10 @@ asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
             case .JMP; continue;
         }
     }
-    // -4 because we only support 32-bit int at the moment
+    // 4 because we only support 32-bit int at the moment
     stack_size := (table.count * 4);
-    if stack_size % 16 != 0 {
-        // stack size should be multiple of 16
-        stack_size += (16 - (stack_size % 16));
-    }
+    print("======== %", table);
+   
     return stack_size;
 }
 
@@ -348,6 +348,7 @@ asm_gen_stage_3 :: (pg: *Program_Asm) -> *Program_Asm {
     for fn: pg.fns {
         stack_size := fn.stack_size;
         old_insts := fn.instructions;
+        print("============= % \n", fn.ident);
         new_insts := asm_gen_stage_3(old_insts, stack_size);
         array_add(*fns, .{fn.ident, new_insts, stack_size});
     }
@@ -355,8 +356,14 @@ asm_gen_stage_3 :: (pg: *Program_Asm) -> *Program_Asm {
     return new_pg;
 }
 
+
 asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
+    print("-================ %\n", stack_size);
+    if stack_size % 16 != 0 {
+        // stack size should be multiple of 16
+        stack_size += (16 - (stack_size % 16));
+    }
     array_add(*insts, .{.ALLOCATE_STACK, .{allocate_stack = stack_size}});
 
     for oi: old_insts {
@@ -368,11 +375,12 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
             case .DEALLOCATE_STACK;
                 array_add(*insts, oi);
             case .MOV;
-                if oi.as.mov.src.type == .STACK && oi.as.mov.dst.type == .STACK {
+                movi := oi.as.mov;
+                if movi.src.type == .STACK && movi.dst.type == .STACK {
                     // both src and dst can't be memory address
-                    ireg := Operand_Asm.{.REG,.{reg = .R10}};
-                    array_add(*insts, .{.MOV, .{mov = .{src = oi.as.mov.src, dst = ireg }}});
-                    array_add(*insts, .{.MOV, .{mov = .{src = ireg, dst = oi.as.mov.dst}}});
+                    ireg := reg(.R10, .DWORD);
+                    array_add(*insts, mov(movi.src, ireg));
+                    array_add(*insts, mov(ireg, movi.dst));
                 } else {
                     array_add(*insts, oi);
                 }
@@ -383,7 +391,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                     // movl   $3, %r10d
                     // idivl  %r10d
                     // idiv divisor can't be constant
-                    intermediate_reg := Operand_Asm.{.REG,.{reg = .R10}};
+                    intermediate_reg := reg(.R10, .DWORD);
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.idiv, intermediate_reg}}});
                     array_add(*insts, .{.IDIV, .{idiv = intermediate_reg}});
                 } else {
@@ -393,7 +401,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                 if #complete oi.as.binary.op == {
                     case .LEFT_SHIFT; #through;
                     case .RIGHT_SHIFT;
-                        ireg := Operand_Asm.{.REG,.{reg = .CX }};
+                        ireg := reg(.CX, .DWORD);
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{ oi.as.binary.op, ireg, oi.as.binary.src2}}});
                     case .BITWISE_AND; #through;
@@ -406,7 +414,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                         // -- to --
                         // movl   -4(%rbp), %r10d
                         // addl   %r10d, -8(%rbp)
-                        ireg := Operand_Asm.{.REG,.{reg = .R10}};
+                        ireg := reg(.R10, .DWORD);
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{ oi.as.binary.op, ireg, oi.as.binary.src2}}});
                     case .MUL;
@@ -415,7 +423,7 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                         // movl   -4(%rbp), %r11d
                         // imull  $3, %r11d
                         // movl   %r11d, -4(%rbp)
-                        ireg := Operand_Asm.{.REG,.{reg = .R11}};
+                        ireg := reg(.R11, .DWORD);
                         array_add(*insts, .{.MOV, .{mov = .{oi.as.binary.src2, ireg }}});
                         array_add(*insts, .{.BINARY, .{binary = .{oi.as.binary.op, oi.as.binary.src1, ireg }}});
                         array_add(*insts, .{.MOV, .{mov = .{ ireg, oi.as.binary.src2 }}});
@@ -438,12 +446,12 @@ asm_gen_stage_3 :: (old_insts: []Instruction_Asm, stack_size: int) -> [..]Instru
                 array_add(*insts, oi);
             case .CMP;
                 if oi.as.cmp.op1.type == .STACK && oi.as.cmp.op2.type == .STACK {
-                    ireg := Operand_Asm.{.REG,.{reg = .R10}};
+                    ireg := reg(.R10, .DWORD);
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op1, ireg }}});
                     array_add(*insts, .{.CMP, .{cmp = .{ ireg, oi.as.cmp.op2}}});
                 }
                 else if oi.as.cmp.op2.type == .IMM {
-                    ireg := Operand_Asm.{.REG,.{reg = .R11}};
+                    ireg := reg(.R11, .DWORD);
                     array_add(*insts, .{.MOV, .{mov = .{oi.as.cmp.op2, ireg }}});
                     array_add(*insts, .{.CMP, .{cmp = .{ oi.as.cmp.op1, ireg}}});
                 }

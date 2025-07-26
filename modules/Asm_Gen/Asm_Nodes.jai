@@ -51,7 +51,12 @@ Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; };
 
 Operand_Asm :: struct {
     type: enum { IMM; REG; PSEUDO; STACK; };
-    as: union { imm: int; reg: Reg_Asm; pseudo: string; stack: int; }; 
+    as: union { 
+        imm: int;
+        reg: Register_Asm;
+        pseudo: string;
+        stack: int; 
+    }; 
 };
 
 Unary_Op_Asm :: enum { NEG; BITWISE_NOT; NNOT; }
@@ -73,7 +78,19 @@ Bin_Op_Asm :: enum {
     LESS_EQUAL;
 }; 
 
-Reg_Asm :: enum { 
+Register_Asm :: struct {
+    register: Register;
+    size: Register_Size;
+};
+
+Register_Size :: enum #specified { 
+    BYTE  :: 1;
+    WORD  :: 2;
+    DWORD :: 4;
+    QWORD :: 8;
+}
+
+Register :: enum { 
     AX;
     CX;
     DX;

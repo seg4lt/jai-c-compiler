@@ -17,6 +17,7 @@ assember_and_linker :: (src_path_without_ext: string, output_type: Output_Type) 
         case .EXE;
             command: [..] string;
             array_add(*command, "gcc");
+            array_add(*command, "-g");
             array_add(*command, tprint("%.s", src_path_without_ext));
             array_add(*command, "-o");
             array_add(*command, src_path_without_ext);
