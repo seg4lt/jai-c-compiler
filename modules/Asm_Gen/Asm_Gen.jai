@@ -1,5 +1,5 @@
-asm_gen :: (pgt: *Program_Tacky, do_print: bool = false) -> *Program_Asm {
-    pasm_st_1 := asm_gen_state_1(pgt);
+asm_gen :: (pgt: *Program_Tacky, st: Symbol_Table, do_print: bool = false) -> *Program_Asm {
+    pasm_st_1 := asm_gen_state_1(pgt, st);
     if do_print {
         writer := make_stdout_writer();
         print_asm(*writer, pasm_st_1, 1);
@@ -20,30 +20,38 @@ asm_gen :: (pgt: *Program_Tacky, do_print: bool = false) -> *Program_Asm {
 
 #scope_file
 
-asm_gen_state_1 :: (pgt: *Program_Tacky) -> *Program_Asm {
+asm_gen_state_1 :: (pgt: *Program_Tacky, st: Symbol_Table) -> *Program_Asm {
     pg := New(Program_Asm);
     fns : [..]Fn_Asm;
     for pgt.fns {
-        fn := asm_gen_fn(*it);
+        fn := asm_gen_fn(*it, st);
         array_add(*fns, fn);
     }
     pg.* = .{fns};
     return pg;
 }
-asm_gen_fn :: (fnt: *Fn_Tacky) -> Fn_Asm {
+asm_gen_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
     instructions : [..]Instruction_Asm;
     
+    success, entry := table_find_new(*st, fnt.ident);
+    if !success assert(false, "Function % not found in symbol table", fnt.ident);
+    if entry.type != .FN assert(false, "Symbol % is not a function", fnt.ident);
+    
+    // fn args already has a name - but they don't have values
+    // we need to move value as per System V calling convention to respective pseudo registers
+    fn_symbol := entry.as.fn;
+    fn_params := fn_symbol.params;
     args_registers : []Reg_Asm = .[.DI, .SI, .DX, .CX, .R8, .R9];
-    register_args := array_view(fnt.params, 0, min(fnt.params.count, 6));
-    stack_args := ifx fnt.params.count > 6 array_view(fnt.params, 6, fnt.params.count - 6) else .[];
+    register_args := array_view(fn_params, 0, min(fn_params.count, 6));
+    stack_args := ifx fn_params.count > 6 array_view(fn_params, 6, fn_params.count - 6) else .[];
     
     for register_args {
         register_to_use := args_registers[it_index];
-        assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it}};
+        assembly_arg := Operand_Asm.{ .PSEUDO, .{pseudo = it.ident }};
         array_add(*instructions, mov(reg(register_to_use), assembly_arg));
     }
     for stack_args {
-        assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it}};
+        assembly_arg := Operand_Asm.{.PSEUDO, .{pseudo = it.ident }};
         src := Operand_Asm.{ .STACK, .{ stack = 16 + (it_index * 8 )}};
         array_add(*instructions, mov(src, assembly_arg));
     }
@@ -266,9 +274,9 @@ asm_gen_stage_2 :: (pg: *Program_Asm) {
 
 // replace pseudo register, with offset relative to stack
 asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
-    table : Hash_Table.Table(string, int);
-    Hash_Table.init(*table);
-    defer Hash_Table.deinit(*table);
+    table : Table(string, int);
+    init(*table);
+    defer deinit(*table);
 
     for *inst: insts {
         if #complete inst.type == {
@@ -321,14 +329,14 @@ asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
     return stack_size;
 }
 
-asm_gen_stage_2_stack_offset :: (table: *Hash_Table.Table, op: Operand_Asm) -> Operand_Asm {
+asm_gen_stage_2_stack_offset :: (table: *Table, op: Operand_Asm) -> Operand_Asm {
     if op.type != .PSEUDO return op;
 
-    success, saved_offset := Hash_Table.table_find_new(table, op.as.pseudo);
+    success, saved_offset := table_find_new(table, op.as.pseudo);
     if success return .{.STACK, .{ stack = saved_offset }};
 
     offset := (table.count + 1) * -4;
-    Hash_Table.table_add(table, op.as.pseudo, offset);
+    table_add(table, op.as.pseudo, offset);
     return .{.STACK,  .{stack=offset}};
 }
 
