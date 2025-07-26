@@ -1,16 +1,7 @@
 int putchar(int c);
+int sum(int x, int y) { return x + y; }
 
 int main(void) {
-  putchar(72);  // ASCII for 'H'
-  putchar(101); // ASCII for 'e'
-  putchar(108); // ASCII for 'l'
-  putchar(108); // ASCII for 'l'
-  putchar(111); // ASCII for 'o'
-  putchar(32);  // ASCII for ' ' (space)
-  putchar(87);  // ASCII for 'W'
-  putchar(111); // ASCII for 'o'
-  putchar(114); // ASCII for 'r'
-  putchar(108); // ASCII for 'l'
-  putchar(100); // ASCII for 'd'
-  putchar(10);  // ASCII for '\n' (newline)
+    putchar(72);
+    return sum(3, 4);
 }

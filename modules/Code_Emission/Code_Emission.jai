@@ -42,9 +42,13 @@ ce_inst :: (writer: *Writer, using inst: Instruction_Asm, st: Symbol_Table) {
         case .CALL;
             fn_name := inst.as.call;
             #if OS == .LINUX {
-                success := table_find_new(*st, fn_name);
+                success, entry := table_find_new(*st, fn_name);
+                add_plt := false;
+                if success && entry.type == .FN && !entry.as.fn.defined {
+                    add_plt = true;
+                }
                 write(writer, "\tcall\t%", fn_name); 
-                write(writer, "%\n", ifx success "" else "@PLT");
+                write(writer, "%\n", ifx !add_plt "" else "@PLT");
             } else #if OS == .MACOS {
                 write(writer, "\tcall\t_%\n", fn_name);
             }
