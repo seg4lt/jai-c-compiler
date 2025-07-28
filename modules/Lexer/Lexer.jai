@@ -29,81 +29,81 @@ scan :: (using lexer: *Lexer) {
         current_char := consume(lexer);
 
         if is_space(current_char) {
-            if current_char == #char "\n" line += 1;
+            if current_char == "\n" line += 1;
             continue;
         }
-        if is_alpha(current_char) || current_char == #char "_" { ident_or_keyword(lexer); continue; }
+        if is_alpha(current_char) || current_char == "_" { ident_or_keyword(lexer); continue; }
         if is_digit(current_char) { number(lexer); continue; }
 
         if current_char == {
-            case #char "("; add_token(lexer, .LPAREN);
-            case #char ")"; add_token(lexer, .RPAREN);
-            case #char "{"; add_token(lexer, .LCURLY);
-            case #char "}"; add_token(lexer, .RCURLY);
-            case #char ";"; add_token(lexer, .SEMICOLON);
-            case #char "~"; add_token(lexer, .BITWISE_NOT);
-            case #char ","; add_token(lexer, .COMMA);
-            case #char "+"; 
-                if peek(lexer) == #char "=" {
+            case "("; add_token(lexer, .LPAREN);
+            case ")"; add_token(lexer, .RPAREN);
+            case "{"; add_token(lexer, .LCURLY);
+            case "}"; add_token(lexer, .RCURLY);
+            case ";"; add_token(lexer, .SEMICOLON);
+            case "~"; add_token(lexer, .BITWISE_NOT);
+            case ","; add_token(lexer, .COMMA);
+            case "+"; 
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .PLUS_EQUAL);
                     continue;
                 }
-                if peek(lexer) == #char "+" {
+                if peek(lexer) == "+" {
                     consume(lexer);
                     add_token(lexer, .PLUS_PLUS);
                     continue;
                 }
                 add_token(lexer, .PLUS);
-            case #char "*"; 
-                if peek(lexer) == #char "=" {
+            case "*"; 
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .MULTIPLY_EQUAL);
                     continue;
                 }
                 add_token(lexer, .MULTIPLY);
-            case #char "%"; 
-                if peek(lexer) == #char "=" {
+            case "%"; 
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .MOD_EQUAL);
                     continue;
                 }
                 add_token(lexer, .MOD);
-            case #char "&"; 
-                if peek(lexer) == #char "&" {
+            case "&"; 
+                if peek(lexer) == "&" {
                     consume(lexer);
                     add_token(lexer, .AND);
                     continue;
                 }
-                if peek(lexer) == #char "=" {
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .BITWISE_AND_EQUAL);
                     continue;
                 }
                 add_token(lexer, .BITWISE_AND);
-            case #char "|"; 
-                if peek(lexer) == #char "|" {
+            case "|"; 
+                if peek(lexer) == "|" {
                     consume(lexer);
                     add_token(lexer, .OR);
                     continue;
                 }
-                if peek(lexer) == #char "=" {
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .BITWISE_OR_EQUAL);
                     continue;
                 }
                 add_token(lexer, .BITWISE_OR);
-            case #char "^"; 
-                if peek(lexer) == #char "=" {
+            case "^"; 
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .BITWISE_XOR_EQUAL);
                     continue;
                 }
                 add_token(lexer, .BITWISE_XOR);
-            case #char ">";
-                if peek(lexer) == #char ">" {
+            case ">";
+                if peek(lexer) == ">" {
                     consume(lexer);
-                    if peek(lexer) == #char "=" {
+                    if peek(lexer) == "=" {
                         consume(lexer);
                         add_token(lexer, .RIGHT_SHIFT_EQUAL);
                         continue;
@@ -111,16 +111,16 @@ scan :: (using lexer: *Lexer) {
                     add_token(lexer, .RIGHT_SHIFT);
                     continue;
                 }
-                if peek(lexer) == #char "=" {
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .GREATER_EQUAL);
                     continue;
                 }
                 add_token(lexer, .GREATER);
-            case #char "<";
-                if peek(lexer) == #char "<" {
+            case "<";
+                if peek(lexer) == "<" {
                     consume(lexer);
-                    if peek(lexer) == #char "=" {
+                    if peek(lexer) == "=" {
                         consume(lexer);
                         add_token(lexer, .LEFT_SHIFT_EQUAL);
                         continue;
@@ -128,51 +128,51 @@ scan :: (using lexer: *Lexer) {
                     add_token(lexer, .LEFT_SHIFT);
                     continue;
                 }
-                if peek(lexer) == #char "=" {
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .LESS_EQUAL);
                     continue;
                 }
                 add_token(lexer, .LESS);
-            case #char "/"; 
-                if peek(lexer) == #char "/" || peek(lexer) == #char "*" {
+            case "/"; 
+                if peek(lexer) == "/" || peek(lexer) == "*" {
                     comment(lexer);
                     continue;
                 }
-                if peek(lexer) == #char "=" {
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .DIVIDE_EQUAL);
                     continue;
                 }
                 add_token(lexer, .DIVIDE);
-            case #char "-"; 
-                if peek(lexer) == #char "=" {
+            case "-"; 
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .MINUS_EQUAL);
                     continue;
                 }
-                if peek(lexer) == #char "-" {
+                if peek(lexer) == "-" {
                     consume(lexer);
                     add_token(lexer, .MINUS_MINUS);
                     continue;
                 }
                 add_token(lexer, .MINUS);
-            case #char "=";
-                if peek(lexer) == #char "=" {
+            case "=";
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .EQUAL_EQUAL);
                     continue;
                 }
                 add_token(lexer, .ASSIGN);
-            case #char "!";
-                if peek(lexer) == #char "=" {
+            case "!";
+                if peek(lexer) == "=" {
                     consume(lexer);
                     add_token(lexer, .NOT_EQUAL);
                     continue;
                 }
                 add_token(lexer, .NOT);
-            case #char "?"; add_token(lexer, .QUESTION_MARK);
-            case #char ":"; add_token(lexer, .COLON);
+            case "?"; add_token(lexer, .QUESTION_MARK);
+            case ":"; add_token(lexer, .COLON);
             case; lex_err(lexer, "Unexpected character %", to_string(*current_char, 1));
         }
     }
@@ -192,17 +192,17 @@ print_tokens :: (tokens: []Token) {
 
 comment :: (using lexer: *Lexer) {
     if peek(lexer) == {
-        case #char "/";
-            while !is_at_end(lexer) && peek(lexer) != #char "\n" {
+        case "/";
+            while !is_at_end(lexer) && peek(lexer) != "\n" {
                 consume(lexer);
             }
             line += 1;
-        case #char "*";
+        case "*";
             consume(lexer);
             while !is_at_end(lexer) {
                 c := consume(lexer);
-                if c == #char "\n" line += 1;
-                if c == #char "*" && peek(lexer) == #char "/" break;
+                if c == "\n" line += 1;
+                if c == "*" && peek(lexer) == "/" break;
             }
             consume(lexer); // consume closing /, if not found, this is an error
         case; lex_err(lexer, "unable to parse comment\n");
@@ -233,7 +233,7 @@ ident_or_keyword :: (using lexer: *Lexer) {
 eat_whitespace :: (lexer: *Lexer) {
     while is_space(peek(lexer)) {
         token := consume(lexer);
-        if token == #char "\n" lexer.line += 1;
+        if token == "\n" lexer.line += 1;
     }
 }
 
@@ -264,7 +264,7 @@ add_token :: (using lexer: *Lexer, type: Token_Type) {
 consume :: (using lexer: *Lexer) -> u8 {
     defer current += 1;
     c := peek(lexer);
-    if c == #char "\n" line += 1;
+    if c == "\n" line += 1;
     return c;
 }
 
