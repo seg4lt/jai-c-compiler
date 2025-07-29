@@ -69,8 +69,10 @@ typecheck_var_decl :: (var_decl: *Var_Decl_Ast, st: *Symbol_Table, erp: *Error_R
 typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     assert(stmt != null, "stmt should not be null");
     if #complete stmt.type == {
-        case .RETURN; typecheck_expr(stmt.as.return_stmt.expr, st, erp);
-        case .EXPR; typecheck_expr(stmt.as.expr, st, erp);
+        case .RETURN;
+            typecheck_expr(stmt.as.return_stmt.expr, st, erp);
+        case .EXPR;
+            typecheck_expr(stmt.as.expr, st, erp);
         case .IF;
             typecheck_expr(stmt.as.if_stmt.condition, st, erp);
             typecheck_stmt(stmt.as.if_stmt.if_block, st, erp);
@@ -106,12 +108,12 @@ typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
                 }
             }
             for switch_stmt.body typecheck_block_item(it, st, erp);
-        case .CASE; #through;
-        case .DEFAULT; #through;
+        case .CASE;     #through;
+        case .DEFAULT;  #through;
         case .CONTINUE; #through;
-        case .BREAK; #through;
-        case .NULL; #through;
-        case .GOTO; // noop
+        case .BREAK;    #through;
+        case .NULL;     #through;
+        case .GOTO;     // noop
     }
 }
 
@@ -120,20 +122,20 @@ typecheck_expr :: (expr: *Expr_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
         case .UNARY;
             typecheck_expr(expr.as.unary.expr, st, erp);
         case .BINARY;
-            left := expr.as.binary.left;
-            typecheck_expr(expr.as.binary.left, st, erp);
-            typecheck_expr(expr.as.binary.right, st, erp);
+            binary := expr.as.binary;
+            typecheck_expr(binary.left, st, erp);
+            typecheck_expr(binary.right, st, erp);
         case .GROUP;
             typecheck_expr(expr.as.group, st, erp);
         case .ASSIGNMENT;
-            src := expr.as.assignment.src;
-            dst := expr.as.assignment.dst;
-            typecheck_expr(expr.as.assignment.src, st, erp);
-            typecheck_expr(expr.as.assignment.dst, st, erp);
+            assignment := expr.as.assignment;
+            typecheck_expr(assignment.src, st, erp);
+            typecheck_expr(assignment.dst, st, erp);
         case .TERNARY;
-            typecheck_expr(expr.as.ternary.condition, st, erp);
-            typecheck_expr(expr.as.ternary.true_expr, st, erp);
-            typecheck_expr(expr.as.ternary.false_expr, st, erp);
+            ternary := expr.as.ternary;
+            typecheck_expr(ternary.condition, st, erp);
+            typecheck_expr(ternary.true_expr, st, erp);
+            typecheck_expr(ternary.false_expr, st, erp);
         case .FN_CALL;
             fn_call := expr.as.fn_call;
             success, saved_symbol := table_find_new(st, fn_call.ident);
@@ -142,15 +144,16 @@ typecheck_expr :: (expr: *Expr_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
             if saved_symbol.type != .FN error_report(erp, expr.line, expr.start, "only function can be called", saved_symbol.type);
                 
             saved_fn_symbol := saved_symbol.as.fn;
-            if saved_fn_symbol.params.count != fn_call.args.count error_report(erp, expr.line, expr.start, "function % expected % arguments, got %", fn_call.ident, saved_fn_symbol.params.count, fn_call.args.count);
+            if saved_fn_symbol.params.count != fn_call.args.count
+                error_report(erp, expr.line, expr.start, "function % expected % arguments, got %", fn_call.ident, saved_fn_symbol.params.count, fn_call.args.count);
                 
             for fn_call.args typecheck_expr(it, st, erp);
-        case .CONSTANT;
         case .VAR;
             var := expr.as.var; 
             success, saved_symbol := table_find_new(st, var);
             if success && saved_symbol.type != .INT {
                 error_report(erp, expr.line, expr.start, "function % cannot be used as variable", var);
             }
+        case .CONSTANT; // noop
     }
 }
