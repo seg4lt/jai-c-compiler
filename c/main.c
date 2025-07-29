@@ -1,5 +1,10 @@
+#ifdef SUPPRESS_WARNINGS
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
+#else
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+#endif
 int main(void) {
-    int first_variable = 1;
-    int second_variable = 2;
-    return first_variable + second_variable;
+    return 0 || 0 && (1 / 0);
 }

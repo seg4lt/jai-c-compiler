@@ -3,59 +3,59 @@ Program_Asm :: struct {
 }
 
 Fn_Asm :: struct {
-    ident: string;
-    instructions: [..]Instruction_Asm;
-    stack_size: int = 0;
+    ident        : string;
+    instructions : [..]Instruction_Asm;
+    stack_size   : int = 0;
 }
 
 Instruction_Asm :: struct {
-    type: Instruction_Asm_Type;
-    as: union {
-        mov: struct {src: Operand_Asm; dst: Operand_Asm;};
-        unary: struct {op: Unary_Op_Asm; operand: Operand_Asm;}
-        binary: struct {op: Bin_Op_Asm; src1: Operand_Asm; src2: Operand_Asm;} 
-        idiv: Operand_Asm;
-        cmp: struct {op1: Operand_Asm; op2: Operand_Asm;};
-        jmp: string;
-        jmp_cc: struct {cond_code: Cond_Code_Asm; ident: string;};
-        set_cc: struct {cond_code: Cond_Code_Asm; operand: Operand_Asm;};
-        label: string;
-        allocate_stack: int;
-        deallocate_stack: int;
-        push: Operand_Asm;
-        call: string;
-        // cdq: no value needed
-        // ret : no value needed
+    type : Instruction_Asm_Type;
+    as   : union {
+        allocate_stack    : int;
+        binary            : struct { op: Bin_Op_Asm; src1: Operand_Asm; src2: Operand_Asm; } 
+        call              : string;
+        cmp               : struct { op1: Operand_Asm; op2: Operand_Asm; };
+        deallocate_stack  : int;
+        idiv              : Operand_Asm;
+        jmp               : string;
+        jmp_cc            : struct { cond_code: Cond_Code_Asm; ident: string; };
+        label             : string;
+        mov               : struct { src: Operand_Asm; dst: Operand_Asm; };
+        push              : Operand_Asm;
+        set_cc            : struct { cond_code: Cond_Code_Asm; operand: Operand_Asm; };
+        unary             : struct { op: Unary_Op_Asm; operand: Operand_Asm; }
+        // cdq            : no value needed
+        // ret            : no value needed
     };
 }
 
 Instruction_Asm_Type :: enum {
-    MOV;
-    UNARY;
-    BINARY;
-    IDIV;
-    CDQ;
     ALLOCATE_STACK;
-    RET;
+    BINARY;
+    CALL;
+    CDQ;
     CMP;
+    DEALLOCATE_STACK;
+    IDIV;
     JMP;
     JMP_CC;
-    SET_CC;
     LABEL;
-    DEALLOCATE_STACK;
+    MOV;
     PUSH;
-    CALL;
+    RET;
+    SET_CC;
+    UNARY;
 };
 
 Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; }; 
 
 Operand_Asm :: struct {
-    type: enum { IMM; REG; PSEUDO; STACK; };
-    as: union { 
-        imm: int;
-        reg: Register_Asm;
-        pseudo: string;
-        stack: int; 
+    type : enum { IMM; REG; PSEUDO; STACK; };
+    as   : union { 
+        imm     : int;
+        pseudo  : string;
+        reg     : Register_Asm;
+        stack   : int; 
     }; 
 };
 
@@ -63,24 +63,24 @@ Unary_Op_Asm :: enum { NEG; BITWISE_NOT; NNOT; }
 
 Bin_Op_Asm :: enum {
     ADD;
-    SUB;
-    MUL;
-    BITWISE_OR;
     BITWISE_AND;
+    BITWISE_OR;
     BITWISE_XOR;
-    LEFT_SHIFT;
-    RIGHT_SHIFT;
     EQUAL_EQUAL;
-    NOT_EQUAL;
     GREATER;
     GREATER_EQUAL;
+    LEFT_SHIFT;
     LESS;
     LESS_EQUAL;
+    MUL;
+    NOT_EQUAL;
+    RIGHT_SHIFT;
+    SUB;
 }; 
 
 Register_Asm :: struct {
-    register: Register;
-    size: Register_Size;
+    register : Register;
+    size     : Register_Size;
 };
 
 Register_Size :: enum #specified { 
@@ -93,13 +93,96 @@ Register_Size :: enum #specified {
 Register :: enum { 
     AX;
     CX;
-    DX;
     DI;
-    SI;
-    R8;
-    R9;
+    DX;
     R10;
     R11;
-    RSP;
+    R8;
+    R9;
     RBP;
+    RSP;
+    SI;
+}
+
+#scope_module
+
+COUNT_REGISTER_FOR_ARGS :: 6;
+STACK_ALIGNMENT         :: 16;
+PUSH_SIZE               :: 8; // we use push and it only works with 8 bytes
+
+
+reg :: (register: Register, size: Register_Size) -> Operand_Asm #expand {
+    return .{.REG, .{reg = .{register, size }}};
+}
+
+pseudo :: (ident: string) -> Operand_Asm #expand {
+    return .{.PSEUDO, .{pseudo = ident}};
+}
+
+stack :: (position: int) -> Operand_Asm #expand {
+    return .{.STACK, .{stack = position }}; 
+}
+
+imm :: (value: int) -> Operand_Asm #expand {
+    return .{.IMM, .{imm = value}};
+} 
+
+ret :: () -> Instruction_Asm #expand {
+    return .{.RET, .{}};
+}
+
+mov :: (src: Operand_Asm, dst: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .MOV, .{ mov = .{ src, dst } } };
+}
+
+cmp :: (op1: Operand_Asm, op2: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .CMP, .{ cmp = .{ op1, op2 } } };
+}
+
+set_cc :: (cond_code: Cond_Code_Asm, operand: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .SET_CC, .{ set_cc = .{ cond_code, operand } } }; 
+}
+
+unary :: (op: Unary_Op_Asm, operand: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .UNARY, .{ unary = .{ op, operand } } };
+}
+
+binary :: (op: Bin_Op_Asm, src1: Operand_Asm, src2: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .BINARY, .{ binary = .{ op, src1, src2 } } };
+}
+
+cdq :: () -> Instruction_Asm #expand {
+    return .{ .CDQ, .{} };
+}
+
+idiv :: (operand: Operand_Asm) -> Instruction_Asm #expand {
+    return .{ .IDIV, .{ idiv = operand } };
+}
+
+label :: (ident: string) -> Instruction_Asm #expand {
+    return .{ .LABEL, .{ label = ident } };
+}
+
+jmp_cc :: (cond_code: Cond_Code_Asm, ident: string) -> Instruction_Asm #expand {
+    return .{ .JMP_CC, .{ jmp_cc = .{ cond_code, ident } } };
+}
+
+jmp :: (ident: string) -> Instruction_Asm #expand {
+    return .{ .JMP, .{ jmp = ident } };
+}
+
+allocate_stack :: (size: int) -> Instruction_Asm #expand {
+    return .{.ALLOCATE_STACK, .{allocate_stack = size}};
+}
+
+push :: (operand: Operand_Asm) -> Instruction_Asm #expand {
+    return .{.PUSH, .{push = operand}};
+}
+
+call :: (ident: string) -> Instruction_Asm #expand {
+    return .{.CALL, .{ call = ident }};
+}
+
+deallocate_stack :: (size: int) -> Instruction_Asm #expand {
+    return .{.DEALLOCATE_STACK, .{ deallocate_stack = size }};
 }

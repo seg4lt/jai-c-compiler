@@ -1,4 +1,16 @@
 ///
+/// Arrays
+///
+
+array_slice :: (arr: []$T, from: int = 0, to: int = 0) -> []T {
+    assert(from >= 0, "array slice `from` has to be greater or equal to 0");
+    assert(to >= 0, "array slice `to` has to be greater or equal to 0");
+    assert(to <= str.count, "array slice `to` has to be less then array count");
+    if to == 0 to = str.count;
+    return array_view(arr, from, to - from);
+}
+
+///
 /// String
 ///
 
@@ -10,9 +22,6 @@ str_slice :: (str: string, from: int = 0, to: int = 0) -> string {
     return slice(str, from, to - from);
 }
 
-///
-/// String Formatting 
-///
 String_Format_Alignment :: enum_flags {
     LEFT;
     RIGHT;

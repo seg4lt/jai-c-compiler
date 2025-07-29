@@ -384,7 +384,7 @@ gen_logical_or :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast
     array_add(instructions, jump_if_not_zero(src2, label_false.as.label));
 
     result_var := make_var(tc);
-    zero := constant(0);
+    zero       := constant(0);
     array_add(instructions, copy(zero, result_var));
 
     label_end := make_label(tc, "logical_cmp_end");
@@ -452,6 +452,7 @@ jump :: (ident: string) -> Instruction_Tacky #expand {
 jump_if_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
     return .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, ident } }};
 }
+
 jump_if_not_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
     return .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{condition, ident } }};
 }
