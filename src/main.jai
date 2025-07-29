@@ -6,15 +6,15 @@ main :: () {
     src_content := run_preprocessor(args.src_path);
 
     erp := Error_Reporter.{src_path = args.src_path, src = src_content};
-    st: Symbol_Table;
-    init(*st);
+    symbols: Symbol_Table;
+    init(*symbols);
     
     lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *erp, do_print=true);
     ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *erp, do_print=true);
-    if args.flags                   & .SEMA         sema(ast, *st, *erp, do_print=true);
+    if args.flags                   & .SEMA         sema(ast, *symbols, *erp, do_print=true);
     tacky         := ifx args.flags & .TACKY        gen_tacky(ast, do_print=true);
-    asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky, st, do_print=true);
-    if args.flags                   & .ALL          code_emm(args.src_path_without_ext, asm_construct, st);
+    asm_construct := ifx args.flags & .CODE_GEN     asm_gen(tacky, symbols, do_print=true);
+    if args.flags                   & .ALL          code_emm(args.src_path_without_ext, asm_construct, symbols, do_print=true);
     if args.flags                   & .ALL          assember_and_linker(args.src_path_without_ext, args.output_type);
 }
 
