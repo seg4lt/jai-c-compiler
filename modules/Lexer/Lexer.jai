@@ -193,7 +193,7 @@ print_tokens :: (tokens: []Token) {
     for token: tokens {
         print("% % %\n", 
             string_format(tprint("%", token.type), 15, .RIGHT),
-            string_format(token.value, 10, .RIGHT),
+            string_format(token.value, 15, .RIGHT),
             string_format(tprint("%:%", token.line, token.start), 7, .RIGHT)
         ); 
     }

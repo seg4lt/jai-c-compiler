@@ -1,3 +1,5 @@
 int main(void) {
-    return (1 > 2) + (1 > 1);
+    int first_variable = 1;
+    int second_variable = 2;
+    return first_variable + second_variable;
 }
