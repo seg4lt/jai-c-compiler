@@ -58,7 +58,6 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             array_add(label_info, .{.SWITCH, .{ switch = .{ label = label }}});
             label_block_item(*stmt.as.switch.body, label_info, error_reporter);
             switch_label_info := pop(label_info);
-            // @note
             // saving references to all cases switch has
             // Need this on tacky gen phase to know what cases we have so we can jump to right location
             stmt.as.switch.cases_label = switch_label_info.as.switch.cases_label;
@@ -105,20 +104,19 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
         case .LABEL;
             label_stmt(stmt.as.label.stmt, label_info, error_reporter);
         case .RETURN; #through;
-        case .EXPR; #through;
-        case .GOTO; #through;
-        case .NULL;
-            // noop
+        case .EXPR;   #through;
+        case .GOTO;   #through;
+        case .NULL;   // noop
     }
 }
 
 label_expr :: (expr: *Expr_Ast, label_stack: *[..]Label_Info, error_reporter: *Error_Reporter) {
     if #complete expr.type == {
-        case .CONSTANT; #through;
-        case .UNARY;  #through;
-        case .BINARY; #through;
+        case .CONSTANT;   #through;
+        case .UNARY;      #through;
+        case .BINARY;     #through;
         case .ASSIGNMENT; #through;
-        case .VAR; // noop
+        case .VAR;        // noop
 
         case .GROUP;
             label_expr(expr.as.group, label_stack, error_reporter);
@@ -135,18 +133,18 @@ Loop_Label :: struct {
 };
 
 Switch_Label :: struct {
-    label: string;
-    cases_label: [..]Case_Label_Info;
+    label       : string;
+    cases_label : [..]Case_Label_Info;
 }
 
 Label_Info :: struct {
-    type: enum {
+    type : enum {
         LOOP;
         SWITCH;
     };
-    as: union {
-        loop: Loop_Label;
-        switch: Switch_Label ;
+    as  : union {
+        loop   : Loop_Label;
+        switch : Switch_Label;
     };
 }
 
@@ -171,9 +169,8 @@ has_same_case :: (case_labels: *[..]Case_Label_Info, value: string) -> bool {
 get_closest_switch_label :: (label_info: *[..]Label_Info) -> *Switch_Label {
     for < label_info.* {
         if #complete it.type == {
-            case .SWITCH;
-                return *it.as.switch;
-            case .LOOP; // noop
+            case .SWITCH; return *it.as.switch;
+            case .LOOP;   // noop
         }
     }
     return null;
@@ -182,8 +179,7 @@ get_closest_switch_label :: (label_info: *[..]Label_Info) -> *Switch_Label {
 get_closest_loop_label :: (label_info: *[..]Label_Info) -> *Loop_Label {
     for < label_info.* {
         if #complete it.type == {
-            case .LOOP;
-                return *it.as.loop;
+            case .LOOP;   return *it.as.loop;
             case .SWITCH; // noop
         }
     }

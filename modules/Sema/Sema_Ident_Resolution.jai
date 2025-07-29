@@ -15,11 +15,6 @@ resolve_block :: (block: *Block_Ast, scope: *Scope_Idents, erp: *Error_Reporter)
 }
 
 resolve_block_item :: (block_items: *[..]*Block_Item_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-    // new_scope: Scope_Idents;
-    // if   scope == null   init(*new_scope);
-    // else new_scope = create_new_scope(scope);
-    // defer deinit(*new_scope);
-
     for block_items.* {
         if #complete it.type == {
             case .DECL; resolve_decl(it.as.decl, scope, erp);
@@ -61,12 +56,11 @@ resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
         case .LABEL;
             resolve_stmt(stmt.as.label.stmt, scope, erp);
         case .CONTINUE; #through;
-        case .BREAK; #through;
-        case .GOTO; #through;
-        case .DEFAULT; #through;
-        case .CASE; #through;
-        case .NULL;
-            // noop
+        case .BREAK;    #through;
+        case .GOTO;     #through;
+        case .DEFAULT;  #through;
+        case .CASE;     #through;
+        case .NULL;     // noop
     }
 }
 
@@ -87,14 +81,15 @@ resolve_decl :: (decl: *Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
             new_ident := make_variable(var_decl.ident); 
             ident := Ident(string).{ 
                 from_current_scope = true,
-                external_linkage = false,
-                name = new_ident,
-                type = .VAR 
+                external_linkage   = false,
+                name               = new_ident,
+                type               = .VAR 
             };
             table_set(scope, var_decl.ident, ident);
 
             if var_decl.init resolve_expr(var_decl.init, scope, erp);
-            var_decl.* = .{ new_ident, var_decl.init, var_decl.loc };
+            // var_decl.* = .{ new_ident, var_decl.init, var_decl.loc };
+            var_decl.ident = new_ident;
         case .FN; 
             resolve_fn_decl(decl.as.fn, scope, erp, can_have_body=false);
     }
@@ -102,7 +97,7 @@ resolve_decl :: (decl: *Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
 
 resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter, can_have_body: bool = true) {
     success, entry := table_find_new(scope, fn_decl.ident);
-    if success  {
+    if success {
         if entry.type == .FN && entry.has_body {
             error_report(erp, fn_decl.line, fn_decl.start, "duplicate function declaration! : %", fn_decl.ident);
         }
@@ -149,7 +144,6 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
 
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     if #complete expr.type == {
-        case .CONSTANT; // noop
         case .UNARY;
             resolve_expr(expr.as.unary.expr, scope, erp);
         case .BINARY;
@@ -159,29 +153,27 @@ resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
             resolve_expr(expr.as.group, scope, erp);
         case .VAR;
             success, ident := table_find_new(scope, expr.as.var);
-            if !success {
-                error_report(erp, expr.loc.line, expr.loc.start, "undeclared variable: %", expr.as.var);
-            }
+            if !success error_report(erp, expr.loc.line, expr.loc.start, "undeclared variable: %", expr.as.var);
             expr.as.var = ident.name;
         case .FN_CALL; 
             fn_call := expr.*.as.fn_call;
             success, ident := table_find_new(scope, fn_call.ident);
-            if !success {
-                error_report(erp, expr.line, expr.start, "undeclared function: %", fn_call.ident);
-            }
-            print("fn_call_ident: %\n", fn_call.ident);
-            print("ident: %\n", ident);
+            
+            if !success error_report(erp, expr.line, expr.start, "undeclared function: %", fn_call.ident);
+            
             if success && ident.from_current_scope {
                 fn_call.ident = ident.name;
                 expr.as.fn_call = fn_call;
             }
             for fn_call.args resolve_expr(it, scope, erp);
-        case .ASSIGNMENT; resolve_assignment_expr(expr, scope, erp);
+        case .ASSIGNMENT;
+            resolve_assignment_expr(expr, scope, erp);
         case .TERNARY;
             ternary := expr.as.ternary;
             resolve_expr(ternary.condition, scope, erp);
             resolve_expr(ternary.true_expr, scope, erp);
             resolve_expr(ternary.false_expr, scope, erp);
+        case .CONSTANT; // noop
     }
 }
 
@@ -191,7 +183,10 @@ resolve_assignment_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_R
     if !(assignment.dst.type == .VAR || (assignment.dst.type == .GROUP && assignment.dst.as.group.type == .VAR)) {
         error_report(erp, expr.loc.line, expr.loc.start,"expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
     }
-    dst := ifx assignment.dst.type == .VAR then assignment.dst else assignment.dst.as.group;
+    
+    dst := ifx assignment.dst.type == .VAR then assignment.dst 
+           else assignment.dst.as.group;
+           
     resolve_expr(dst, scope, erp);
     resolve_expr(assignment.src, scope, erp);
 }
@@ -199,19 +194,19 @@ resolve_assignment_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_R
 For_Stmt_Ast :: type_of(Stmt_Ast.as.for_stmt);
 
 resolve_for_stmt :: (for_stmt: For_Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-
     scope_for_init : Scope_Idents;
     defer deinit(*scope_for_init);
     scope_for_init = create_new_scope(scope);
 
     if #complete for_stmt.init.type == {
-        case .INIT_DECL; resolve_decl(for_stmt.init.as.decl, *scope_for_init, erp);
+        case .INIT_DECL; 
+            resolve_decl(for_stmt.init.as.decl, *scope_for_init, erp);
         case .INIT_EXPR;
             if for_stmt.init.as.expr resolve_expr(for_stmt.init.as.expr, *scope_for_init, erp);
     }
+    
     if for_stmt.condition resolve_expr(for_stmt.condition, *scope_for_init, erp);
-
-    if for_stmt.post resolve_expr(for_stmt.post, *scope_for_init, erp);
+    if for_stmt.post      resolve_expr(for_stmt.post, *scope_for_init, erp);
 
     {
         scope_for_body : Scope_Idents;
@@ -237,6 +232,7 @@ create_new_scope :: (scope: *Scope_Idents) -> Scope_Idents {
     init(*new_table);
 
     for scope {
+        // @question : Is this enough for copying the scope variable
         value := it;
         value.from_current_scope = false;
         table_set(*new_table, it_index, value);
