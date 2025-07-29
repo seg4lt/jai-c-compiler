@@ -32,7 +32,7 @@ multi_digit_number_test :: () {
     program_ast    := parse_ast(*lexer, *error_reporter);
 
     sb: String_Builder;
-    sb_writer := make_sb_writer(*sb);
+    sb_writer := sb_writer_new(*sb);
     print_program_ast(*sb_writer, program_ast);
 
     ast_string := builder_to_string(*sb);

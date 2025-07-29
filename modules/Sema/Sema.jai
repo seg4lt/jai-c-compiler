@@ -6,7 +6,7 @@ sema :: (ast: *Program_Ast, st: *Symbol_Table, erp: *Error_Reporter, do_print: b
 
     if do_print {
         print("\n-- AFTER SEMA --\n");
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_program_ast(*writer, ast);
         
         
