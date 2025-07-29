@@ -37,11 +37,11 @@ map_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
         array_add(*instructions, mov(src, asm_arg));
     }
     
-    for fnt.instructions asm_gen_inst(*instructions, *it);
+    for fnt.instructions map_instructions(*instructions, *it);
     INITIAL_STACK_SIZE :: 0; // this will be updated in later stages
     return .{fnt.ident, instructions, INITIAL_STACK_SIZE };
 }
-asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
+map_instructions :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
         case .RETURN;
             src := to_operand(*instt.as.ret);
@@ -85,7 +85,7 @@ asm_gen_inst :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
                     dst := to_operand(*binary_i.dst);
                     array_add(insts, mov(src1, dst));
 
-                    op := from_tacky_to_asm_binop(binary_i.op);
+                    op := map_binary_op(binary_i.op);
                     src2 := to_operand(*binary_i.src2);
                     array_add(insts, binary(op, src2, dst));
                 case .DIV; #through;
@@ -204,7 +204,7 @@ to_condition_code :: (op: Bin_Op_Type_Tacky) -> Cond_Code_Asm {
     return .EE; // unreachable
 }
 
-from_tacky_to_asm_binop :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -> type_of(Instruction_Asm.as.binary.op) {
+map_binary_op :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -> type_of(Instruction_Asm.as.binary.op) {
     if #complete tacky_op == {
         case .ADD;           return .ADD;
         case .SUB;           return .SUB;
