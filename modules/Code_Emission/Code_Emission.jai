@@ -1,13 +1,20 @@
-code_emm :: (src_path_no_ext: string, program: *Program_Asm, symbols: Symbol_Table) {
+code_emm :: (src_path_no_ext: string, program: *Program_Asm, symbols: Symbol_Table, do_print: bool = false) {
+    sb: String_Builder;
+    sb_writer := sb_writer_new(*sb);
+    
+    emm_pg(*sb_writer, program, symbols);
+    asm := builder_to_string(*sb);
+    
+    if do_print print("\n\n-- Native Asm --\n%", asm);
+    
     file, success := file_open(tprint("%.s", src_path_no_ext), for_writing=true, keep_existing_content=false);
     if !success return;
     defer file_close(*file);
-
-    writer := file_writer_new(*file);
-    emm_pg(*writer, program, symbols);
+    
+    file_write(*file, asm);
 }
 
-#scope_module
+#scope_file
 
 emm_pg :: (writer: *Writer, using program: *Program_Asm, symbols: Symbol_Table) {
     if program == null return;
