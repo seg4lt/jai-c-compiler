@@ -15,7 +15,7 @@ Token :: struct {
 }
 
 parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, do_print: bool = false) -> Lexer {
-    lexer := Lexer.{src = src, error_reporter = error_reporter};
+    lexer := Lexer.{ src = src, error_reporter = error_reporter };
     scan(*lexer);
     if do_print print_tokens(lexer.tokens);
     return lexer;
@@ -23,7 +23,7 @@ parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, do_print: boo
 
 #scope_module
 
-scan :: (using lexer: *Lexer) {
+scan :: (using lexer: *Lexer) -> success: bool = true {
     while !is_at_end(lexer) {
         start = current;
         current_char := consume(lexer);
@@ -43,6 +43,8 @@ scan :: (using lexer: *Lexer) {
             case ";"; add_token(lexer, .SEMICOLON);
             case "~"; add_token(lexer, .BITWISE_NOT);
             case ","; add_token(lexer, .COMMA);
+            case "?"; add_token(lexer, .QUESTION_MARK);
+            case ":"; add_token(lexer, .COLON);
             case "+"; 
                 if peek(lexer) == "=" {
                     consume(lexer);
@@ -171,11 +173,13 @@ scan :: (using lexer: *Lexer) {
                     continue;
                 }
                 add_token(lexer, .NOT);
-            case "?"; add_token(lexer, .QUESTION_MARK);
-            case ":"; add_token(lexer, .COLON);
-            case; lex_err(lexer, "Unexpected character %", to_string(*current_char, 1));
+            case; 
+                lex_err(lexer, "Unexpected character %", to_string(*current_char, 1));
+                return success = false;
         }
     }
+    
+    return success = true;
 }
 
 #scope_file
@@ -185,9 +189,14 @@ lex_err :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
 }
 
 print_tokens :: (tokens: []Token) {
-    print("\n -- Lexer -- \n");
-    for tokens print("%\n", it); 
-    print("\n");
+    print("-- Lexer --\n");
+    for token: tokens {
+        print("% % %\n", 
+            string_format(tprint("%", token.type), 15, .RIGHT),
+            string_format(token.value, 10, .RIGHT),
+            string_format(tprint("%:%", token.line, token.start), 7, .RIGHT)
+        ); 
+    }
 }
 
 comment :: (using lexer: *Lexer) {
@@ -215,7 +224,7 @@ number :: (using lexer: *Lexer) {
         if is_alpha(peek(lexer)) found_alpha = true;
         consume(lexer);
     }
-    str := slice(src, start, current-start);
+    str := str_slice(src, start, current);
     if found_alpha lex_err(lexer, "Invalid number found %", str);
 
     token := Token.{ .INT_LITERAL, str, line, start};
@@ -224,8 +233,8 @@ number :: (using lexer: *Lexer) {
 
 ident_or_keyword :: (using lexer: *Lexer) {
     while !is_at_end(lexer) && is_alnum(peek(lexer)) consume(lexer);
-    str := slice(src, start, current-start);
-    token_type := find_keyword_or_ident(str);
+    str := str_slice(src, start, current);
+    token_type := ident(str);
     token := Token.{ token_type, str, line, start};
     array_add(*tokens, token);
 }
@@ -237,28 +246,28 @@ eat_whitespace :: (lexer: *Lexer) {
     }
 }
 
-find_keyword_or_ident :: (str: string) -> Token_Type {
+ident :: (str: string) -> Token_Type {
     if str == {
-        case "int"; return .INT;
-        case "void"; return .VOID;
-        case "return"; return .RETURN;
-        case "if"; return .IF;
-        case "else"; return .ELSE;
-        case "goto"; return .GOTO;
-        case "for"; return .FOR;
-        case "do"; return .DO;
-        case "while"; return .WHILE;
-        case "break"; return .BREAK;
+        case "int";      return .INT;
+        case "void";     return .VOID;
+        case "return";   return .RETURN;
+        case "if";       return .IF;
+        case "else";     return .ELSE;
+        case "goto";     return .GOTO;
+        case "for";      return .FOR;
+        case "do";       return .DO;
+        case "while";    return .WHILE;
+        case "break";    return .BREAK;
         case "continue"; return .CONTINUE;
-        case "switch"; return .SWITCH;
-        case "case"; return .CASE;
-        case "default"; return .DEFAULT;
-        case; return .IDENT;
+        case "switch";   return .SWITCH;
+        case "case";     return .CASE;
+        case "default";  return .DEFAULT;
+        case;            return .IDENT;
     }
 }
 
 add_token :: (using lexer: *Lexer, type: Token_Type) {
-    array_add(*tokens, .{ type, slice(src, start, current-start), line, start });
+    array_add(*tokens, .{ type = type, value = str_slice(src, start, current), line = line, start = start });
 }
 
 consume :: (using lexer: *Lexer) -> u8 {
