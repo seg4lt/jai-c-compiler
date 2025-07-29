@@ -9,7 +9,6 @@ main :: () {
     st: Symbol_Table;
     init(*st);
     
-
     lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *erp, do_print=true);
     ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *erp, do_print=true);
     if args.flags                   & .SEMA         sema(ast, *st, *erp, do_print=true);
