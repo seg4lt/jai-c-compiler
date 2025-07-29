@@ -6,18 +6,18 @@
 #import "Not_Basic";
 
 Parser :: struct {
-    tokens: []Token;
-    start: int = 0;
-    current: int = 0;
-    error_reporter: *Error_Reporter;
+    tokens         : []Token;
+    start          : int = 0;
+    current        : int = 0;
+    error_reporter : *Error_Reporter;
 }
 
 parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = false) -> *Program_Ast {
     parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
-    program := parse_program_ast(*parser);
+    program := parse_program(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
     if do_print {
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_program_ast(*writer, program);
     }
     return program;
@@ -36,7 +36,7 @@ parse_err :: (parser: *Parser, tok: Token, msg_fmt: string, args: .. Any) #expan
 
 #scope_file
 
-parse_program_ast :: (parser: *Parser) -> *Program_Ast {
+parse_program :: (parser: *Parser) -> *Program_Ast {
     fns: [..]*Fn_Decl_Ast;
 
     while !is_at_end(parser) {

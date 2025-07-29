@@ -3,7 +3,7 @@ code_emm :: (src_path_no_ext: string, program: *Program_Asm, st: Symbol_Table) {
     if !success return;
     defer file_close(*file);
 
-    writer := make_file_writer(*file);
+    writer := file_writer_new(*file);
     ce_program(*writer, program, st);
 }
 
