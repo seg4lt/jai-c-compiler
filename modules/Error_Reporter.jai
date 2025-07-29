@@ -52,7 +52,7 @@ get_error_item :: (src: string, src_path: string, line: int, start: int, detail_
     append(*sb, sprint("%", slice(src, previous_line_start, current_line_start-previous_line_start)));
     append(*sb, sprint("%\n", slice(src, current_line_start, current_line_end-current_line_start)));
     d_msg := sprint(detail_msg_fmt, .. args);
-    append(*sb, sprint("%----%", format_string("^", padding_left = column), d_msg));
+    append(*sb, sprint("%----%", string_format("^", 20, .PAD_LEFT), d_msg));
     error_item := New(Error_Item);
     error_item.* = .{  msg = builder_to_string(*sb), file = "", line = line, column = column };
     return error_item;
