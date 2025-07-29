@@ -1,18 +1,18 @@
 asm_gen :: (pgt: *Program_Tacky, st: Symbol_Table, do_print: bool = false) -> *Program_Asm {
     pasm_st_1 := asm_gen_state_1(pgt, st);
     if do_print {
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_asm(*writer, pasm_st_1, 1);
     }
     asm_gen_stage_2(pasm_st_1);
     if do_print {
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_asm(*writer, pasm_st_1, 2);
     }
 
     pg_stage_3 := asm_gen_stage_3(pasm_st_1);
     if do_print {
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_asm(*writer, pg_stage_3, 3);
     }
     return  pg_stage_3;

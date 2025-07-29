@@ -9,21 +9,21 @@ write :: (writer: *Writer, format_string: string, args: .. Any) -> success: bool
     return writer.write(writer.ctx, format_string, .. args);
 }
 
-make_stdout_writer :: () -> Writer {
+stdout_writer_new :: () -> Writer {
     writer: Writer;
     writer.ctx = null;
     writer.write = stdout_write;
     return writer;
 }
 
-make_sb_writer :: (sb: *String_Builder) -> Writer {
+sb_writer_new :: (sb: *String_Builder) -> Writer {
     writer: Writer;
     writer.ctx = sb;
     writer.write = sb_write;
     return writer;
 }
 
-make_file_writer :: (file: *File.File) -> Writer {
+file_writer_new :: (file: *File.File) -> Writer {
     writer: Writer;
     writer.ctx = file;
     writer.write = file_write;

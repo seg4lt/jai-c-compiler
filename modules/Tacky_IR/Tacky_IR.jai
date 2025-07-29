@@ -12,7 +12,7 @@ gen_program_tacky :: (pg: *Program_Ast, do_print: bool = false) -> *Program_Tack
     program.* = .{ fns };
 
     if do_print {
-        writer := make_stdout_writer();
+        writer := stdout_writer_new();
         print_tacky(program, *writer);
     }
 
