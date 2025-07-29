@@ -42,6 +42,12 @@ unreachable :: ($message := "", args: .. Any, log: bool = true, exit_status_code
     my_panic();
 }
 
+New :: ($T: Type, value: T) -> *T #expand {
+    ptr := New(T);
+    ptr.* = value;
+    return ptr;
+}
+
 #load "Writer.jai";
 
 #scope_module
