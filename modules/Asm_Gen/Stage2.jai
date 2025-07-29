@@ -1,74 +1,73 @@
-// replace pseudo register, with offset relative to stack
-asm_gen_stage_2 :: (pg: *Program_Asm) {
-    stack_size: int;
-    
-    for *fn: pg.fns {
-        stack_size = asmgen_stage_2(fn.instructions);
-        fn.stack_size = stack_size;
-    }
-}
+#scope_module
 
 // replace pseudo register, with offset relative to stack
-asmgen_stage_2 :: (insts: []Instruction_Asm) -> stack_size: int {
+fix_pseudo_register :: (pg: *Program_Asm) {
+    for *fn: pg.fns fn.stack_size = fix_instructions(fn.instructions);
+}
+
+#scope_file
+
+STACK_SIZE := 4; // 4 bytes for 32-bit int - we only support 32-bit int at the moment
+
+// replace pseudo register, with offset relative to stack
+fix_instructions :: (insts: []Instruction_Asm) -> stack_size: int {
     table : Table(string, int);
     init(*table);
     defer deinit(*table);
 
-    for *inst: insts {
+    for * inst: insts {
         if #complete inst.type == {
-            case .CALL;
-                continue;
-            case .PUSH;
-                continue;
-            case .DEALLOCATE_STACK;
-                continue;
             case .MOV;
-                mov := inst.as.mov;
-                mov.src = asm_gen_stage_2_stack_offset(*table, mov.src);
-                mov.dst = asm_gen_stage_2_stack_offset(*table, mov.dst);
-                inst.* = .{.MOV,.{mov = mov}};
+                mov := *inst.as.mov;
+                mov.src = pseudo_to_stack(*table, mov.src);
+                mov.dst = pseudo_to_stack(*table, mov.dst);
+                // inst.* = .{.MOV,.{mov = mov}};
             case .UNARY;
-                un := inst.as.unary;
-                un.operand = asm_gen_stage_2_stack_offset(*table, un.operand);
-                inst.* = .{.UNARY,.{unary=un}};
+                unary := *inst.as.unary;
+                unary.operand = pseudo_to_stack(*table, unary.operand);
+                // inst.* = .{.UNARY,.{unary=un}};
             case .BINARY;
-                bin := inst.as.binary;
-                bin.src1 = asm_gen_stage_2_stack_offset(*table, bin.src1);
-                bin.src2 = asm_gen_stage_2_stack_offset(*table, bin.src2);
-                inst.* = .{.BINARY, .{binary=bin}};
+                binary := *inst.as.binary;
+                binary.src1 = pseudo_to_stack(*table, binary.src1);
+                binary.src2 = pseudo_to_stack(*table, binary.src2);
+                // inst.* = .{.BINARY, .{binary=bin}};
             case .CMP;
-                cmp := inst.as.cmp;
-                cmp.op1 = asm_gen_stage_2_stack_offset(*table, cmp.op1);
-                cmp.op2 = asm_gen_stage_2_stack_offset(*table, cmp.op2);
-                inst.* = .{.CMP, .{cmp=cmp}};
+                cmp := *inst.as.cmp;
+                cmp.op1 = pseudo_to_stack(*table, cmp.op1);
+                cmp.op2 = pseudo_to_stack(*table, cmp.op2);
+                // inst.* = .{.CMP, .{cmp=cmp}};
             case .IDIV;
-                div := asm_gen_stage_2_stack_offset(*table, inst.as.idiv);
-                inst.* = .{.IDIV, .{idiv=div}};
+                div := pseudo_to_stack(*table, inst.as.idiv);
+                inst.as.idiv = div;
+                // inst.* = .{.IDIV, .{idiv=div}};
             case .SET_CC;
-                set_cc := inst.as.set_cc;
-                set_cc.operand = asm_gen_stage_2_stack_offset(*table, set_cc.operand);
-                inst.* = .{.SET_CC, .{set_cc=set_cc}};
-            case .CDQ; #through;
-            case .RET; #through;
-            case .ALLOCATE_STACK; continue;
-            case .LABEL; continue;
-            case .JMP_CC; continue;
-            case .JMP; continue;
+                set_cc := *inst.as.set_cc;
+                set_cc.operand = pseudo_to_stack(*table, set_cc.operand);
+                // inst.* = .{.SET_CC, .{set_cc=set_cc}};
+                
+            case .CDQ;              #through;
+            case .RET;              #through;
+            case .CALL;             #through;
+            case .PUSH;             #through;
+            case .DEALLOCATE_STACK; #through;
+            case .ALLOCATE_STACK;   #through;
+            case .LABEL;            #through;
+            case .JMP_CC;           #through;
+            case .JMP;              continue;
         }
     }
-    // 4 because we only support 32-bit int at the moment
-    stack_size := (table.count * 4);
-   
-    return stack_size;
+    return (table.count * STACK_SIZE);
 }
 
-asm_gen_stage_2_stack_offset :: (table: *Table, op: Operand_Asm) -> Operand_Asm {
+pseudo_to_stack :: (table: *Table, op: Operand_Asm) -> Operand_Asm {
     if op.type != .PSEUDO return op;
+    
+    pseudo := op.as.pseudo;
+    
+    success, saved_offset := table_find_new(table, pseudo);
+    if success return stack(saved_offset);
 
-    success, saved_offset := table_find_new(table, op.as.pseudo);
-    if success return .{.STACK, .{ stack = saved_offset }};
-
-    offset := (table.count + 1) * -4;
-    table_add(table, op.as.pseudo, offset);
-    return .{.STACK,  .{stack=offset}};
+    offset := (table.count + 1) * -STACK_SIZE;
+    table_add(table, pseudo, offset);
+    return stack(offset);
 }

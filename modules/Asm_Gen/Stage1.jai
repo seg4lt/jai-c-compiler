@@ -1,3 +1,5 @@
+#scope_module
+
 map_to_asm :: (pgt: *Program_Tacky, st: Symbol_Table) -> *Program_Asm {
     fns : [..]Fn_Asm;
     for * pgt.fns {

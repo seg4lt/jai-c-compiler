@@ -8,6 +8,7 @@ main :: () {
     erp := Error_Reporter.{src_path = args.src_path, src = src_content};
     st: Symbol_Table;
     init(*st);
+    
 
     lexer         := ifx args.flags & .LEX          parse_lex_tokens(src_content, *erp, do_print=true);
     ast           := ifx args.flags & .PARSE        parse_ast(*lexer, *erp, do_print=true);

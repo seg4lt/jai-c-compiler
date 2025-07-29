@@ -4,7 +4,7 @@ asm_gen :: (pgt: *Program_Tacky, st: Symbol_Table, do_print: bool = false) -> *P
         writer := stdout_writer_new();
         print_asm(*writer, program_asm, 1);
     }
-    asm_gen_stage_2(program_asm);
+    fix_pseudo_register(program_asm);
     if do_print {
         writer := stdout_writer_new();
         print_asm(*writer, program_asm, 2);
