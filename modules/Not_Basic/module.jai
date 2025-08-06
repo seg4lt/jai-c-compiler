@@ -1,3 +1,5 @@
+#module_parameters () (MEMORY_DEBUGGER := false) {}
+
 ///
 /// Arrays
 ///
@@ -58,6 +60,7 @@ New :: ($T: Type, value: T) -> *T #expand {
 }
 
 #load "Writer.jai";
+#load "Arena.jai";
 
 #scope_module
 
