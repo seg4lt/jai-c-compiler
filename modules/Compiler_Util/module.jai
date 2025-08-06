@@ -33,8 +33,6 @@ assember_and_linker :: (src_path_without_ext: string, output_type: Output_Type) 
     }
 }
 
-// pp:
-	// $(CC) -E -P $(FILE_NAME).c -o $(FILE_NAME).i
 preprocessor :: (src_path: string) {
     path := ifx ends_with(src_path, ".c") slice(src_path, 0, src_path.count - 2) else src_path;
     command: [..] string;

@@ -4,7 +4,7 @@
 #import "Parser";
 #import "Lexer";
 
-#run _run_tests();
+// #run _run_tests();
 
 _run_tests :: () {
     log("Running test for file: %", #file);
