@@ -1,29 +1,40 @@
 Lexer :: struct {
-    src            : string;
-    tokens         : [..]Token;
-    error_reporter : *Error_Reporter;
-    line           : int = 1;
-    start          : int = 0; // current token start position
-    current        : int = 0; // where is cursor right now
+    src:            string;
+    tokens:         [..]Token;
+    error_reporter: *Error_Reporter;
+    line:           int = 1;
+    start:          int = 0; 
+    current:        int = 0; 
 }
 
 Token :: struct {
-    type  : Token_Type;
-    value : string;
-    line  : int;
-    start : int;
+    type:  Token_Type;
+    value: string;
+    line:  int;
+    start: int;
 }
 
-parse_lex_tokens :: (src: string, error_reporter: *Error_Reporter, do_print: bool = false) -> Lexer {
+scan_tokens :: (src: string, error_reporter: *Error_Reporter, debug_log: bool = false) -> []Token {
     lexer := Lexer.{ src = src, error_reporter = error_reporter };
     scan(*lexer);
-    if do_print print_tokens(lexer.tokens);
-    return lexer;
+    if debug_log print_tokens(lexer.tokens);
+    return array_view(lexer.tokens, 0);
+}
+
+print_tokens :: (tokens: []Token) {
+    print("-- Lexer --\n");
+    for token: tokens {
+        print("% % %\n", 
+            string_format(tprint("%", token.type), 15, .RIGHT),
+            string_format(token.value, 15, .RIGHT),
+            string_format(tprint("%:%", token.line, token.start), 7, .RIGHT)
+        ); 
+    }
 }
 
 #scope_module
 
-scan :: (using lexer: *Lexer) -> success: bool = true {
+scan :: (using lexer: *Lexer) {
     while !is_at_end(lexer) {
         start = current;
         current_char := consume(lexer);
@@ -32,8 +43,16 @@ scan :: (using lexer: *Lexer) -> success: bool = true {
             if current_char == "\n" line += 1;
             continue;
         }
-        if is_alpha(current_char) || current_char == "_" { ident_or_keyword(lexer); continue; }
-        if is_digit(current_char) { number(lexer); continue; }
+        
+        if is_alpha(current_char) || current_char == "_" { 
+            ident_or_keyword(lexer); 
+            continue; 
+        }
+        
+        if is_digit(current_char) { 
+            number(lexer); 
+            continue; 
+        }
 
         if current_char == {
             case "("; add_token(lexer, .LPAREN);
@@ -175,11 +194,8 @@ scan :: (using lexer: *Lexer) -> success: bool = true {
                 add_token(lexer, .NOT);
             case; 
                 lex_err(lexer, "Unexpected character %", to_string(*current_char, 1));
-                return success = false;
         }
     }
-    
-    return success = true;
 }
 
 #scope_file
@@ -188,16 +204,6 @@ lex_err :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
     error_report(error_reporter, line, start, msg_fmt, .. args);
 }
 
-print_tokens :: (tokens: []Token) {
-    print("-- Lexer --\n");
-    for token: tokens {
-        print("% % %\n", 
-            string_format(tprint("%", token.type), 15, .RIGHT),
-            string_format(token.value, 15, .RIGHT),
-            string_format(tprint("%:%", token.line, token.start), 7, .RIGHT)
-        ); 
-    }
-}
 
 comment :: (using lexer: *Lexer) {
     if peek(lexer) == {
@@ -235,7 +241,7 @@ ident_or_keyword :: (using lexer: *Lexer) {
     while !is_at_end(lexer) && is_alnum(peek(lexer)) consume(lexer);
     str := str_slice(src, start, current);
     token_type := ident(str);
-    token := Token.{ token_type, str, line, start};
+    token := Token.{ token_type, str, line, start };
     array_add(*tokens, token);
 }
 
@@ -266,7 +272,7 @@ ident :: (str: string) -> Token_Type {
     }
 }
 
-add_token :: (using lexer: *Lexer, type: Token_Type) {
+add_token :: (using lexer: *Lexer, type: Token_Type) #expand {
     array_add(*tokens, .{ type = type, value = str_slice(src, start, current), line = line, start = start });
 }
 
@@ -278,6 +284,7 @@ consume :: (using lexer: *Lexer) -> u8 {
 }
 
 peek :: (using lexer: *Lexer, offset: int = 0) -> u8 {
+    if is_at_end(lexer) return 0;
     return src.data[current + offset];
 }
 

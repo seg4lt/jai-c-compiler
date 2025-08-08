@@ -34,28 +34,6 @@ run :: () {
     }
 }
 
-print_arena :: (using arena: *Arena) {
-    print("\n================ Arena Info =================== \n");
-    total_size := 0;
-    total_uzed := 0;
-    
-    block_counter := 1;
-    current := arena.first_block;
-    while current {
-        total_size += current.size;
-        total_uzed += current.used;
-        print("\t %. Address: %\n",block_counter, current.memory);
-        print("\t %. Used: %\n", block_counter, current.used);
-        print("\t %. Size: %\n", block_counter, current.size);
-        current = current.next;
-        block_counter += 1;
-    }
-    
-    print("Total Used: %\n", total_uzed);
-    print("Total Size: %\n", total_size);
-    print("Num Buckets: %\n", block_counter);
-    print("================ End: Arena Info =================== \n\n");
-}
 
 
 #import "Compiler";

@@ -1,4 +1,5 @@
 sema_typecheck :: (pg: *Program_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
+    push_allocator(st.allocator);
     for fn: pg.fns typecheck_fn_decl(fn, st, erp);
 }
 
@@ -6,7 +7,9 @@ sema_typecheck :: (pg: *Program_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
 
 typecheck_fn_decl :: (fn: *Fn_Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     fn_params: [..]Symbol_Fn_Param;
-    for param: fn.params array_add(*fn_params, Symbol_Fn_Param.{ ident = param.ident, type  = "int" });
+    for param: fn.params {
+        array_add(*fn_params, Symbol_Fn_Param.{ ident = copy_string(param.ident), type  = "int" });
+    }
     
     has_body := fn.block != null;
     already_defined := false;
@@ -30,10 +33,10 @@ typecheck_fn_decl :: (fn: *Fn_Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter)
     }
     
     fn_type := make_symbol_fn(fn.ident, fn_params, "int", has_body || already_defined);
-    table_set(st, fn.ident, fn_type);
+    table_set(st, copy_string(fn.ident), fn_type);
     
     if has_body {
-        for fn.params table_set(st, it.ident, make_symbol_int(it.ident));
+        for fn.params table_set(st, copy_string(it.ident), make_symbol_int(it.ident));
         typecheck_block(fn.block, st, erp);
     }
 }
@@ -61,7 +64,7 @@ typecheck_decl :: (decl: *Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
 typecheck_var_decl :: (var_decl: *Var_Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     success, entry := table_find_new(st, var_decl.ident);
     if !success {
-        table_set(st, var_decl.ident, make_symbol_int(var_decl.ident));
+        table_set(st, copy_string(var_decl.ident), make_symbol_int(var_decl.ident));
     }
     if var_decl.init typecheck_expr(var_decl.init, st, erp);
 }

@@ -5,14 +5,14 @@ Parser :: struct {
     error_reporter : *Error_Reporter;
 }
 
-parse_ast :: (lexer: *Lexer, error_reporter: *Error_Reporter, do_print: bool = false) -> *Program_Ast {
-    parser := Parser.{ tokens = lexer.tokens, error_reporter = error_reporter };
+parse_ast :: (tokens: []Token, error_reporter: *Error_Reporter, debug_log: bool = false) -> *Program_Ast {
+    parser := Parser.{ tokens = tokens, error_reporter = error_reporter };
+    
     program := parse_program(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
-    if do_print {
-        writer := stdout_writer_new();
-        print_program_ast(*writer, program);
-    }
+    
+    if debug_log print_program_ast(*stdout_writer_new(), program);
+    
     return program;
 }
 
@@ -117,7 +117,7 @@ parser_decl :: (parser: *Parser) -> *Decl_Ast {
     if peek(parser).type != .INT parse_err(parser, "Expected int found %", peek(parser).type);
 
     if is_fn_decl(parser) {
-        fn_decl_ast := parse_fn_decl(parser, only_decl = false);
+        fn_decl_ast := parse_fn_decl(parser, only_decl = true);
         return decl_fn_new(fn_decl_ast);
     }
     // normal variable decl

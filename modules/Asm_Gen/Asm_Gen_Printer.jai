@@ -81,15 +81,16 @@ print_asm_inst :: (writer: *Writer, inst: Instruction_Asm) {
             write(writer, "\n");
     }
 }
-print_asm_operand :: (writer: *Writer, operand: Operand_Asm) {
+
+print_asm_operand :: (writer: *Writer, using operand: Operand_Asm) {
     if #complete operand.type == {
         case .IMM;
-            write(writer, "imm(%)", operand.as.imm);
+            write(writer, "imm(%)", imm);
         case .REG;
-            write(writer, "reg(%)", operand.as.reg);
+            write(writer, "reg(%)", reg);
         case .PSEUDO;
-            write(writer, "pseudo(%)",operand.as.pseudo);
+            write(writer, "pseudo(%)", pseudo);
         case .STACK;
-            write(writer, "stack(%)", operand.as.stack);
+            write(writer, "stack(%)", stack);
     }
 }

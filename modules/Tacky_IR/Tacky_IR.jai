@@ -1,4 +1,4 @@
-gen_tacky :: (pg: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
+gen_tacky :: (pg: *Program_Ast, debug_log: bool = false) -> *Program_Tacky {
     tc : Tacky_Ctx;
     
     fns: [..]Fn_Tacky;
@@ -10,11 +10,7 @@ gen_tacky :: (pg: *Program_Ast, do_print: bool = false) -> *Program_Tacky {
     }
     program := New(Program_Tacky, .{ fns });
 
-    if do_print {
-        writer := stdout_writer_new();
-        print_tacky(program, *writer);
-    }
-
+    if debug_log print_tacky(program, *stdout_writer_new());
     return program;
 }
 
@@ -28,7 +24,7 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast) -> Fn_Tacky {
         // Potentially we can optimize this away later.
         array_add(*instructions, ret(constant(0)));
     }
-    return .{ fn_ast.ident, instructions };
+    return .{ copy_string(fn_ast.ident), instructions };
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast) {
@@ -118,9 +114,9 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             gen_instructions(tc, instructions, stmt_ast.as.compound);
         case .FOR;
             for_stmt := stmt_ast.as.for_stmt;
-            loop_start_label := tprint("%_start", for_stmt.label);
-            loop_post_expr_label := tprint("%_post_expr", for_stmt.label);
-            loop_end_label := tprint("%_end", for_stmt.label);
+            loop_start_label := sprint("%_start", for_stmt.label);
+            loop_post_expr_label := sprint("%_post_expr", for_stmt.label);
+            loop_end_label := sprint("%_end", for_stmt.label);
 
             if #complete for_stmt.init.type == {
                 case .INIT_DECL;
@@ -149,12 +145,12 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, label(loop_end_label));
         case .DO_WHILE;
             do_while_stmt := stmt_ast.as.do_while;
-            loop_start_label := tprint("%_start", do_while_stmt.label);
-            loop_end_label := tprint("%_end", do_while_stmt.label);
+            loop_start_label := sprint("%_start", do_while_stmt.label);
+            loop_end_label := sprint("%_end", do_while_stmt.label);
             // @refactor adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
             // Maybe there is a better way to do this but..... this is what we have for now
-            loop_post_expr_label := tprint("%_post_expr", do_while_stmt.label);
+            loop_post_expr_label := sprint("%_post_expr", do_while_stmt.label);
 
             array_add(instructions, label(loop_start_label));
 
@@ -167,13 +163,13 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, label(loop_end_label));
         case .WHILE;
             while_stmt := stmt_ast.as.while_stmt;
-            loop_start_label := tprint("%_start", while_stmt.label);
-            loop_end_label := tprint("%_end", while_stmt.label);
+            loop_start_label := sprint("%_start", while_stmt.label);
+            loop_end_label := sprint("%_end", while_stmt.label);
             // @refactor
             // adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
             // Maybe there is a better way to do this but..... this is what we have for now
-            loop_post_expr_label := tprint("%_post_expr", while_stmt.label);
+            loop_post_expr_label := sprint("%_post_expr", while_stmt.label);
 
             array_add(instructions, label(loop_start_label));
             array_add(instructions, label(loop_post_expr_label));
@@ -187,11 +183,11 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
             array_add(instructions, label(loop_end_label));
         case .BREAK;
             break_stmt := stmt_ast.as.break_stmt;
-            loop_end_label := tprint("%_end", break_stmt);
+            loop_end_label := sprint("%_end", break_stmt);
             array_add(instructions, jump(loop_end_label));
         case .CONTINUE;
             continue_stmt := stmt_ast.as.continue_stmt;
-            loop_start_label := tprint("%_post_expr", continue_stmt);
+            loop_start_label := sprint("%_post_expr", continue_stmt);
             array_add(instructions, jump(loop_start_label));
         case .NULL; // pass through - nothing to do when null stmt is received
     }
@@ -231,7 +227,7 @@ gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_
 
     // by this point we have added required jump instructions to correct cases
     // if nothing maches we need to go to end to the switch
-    switch_end_label := tprint("%_end", switch_ast.label);
+    switch_end_label := sprint("%_end", switch_ast.label);
     array_add(instructions, jump(switch_end_label));
 
     // now add instruction for all cases
@@ -349,7 +345,7 @@ gen_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: 
 }
 
 gen_logical_and :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.as.binary)) -> Val_Tacky {
-    label_false := make_label(tc, tprint("cond_%", "false"));
+    label_false := make_label(tc, "cond_false");
 
     src1 := gen_expr(tc, instructions, bin_ast.left);
     array_add(instructions, jump_if_zero(src1, label_false.as.label));
@@ -375,7 +371,7 @@ gen_logical_and :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_as
 }
 
 gen_logical_or :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.as.binary)) -> Val_Tacky {
-    label_false := make_label(tc, tprint("cond_%", "true"));
+    label_false := make_label(tc, "cond_true");
 
     src1 := gen_expr(tc, instructions, bin_ast.left);
     array_add(instructions, jump_if_not_zero(src1, label_false.as.label));
@@ -434,7 +430,7 @@ constant :: (value: int) -> Val_Tacky #expand {
 }
 
 variable :: (ident: string) -> Val_Tacky #expand {
-    return .{.VARIABLE, .{variable = ident }};
+    return .{.VARIABLE, .{variable = copy_string(ident) }};
 }
 
 copy :: (src: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
@@ -442,23 +438,23 @@ copy :: (src: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
 }
 
 label :: (ident: string) -> Instruction_Tacky #expand {
-    return .{.LABEL, .{label = ident }};
+    return .{.LABEL, .{label = copy_string(ident) }};
 }
 
 jump :: (ident: string) -> Instruction_Tacky #expand {
-    return .{.JUMP, .{ jump = ident }};
+    return .{.JUMP, .{ jump = copy_string(ident) }};
 }
 
 jump_if_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
-    return .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, ident } }};
+    return .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, copy_string(ident) } }};
 }
 
 jump_if_not_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
-    return .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{condition, ident } }};
+    return .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{condition, copy_string(ident) } }};
 }
 
 fn_call :: (ident: string, args: [..]Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{ .FN_CALL, .{ fn_call = .{ ident, args, dst } }};
+    return .{ .FN_CALL, .{ fn_call = .{ copy_string(ident), args, dst } }};
 }
 
 unary :: (op: Unary_Op_Type_Tacky, src: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
@@ -471,10 +467,10 @@ binary :: (op: Bin_Op_Type_Tacky, src1: Val_Tacky, src2: Val_Tacky, dst: Val_Tac
 
 make_var :: (tc : *Tacky_Ctx) -> Val_Tacky {
     defer tc.temp_var_index += 1;
-    return .{.VARIABLE, .{variable = tprint("tmp.%",tc.temp_var_index) }};
+    return .{.VARIABLE, .{variable = sprint("tmp.%",tc.temp_var_index) }};
 }
 
 make_label :: (tc : *Tacky_Ctx, label: string) -> Instruction_Tacky {
     defer tc.label_index += 1;
-    return .{.LABEL, .{label = tprint("L_%.%",label, tc.label_index) }};
+    return .{.LABEL, .{label = sprint("L_%.%", copy_string(label), tc.label_index) }};
 }

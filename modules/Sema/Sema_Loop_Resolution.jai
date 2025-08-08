@@ -6,7 +6,6 @@ sema_loop_labeling :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
 
 label_fn :: (fn: *Fn_Decl_Ast, error_reporter: *Error_Reporter) {
     label_info: [..]Label_Info;
-    defer free(*label_info);
 
     if fn.block != null label_block(fn.block, *label_info, error_reporter);
 }
@@ -38,7 +37,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Default case already defined");
             }
 
-            label := tprint("L.switch_default_case_%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
+            label := sprint("L.switch_default_case_%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
             stmt.as.default = label;
             array_add(*switch_label_info.cases_label, .{label = label, value = "", is_default = true});
         case .CASE;
@@ -49,11 +48,11 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             if has_same_case(*switch_label_info.cases_label, stmt.as.case_stmt.value) {
                 error_report(error_reporter, stmt.loc.line, stmt.loc.start, "Case already defined");
             }
-            label := tprint("L.c%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
+            label := sprint("L.c%.%.r%", switch_label_info.label, switch_label_info.cases_label.count, get_4_digit_random());
             array_add(*switch_label_info.cases_label, .{label = label, value = stmt.as.case_stmt.value, is_default = false});
             stmt.as.case_stmt.label = label;
         case .SWITCH;
-            label := tprint("L.switch.%.r%",label_info.count, get_4_digit_random());
+            label := sprint("L.switch.%.r%",label_info.count, get_4_digit_random());
             stmt.as.switch.label = label;
             array_add(label_info, .{.SWITCH, .{ switch = .{ label = label }}});
             label_block_item(*stmt.as.switch.body, label_info, error_reporter);
@@ -70,7 +69,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             compound := stmt.as.compound;
             label_block(compound, label_info, error_reporter);
         case .WHILE;
-            label := tprint("L.wloop.%.r%", label_info.count, get_4_digit_random());
+            label := sprint("L.wloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.while_stmt.label = label;
             array_add(label_info, .{.LOOP, .{ loop = .{label} }});
             label_stmt(stmt.as.while_stmt.body, label_info, error_reporter);
@@ -87,7 +86,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
             }
             stmt.as.break_stmt = get_any_closest_label(label_info);
         case .FOR;
-            label := tprint("L.forloop.%.r%", label_info.count, get_4_digit_random());
+            label := sprint("L.forloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.for_stmt.label = label;
             {
                 array_add(label_info, .{ .LOOP, .{loop = .{label}}});
@@ -96,7 +95,7 @@ label_stmt :: (stmt: *Stmt_Ast, label_info: *[..]Label_Info, error_reporter: *Er
                 label_stmt(stmt.as.for_stmt.body,label_info, error_reporter);
             }
         case .DO_WHILE;
-            label := tprint("L.dwloop.%.r%", label_info.count, get_4_digit_random());
+            label := sprint("L.dwloop.%.r%", label_info.count, get_4_digit_random());
             stmt.as.do_while.label = label;
             array_add(label_info, .{ .LOOP, .{loop = .{label}}});
             label_stmt(stmt.as.do_while.body,label_info, error_reporter);
