@@ -107,11 +107,34 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
     }
 }
 
+print_arena :: (using arena: *Arena) {
+    print("\n================ Arena Info =================== \n");
+    total_size := 0;
+    total_uzed := 0;
+    
+    block_counter := 1;
+    current := arena.first_block;
+    while current {
+        total_size += current.size;
+        total_uzed += current.used;
+        print("\t %. Address: %\n",block_counter, current.memory);
+        print("\t %. Used: %\n", block_counter, current.used);
+        print("\t %. Size: %\n", block_counter, current.size);
+        current = current.next;
+        block_counter += 1;
+    }
+    
+    print("Total Used: %\n", total_uzed);
+    print("Total Size: %\n", total_size);
+    print("Num Buckets: %\n", block_counter);
+    print("================ End: Arena Info =================== \n\n");
+}
+
 #if MEMORY_DEBUGGER {
     ARENA_AWARE_MEMORY_DEBUGGER :: struct {
         check_alloc   :: custom_check_alloc;
-        check_free    :: _check_free;
-        check_realloc :: _check_realloc;
+        check_free    :: custom_check_free;
+        check_realloc :: custom_check_realloc;
     
         check_create_heap  :: _check_create_heap;
         check_destroy_heap :: _check_destroy_heap;
@@ -119,6 +142,17 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
         custom_check_alloc :: inline (allocator: Allocator, memory: *void, size: s64) #expand {
             if allocator.proc == arena_allocator_proc return; 
             _check_alloc(allocator, memory, size);
+        };
+        
+        custom_check_free :: inline (allocator: Allocator, memory: *void) #expand {
+            if allocator.proc == arena_allocator_proc return; 
+            _check_free(allocator, memory);
+        };
+        
+        
+        custom_check_realloc :: inline (allocator: Allocator, old_memory: *void, old_size: s64, new_memory: *void, new_size: s64) #expand {
+            if allocator.proc == arena_allocator_proc return; 
+            _check_realloc(allocator, old_memory, old_size, new_memory, new_size);
         };
     }
 }

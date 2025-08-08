@@ -1,11 +1,11 @@
-code_emm :: (src_path_no_ext: string, program: *Program_Asm, symbols: Symbol_Table, do_print: bool = false) {
+code_emm :: (src_path_no_ext: string, program: *Program_Asm, symbols: Symbol_Table, $debug_log: bool = false) {
     sb: String_Builder;
     sb_writer := sb_writer_new(*sb);
     
     emm_pg(*sb_writer, program, symbols);
     asm := builder_to_string(*sb);
     
-    if do_print print("\n\n-- Native Asm --\n%", asm);
+    if debug_log print("\n\n-- Native Asm --\n%", asm);
     
     file, success := file_open(tprint("%.s", src_path_no_ext), for_writing=true, keep_existing_content=false);
     if !success return;
@@ -155,9 +155,9 @@ fmt_operand :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
 
 fmt_operand :: (operand: Operand_Asm) -> string {
     if #complete operand.type == {
-        case .IMM;    return tprint("$%", operand.as.imm);
+        case .IMM;    return sprint("$%", operand.as.imm);
         case .REG;    return fmt_reg(operand.as.reg);
-        case .STACK;  return tprint("%(%)", operand.as.stack, fmt_reg(.{.RBP, .QWORD}));
+        case .STACK;  return sprint("%(%)", operand.as.stack, fmt_reg(.{.RBP, .QWORD}));
         case .PSEUDO; unreachable("** Compiler Bug ** pseudo operand shouldn't exist anymore."); return "";
     }
 }

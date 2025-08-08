@@ -50,7 +50,11 @@ string_format :: (str: string, length: int, align: String_Format_Alignment = .LE
 ///
 unreachable :: ($message := "", args: .. Any, log: bool = true, exit_status_code: int = 1, loc := #caller_location) #no_debug #expand {
     if log log_error(message, .. args);
+    print("\n=========== Stacktrace ============\n\n");
+    print_stack_trace(context.stack_trace);
+    print("\n===================================\n");
     my_panic();
+    // TODO(Aman): make this macro return anything here, so on call site we don't have to return dumb value
 }
 
 New :: ($T: Type, value: T) -> *T #expand {

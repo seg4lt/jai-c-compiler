@@ -64,7 +64,7 @@ Val_Tacky :: struct {
         CONSTANT; 
         VARIABLE; 
     };
-    as : union {
+    using as : union {
         constant : int;
         variable : string;
     };

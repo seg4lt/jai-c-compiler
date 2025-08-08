@@ -16,7 +16,6 @@ Label_Store :: Table(
 label_fn :: (fn: *Fn_Decl_Ast, erp: *Error_Reporter) {
     label_store : Label_Store;
     init(*label_store);
-    defer deinit(*label_store);
 
     // find all labels in source code
     // doing this so we can make sure goto is pointing to correct label
@@ -24,7 +23,6 @@ label_fn :: (fn: *Fn_Decl_Ast, erp: *Error_Reporter) {
 
     goto_labels: Label_Store;
     init(*goto_labels);
-    defer deinit(*goto_labels);
 
     // resolve all goto with correct label
     if fn.block resolve_block(fn.block, *goto_labels, *label_store, erp);

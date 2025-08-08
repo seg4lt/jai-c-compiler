@@ -18,8 +18,8 @@ fix_asm:: (pg: *Program_Asm) -> *Program_Asm {
 fix_instructions :: (old_instructions: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
     
-    if stack_size % STACK_ALIGNMENT != 0 stack_size += (STACK_ALIGNMENT - (stack_size % STACK_ALIGNMENT));
-    array_add(*insts, allocate_stack(stack_size));
+    aligned_stack_size := (stack_size + STACK_ALIGNMENT - 1) & ~(STACK_ALIGNMENT - 1);
+    array_add(*insts, allocate_stack(aligned_stack_size));
 
     for oi: old_instructions {
         if #complete oi.type == {

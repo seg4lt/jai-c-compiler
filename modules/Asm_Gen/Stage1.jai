@@ -41,7 +41,7 @@ map_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
     
     for fnt.instructions map_instructions(*instructions, *it);
     INITIAL_STACK_SIZE :: 0; // this will be updated in later stages
-    return .{fnt.ident, instructions, INITIAL_STACK_SIZE };
+    return .{ copy_string(fnt.ident), instructions, INITIAL_STACK_SIZE };
 }
 map_instructions :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
@@ -232,7 +232,7 @@ map_binary_op :: (tacky_op: type_of(Instruction_Tacky.as.binary.op)) -> type_of(
 
 to_operand :: (using val: *Val_Tacky) -> Operand_Asm {
     if #complete type == {
-        case .CONSTANT; return imm(as.constant);
-        case .VARIABLE; return pseudo(as.variable);
+        case .CONSTANT; return imm(constant);
+        case .VARIABLE; return pseudo(variable);
     }
 }

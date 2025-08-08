@@ -51,7 +51,7 @@ Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; };
 
 Operand_Asm :: struct {
     type : enum { IMM; REG; PSEUDO; STACK; };
-    as   : union { 
+    using as   : union { 
         imm     : int;
         pseudo  : string;
         reg     : Register_Asm;
@@ -116,15 +116,15 @@ reg :: (register: Register, size: Register_Size) -> Operand_Asm #expand {
 }
 
 pseudo :: (ident: string) -> Operand_Asm #expand {
-    return .{.PSEUDO, .{pseudo = ident}};
+    return .{ .PSEUDO, .{ pseudo = copy_string(ident) } };
 }
 
 stack :: (position: int) -> Operand_Asm #expand {
-    return .{.STACK, .{stack = position }}; 
+    return .{ .STACK, .{ stack = position } }; 
 }
 
 imm :: (value: int) -> Operand_Asm #expand {
-    return .{.IMM, .{imm = value}};
+    return .{ .IMM, .{ imm = value } };
 } 
 
 ret :: () -> Instruction_Asm #expand {
@@ -160,15 +160,15 @@ idiv :: (operand: Operand_Asm) -> Instruction_Asm #expand {
 }
 
 label :: (ident: string) -> Instruction_Asm #expand {
-    return .{ .LABEL, .{ label = ident } };
+    return .{ .LABEL, .{ label = copy_string(ident) } };
 }
 
 jmp_cc :: (cond_code: Cond_Code_Asm, ident: string) -> Instruction_Asm #expand {
-    return .{ .JMP_CC, .{ jmp_cc = .{ cond_code, ident } } };
+    return .{ .JMP_CC, .{ jmp_cc = .{ cond_code, copy_string(ident) } } };
 }
 
 jmp :: (ident: string) -> Instruction_Asm #expand {
-    return .{ .JMP, .{ jmp = ident } };
+    return .{ .JMP, .{ jmp = copy_string(ident) } };
 }
 
 allocate_stack :: (size: int) -> Instruction_Asm #expand {
@@ -180,7 +180,7 @@ push :: (operand: Operand_Asm) -> Instruction_Asm #expand {
 }
 
 call :: (ident: string) -> Instruction_Asm #expand {
-    return .{.CALL, .{ call = ident }};
+    return .{.CALL, .{ call = copy_string(ident) }};
 }
 
 deallocate_stack :: (size: int) -> Instruction_Asm #expand {

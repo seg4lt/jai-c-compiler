@@ -1,11 +1,11 @@
-Cli_Args :: struct {
+Compiler_Args :: struct {
     src_path              : string;
     src_path_without_ext  : string;
     output_type           : Output_Type    = .EXE;
-    flags                 : Cli_Args_Flags = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
+    flags                 : Compiler_Flag  = .LEX | .PARSE | .SEMA | .TACKY | .CODE_GEN | .ALL;
 }
 
-Cli_Args_Flags :: enum_flags {
+Compiler_Flag :: enum_flags {
     LEX;
     PARSE;
     SEMA;
@@ -14,16 +14,17 @@ Cli_Args_Flags :: enum_flags {
     ALL;
 }
 
-get_cli_args :: () -> Cli_Args {
+get_compiler_args :: () -> Compiler_Args {
     args := get_command_line_arguments();
     args = array_view(args, 1);
 
-    using cli_args := Cli_Args.{};
+    using cli_args := Compiler_Args.{};
 
     for args {
         if it == {
             case "--lex";          flags = .LEX;
             case "--parse";        flags = .LEX | .PARSE;
+            case "--sema";         #through;
             case "--validate";     flags = .LEX | .PARSE | .SEMA;
             case "--tacky";        flags = .LEX | .PARSE | .SEMA | .TACKY;
             case "--code-gen";     #through;

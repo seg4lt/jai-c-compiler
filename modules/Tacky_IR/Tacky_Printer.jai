@@ -48,8 +48,8 @@ print_tacky_inst :: (inst: *Instruction_Tacky, writer: *Writer) {
             write(writer, "Label(%)", inst.as.label);
         case .JUMP_IF_NOT_ZERO; 
             write(writer, "JumpIfNotZero(condition: ");
-            print_tacky_val(*inst.as.jump_if_zero.condition, writer);
-            write(writer, ", label: %", inst.as.jump_if_zero.ident);
+            print_tacky_val(*inst.as.jump_if_not_zero.condition, writer);
+            write(writer, ", label: %", inst.as.jump_if_not_zero.ident);
             write(writer, ")");
         case .JUMP_IF_ZERO; 
             write(writer, "JumpIfZero(condition: ");

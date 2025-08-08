@@ -13,7 +13,6 @@ STACK_SIZE := 4; // 4 bytes for 32-bit int - we only support 32-bit int at the m
 fix_instructions :: (insts: []Instruction_Asm) -> stack_size: int {
     table : Table(string, int);
     init(*table);
-    defer deinit(*table);
 
     for * inst: insts {
         if #complete inst.type == {

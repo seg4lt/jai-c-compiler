@@ -1,7 +1,6 @@
 sema_ident_resolution :: (ast: *Program_Ast, erp: *Error_Reporter) {
     new_scope: Scope_Idents;
     init(*new_scope);
-    defer deinit(*new_scope);
     
     for fn: ast.fns {
         resolve_fn_decl(fn, *new_scope, erp, can_have_body=true);
@@ -42,7 +41,6 @@ resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
         case .COMPOUND;
             compound := stmt.as.compound;
             nested_scope := create_new_scope(scope);
-            defer deinit(*nested_scope);
             resolve_block(compound, *nested_scope, erp);
         case .FOR; resolve_for_stmt(stmt.as.for_stmt, scope, erp);
         case .DO_WHILE;
@@ -116,7 +114,6 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
     table_set(scope, fn_decl.ident, ident);
     
     scope_for_fn_param := create_new_scope(scope);
-    defer deinit(*scope_for_fn_param);
     
     for * param: fn_decl.params  {
         success, entry := table_find_new(*scope_for_fn_param, param.*.ident);
@@ -195,7 +192,6 @@ For_Stmt_Ast :: type_of(Stmt_Ast.as.for_stmt);
 
 resolve_for_stmt :: (for_stmt: For_Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     scope_for_init : Scope_Idents;
-    defer deinit(*scope_for_init);
     scope_for_init = create_new_scope(scope);
 
     if #complete for_stmt.init.type == {
@@ -210,7 +206,6 @@ resolve_for_stmt :: (for_stmt: For_Stmt_Ast, scope: *Scope_Idents, erp: *Error_R
 
     {
         scope_for_body : Scope_Idents;
-        defer deinit(*scope_for_body);
         scope_for_body = create_new_scope(*scope_for_init);
         resolve_stmt(for_stmt.body, *scope_for_body, erp);
     }
