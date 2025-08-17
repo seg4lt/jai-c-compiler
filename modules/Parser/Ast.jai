@@ -78,7 +78,7 @@ Stmt_Ast :: struct {
         compound      : *Block_Ast;
         continue_stmt : string;
         default       : string;
-        do_while      : struct {  body: *Stmt_Ast; condition: *Expr_Ast; label: string;};
+        do_while      : struct { body: *Stmt_Ast; condition: *Expr_Ast; label: string; };
         expr          : *Expr_Ast;
         for_stmt      : struct { init: *For_Init_Ast; condition: /* Optional */ *Expr_Ast; post: /* Optional */ *Expr_Ast; body: *Stmt_Ast; label: string; };
         goto          : string;
@@ -115,25 +115,28 @@ Expr_Ast :: struct {
         TERNARY;
         UNARY;
         VAR;
+        PREFIX;
+        POSTFIX;
     }
     as: union {
-        assignment  : struct { dst: *Expr_Ast; src: *Expr_Ast; };
-        binary      : struct { op: Binary_Operator; left: *Expr_Ast; right: *Expr_Ast;};
-        constant    : int;
-        fn_call     : struct { ident: string; args: [..]*Expr_Ast; }
-        group       : *Expr_Ast;
-        ternary     : struct {condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast;};
-        unary       : struct { op: Unary_Operator; expr: *Expr_Ast; };
-        var         : string; 
+        assignment:   struct { dst: *Expr_Ast; src: *Expr_Ast; };
+        binary:       struct { op: Binary_Operator; left: *Expr_Ast; right: *Expr_Ast;};
+        constant:     int;
+        fn_call:      struct { ident: string; args: [..]*Expr_Ast; }
+        group:        *Expr_Ast;
+        ternary:      struct {condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast;};
+        unary:        struct { op: Unary_Operator; expr: *Expr_Ast; };
+        var:          string; 
+        postfix_expr: struct { op: Postfix_Operator; expr: *Expr_Ast; };
+        prefix_expr:  struct { op: Prefix_Operator; expr: *Expr_Ast; };
     };
-    // @refactor
-    // Maybe should be be a expression type which has sub expression
-    postfix :  enum { 
-        DECR; 
-        INCR; 
-        NONE; 
-    } = .NONE;
     using loc: Source_Location;
+}
+
+Prefix_Operator :: Postfix_Operator; 
+Postfix_Operator :: enum {
+    ADD;
+    SUBTRACT;
 }
 
 Unary_Operator :: enum {
@@ -298,37 +301,47 @@ stmt_return_new :: (expr: *Expr_Ast, line: int, start: int) -> *Stmt_Ast #expand
     return New(Stmt_Ast, .{.RETURN, .{ return_stmt = .{ expr }}, .{line, start}});
 }
 
-expr_assignment_new :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
-    assert(dst != null, "dst cannot be null");
-    assert(src != null, "src cannot be null");
-    return New(Expr_Ast, .{.ASSIGNMENT, .{ assignment = .{ dst, src }}, postfix, .{line, start}});
+expr_prefix_new :: (op: Prefix_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
+    assert(expr != null, "expr cannot be null");
+    return New(Expr_Ast, .{.PREFIX, .{ prefix_expr = .{ op, expr }}, .{line, start}});
 }
 
-expr_ternary_new :: (condition: *Expr_Ast, true_expr: *Expr_Ast, false_expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_postfix_new :: (op: Postfix_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
+    assert(expr != null, "expr cannot be null");
+    return New(Expr_Ast, .{.POSTFIX, .{ postfix_expr = .{ op, expr }}, .{line, start}});
+}
+
+expr_assignment_new :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
+    assert(dst != null, "dst cannot be null");
+    assert(src != null, "src cannot be null");
+    return New(Expr_Ast, .{.ASSIGNMENT, .{ assignment = .{ dst, src }}, .{line, start}});
+}
+
+expr_ternary_new :: (condition: *Expr_Ast, true_expr: *Expr_Ast, false_expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
     assert(condition != null, "condition cannot be null");
     assert(true_expr != null, "true_expr cannot be null");
     assert(false_expr != null, "false_expr cannot be null");
-    return New(Expr_Ast, .{.TERNARY, .{ ternary = .{ condition, true_expr, false_expr }}, postfix, .{line, start}});
+    return New(Expr_Ast, .{.TERNARY, .{ ternary = .{ condition, true_expr, false_expr }}, .{line, start}});
 }
 
-expr_unary_new :: (op: Unary_Operator, expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_unary_new :: (op: Unary_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
     assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.UNARY, .{ unary = .{ op, expr }}, postfix, .{line, start}});
+    return New(Expr_Ast, .{.UNARY, .{ unary = .{ op, expr }}, .{line, start}});
 }
 
-expr_var_new :: (ident: string, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_var_new :: (ident: string, line: int, start: int) -> *Expr_Ast #expand {
     assert(ident != "", "ident cannot be null");
-    return New(Expr_Ast, .{.VAR, .{ var = ident }, postfix, .{line, start}});
+    return New(Expr_Ast, .{.VAR, .{ var = ident }, .{line, start}});
 }
 
-expr_fn_call_new :: (ident: string, args_list: [..]*Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_fn_call_new :: (ident: string, args_list: [..]*Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
     assert(ident != "", "ident cannot be null");
-    return New(Expr_Ast, .{.FN_CALL, .{ fn_call = .{ ident, args_list } }, postfix, .{line, start}});
+    return New(Expr_Ast, .{.FN_CALL, .{ fn_call = .{ ident, args_list } }, .{line, start}});
 }
 
-expr_group_new :: (expr: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_group_new :: (expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
     assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.GROUP, .{ group = expr }, postfix, .{line, start}});
+    return New(Expr_Ast, .{.GROUP, .{ group = expr }, .{line, start}});
 }
 
 stmt_default_new :: (line: int, start: int) -> *Stmt_Ast #expand {
@@ -337,12 +350,12 @@ stmt_default_new :: (line: int, start: int) -> *Stmt_Ast #expand {
 
 #scope_export
 
-expr_binary_new :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
+expr_binary_new :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
     assert(left != null, "left cannot be null");
     assert(right != null, "right cannot be null");
-    return New(Expr_Ast, .{.BINARY, .{ binary = .{ op, left, right }}, postfix, .{line, start}});
+    return New(Expr_Ast, .{.BINARY, .{ binary = .{ op, left, right }}, .{line, start}});
 }
 
-expr_constant_new :: (constant: int, line: int, start: int, postfix: type_of(Expr_Ast.postfix) = .NONE) -> *Expr_Ast #expand {
-    return New(Expr_Ast, .{.CONSTANT, .{ constant = constant }, postfix, .{line, start}});
+expr_constant_new :: (constant: int, line: int, start: int) -> *Expr_Ast #expand {
+    return New(Expr_Ast, .{.CONSTANT, .{ constant = constant }, .{line, start}});
 }

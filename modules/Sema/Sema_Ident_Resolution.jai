@@ -139,8 +139,27 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
     if fn_decl.block resolve_block(fn_decl.block, *scope_for_fn_param, erp);
 }
 
+unwrap_group_expr :: (expr: *Expr_Ast) -> *Expr_Ast {
+    if expr.type == .GROUP return unwrap_group_expr(expr.as.group);
+    return expr;
+}
+
 resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     if #complete expr.type == {
+        case .POSTFIX;
+            postfix := expr.as.postfix_expr;
+            inner_expr := unwrap_group_expr(postfix.expr);
+            if inner_expr.type != .VAR {
+                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in postfix expression, found: %", inner_expr.*);
+            }
+            resolve_expr(postfix.expr, scope, erp);
+        case .PREFIX;
+            prefix := expr.as.prefix_expr;
+            inner_expr := unwrap_group_expr(prefix.expr);
+            if inner_expr.type != .VAR {
+                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in prefix expression, found: %", inner_expr.*);
+            }
+            resolve_expr(prefix.expr, scope, erp);
         case .UNARY;
             resolve_expr(expr.as.unary.expr, scope, erp);
         case .BINARY;

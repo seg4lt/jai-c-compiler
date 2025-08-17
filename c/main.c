@@ -1,8 +1,6 @@
-/* Test that compound assignment expressions yield the correct value, have
- * the same precedence, and are right-associative.
- */
+int x(void);
+
 int main(void) {
-    int foo(void) {
-        
-    }
+  x++;
+  return 0;
 }

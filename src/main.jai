@@ -9,7 +9,6 @@ main :: () {
     
     print("\n================= COMPILER EXITED ===================\n");
 }
-
 run_compiler :: (cc: *Compiler_Context) {
     args := get_compiler_args();
     preprocessed_src := run_preprocessor(args.src_path);
@@ -18,7 +17,7 @@ run_compiler :: (cc: *Compiler_Context) {
     symbols: Symbol_Table = ---;
     init(*symbols,, cc.symbol_arena);
     
-    tokens := ifx args.flags & .LEX scan_tokens(preprocessed_src, *error_reporter,, cc.lexer_arena) else .[];
+    tokens := ifx args.flags & .LEX scan_tokens(preprocessed_src, *error_reporter, debug_log = SUPER_DEBUG,, cc.lexer_arena) else .[];
     
     ast := ifx args.flags & .PARSE parse_ast(tokens, *error_reporter, debug_log = SUPER_DEBUG,, cc.parser_arena) else null;
     deinit(cc, .LEXER);

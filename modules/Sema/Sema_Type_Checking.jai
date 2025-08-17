@@ -121,7 +121,13 @@ typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
 }
 
 typecheck_expr :: (expr: *Expr_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
-    if expr.type == {
+    if #complete expr.type == {
+        case .POSTFIX;
+            postfix := expr.as.postfix_expr;
+            typecheck_expr(postfix.expr, st, erp);
+        case .PREFIX;
+            prefix := expr.as.prefix_expr;
+            typecheck_expr(prefix.expr, st, erp);
         case .UNARY;
             typecheck_expr(expr.as.unary.expr, st, erp);
         case .BINARY;
