@@ -14,7 +14,7 @@ Token :: struct {
     start: int;
 }
 
-scan_tokens :: (src: string, error_reporter: *Error_Reporter, debug_log: bool = false) -> []Token {
+scan_tokens :: (src: string, error_reporter: *Error_Reporter, debug_log: bool = true) -> []Token {
     lexer := Lexer.{ src = src, error_reporter = error_reporter };
     scan(*lexer);
     if debug_log print_tokens(lexer.tokens);

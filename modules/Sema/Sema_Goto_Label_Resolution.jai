@@ -148,6 +148,12 @@ resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label
 
 resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, erp: *Error_Reporter) {
     if #complete expr.type == {
+        case .POSTFIX;
+            postfix := expr.as.postfix_expr;
+            resolve_expr(postfix.expr, goto_labels, label_store, erp);
+        case .PREFIX;
+            prefix := expr.as.prefix_expr;
+            resolve_expr(prefix.expr, goto_labels, label_store, erp);
         case .GROUP;
             resolve_expr(expr.as.group, goto_labels, label_store, erp);
         case .TERNARY;
@@ -167,6 +173,12 @@ resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_
 
 label_expr :: (expr: *Expr_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
     if #complete expr.type == {
+        case .POSTFIX;
+            postfix := expr.as.postfix_expr;
+            label_expr(postfix.expr, label_store, erp);
+        case .PREFIX;
+            prefix := expr.as.prefix_expr;
+            label_expr(prefix.expr, label_store, erp);
         case .FN_CALL;  
             fn_call := expr.as.fn_call;
             for arg_expr: fn_call.args label_expr(arg_expr, label_store, erp);

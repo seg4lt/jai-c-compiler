@@ -193,11 +193,6 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, stmt_
     }
 }
 
-gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
-    val := gen_expr_raw(tc, instructions, expr_ast);
-    return gen_postfix(tc, instructions, expr_ast, val);
-}
-
 gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast) {
     switch_condition := switch_ast.condition;
     switch_expr_val := gen_expr(tc, instructions, switch_condition);
@@ -237,9 +232,43 @@ gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_
     array_add(instructions, label(switch_end_label));
 }
 
-// This doesn't process postfix
-gen_expr_raw :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
+gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast) -> dst: Val_Tacky {
     if #complete expr_ast.type == {
+        case .PREFIX;
+            prefix := expr_ast.as.prefix_expr;
+            inner_expr_result := gen_expr(tc, instructions, prefix.expr);
+            
+            one := constant(1);
+            dst := make_var(tc);
+            if #complete prefix.op == {
+                case .ADD; 
+                    array_add(instructions, binary(.ADD, inner_expr_result, one, dst));
+                    array_add(instructions, copy(dst, inner_expr_result));
+                case .SUBTRACT; 
+                    array_add(instructions, binary(.SUB, inner_expr_result, one, dst));
+                    array_add(instructions, copy(dst, inner_expr_result));
+            }
+            return inner_expr_result;
+        case .POSTFIX;
+            postfix := expr_ast.as.postfix_expr;
+            expr_val_tacky := gen_expr(tc, instructions, postfix.expr);
+            
+            old_value_dst := make_var(tc);
+            old_value     := copy(expr_val_tacky, old_value_dst);
+            array_add(instructions, old_value);
+        
+            one := constant(1);
+            if #complete postfix.op == {
+                case .ADD; 
+                    dst := make_var(tc);
+                    array_add(instructions, binary(.ADD, expr_val_tacky, one, dst));
+                    array_add(instructions, copy(dst, expr_val_tacky));
+                case .SUBTRACT; 
+                    dst := make_var(tc);
+                    array_add(instructions, binary(.SUB, expr_val_tacky, one, dst));
+                    array_add(instructions, copy(dst, expr_val_tacky));
+            }
+            return old_value_dst;
         case .FN_CALL;
             fn_call_expr := expr_ast.as.fn_call;
             args: [..]Val_Tacky;

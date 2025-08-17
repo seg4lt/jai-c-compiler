@@ -374,36 +374,26 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             return expr;
         case .MINUS_MINUS; #through;
         case .PLUS_PLUS;
-            postfix_op_token := consume(parser);
-            ident_expr := parse_factor(parser);
-            if !(ident_expr.type == .VAR || (ident_expr.type == .GROUP && ident_expr.as.group.type == .VAR)) {
-                parse_err(parser, "expected var identifier");
+            prefix_op_token := consume(parser);
+            inner_expr := parse_factor(parser);
+            op: Prefix_Operator = ---; 
+            if prefix_op_token.type == {
+                case .MINUS_MINUS; op = .SUBTRACT;
+                case .PLUS_PLUS;   op = .ADD;
+                case; unreachable("** compiler bug ** only incr/decr operator support in this path");
             }
-            ident := ifx ident_expr.type == .VAR ident_expr.as.var else ident_expr.as.group.as.var;
-
-            var := expr_var_new(ident, ident_expr.loc.line, ident_expr.loc.start);
-            // @note
-            // on sema phase we replace variable with identifier
-            // we we use same reference we will update identifier twice
-            var_clone := expr_var_new(ident, ident_expr.loc.line, ident_expr.loc.start);
-
-            one := expr_constant_new(1, postfix_op_token.line, postfix_op_token.start);
-            op := parse_postfix_binary_op(parser, postfix_op_token.type);
-            binary := expr_binary_new(op, var, one, postfix_op_token.line, postfix_op_token.start);
-            return expr_assignment_new(var_clone, binary, postfix_op_token.line, postfix_op_token.start);
+            return expr_prefix_new(op, inner_expr, prefix_op_token.line, prefix_op_token.start);
         case .LPAREN;
             grp_start_tok := consume(parser, .LPAREN);
             inner_expr := parse_expr(parser, 0);
             expr := expr_group_new(inner_expr, grp_start_tok.line, grp_start_tok.start);
             consume(parser, .RPAREN);
-            parse_postfix_expr_ast(parser, expr);
-            return expr;
+            return parse_postfix_expr_ast(parser, expr);
         case .IDENT;
             ident := consume(parser);
             expr := ifx peek(parser).*.type != .LPAREN  expr_var_new(ident.value, ident.line, ident.start)
                     else expr_fn_call_new(ident.value, parse_args_expr(parser), ident.line, ident.start);
-            parse_postfix_expr_ast(parser, expr);
-            return expr;
+            return parse_postfix_expr_ast(parser, expr);
     }
     parse_err(parser, "This expression is not something I can handle. Duh!! %", peek(parser).*);
     return null;
@@ -426,18 +416,17 @@ parse_args_expr :: (parser: *Parser) -> [..]*Expr_Ast {
     return args;
 }
 
-parse_postfix_expr_ast :: (parser: *Parser, expr: *Expr_Ast) {
-    if peek(parser).type != .MINUS_MINUS && peek(parser).type != .PLUS_PLUS {
-        return;
-    }
-
-    if !(expr.type == .VAR || (expr.type == .GROUP && expr.as.group.type == .VAR)) {
-        parse_err(parser, "invalid l value for postfix operator: %, %", expr.type, expr.*);
-    }
-
+parse_postfix_expr_ast :: (parser: *Parser, inner_expr: *Expr_Ast) -> *Expr_Ast {
+    if peek(parser).type != .MINUS_MINUS && peek(parser).type != .PLUS_PLUS return inner_expr;
+    
     postfix_op_token := consume(parser);
-    op := parse_postfix_enum(parser, postfix_op_token.type);
-    expr.postfix = op;
+    op: Postfix_Operator = ---; 
+    if postfix_op_token.type == {
+        case .MINUS_MINUS; op = .SUBTRACT;
+        case .PLUS_PLUS;   op = .ADD;
+        case; unreachable("** compiler bug ** only incr/decr operator support in this path");
+    }
+    return expr_postfix_new(op, inner_expr, postfix_op_token.line, postfix_op_token.start);
 }
 
 is_compound_assignment_operator :: (token_type: Token_Type) -> bool {
@@ -466,14 +455,14 @@ parse_postfix_binary_op :: (parser: *Parser, token_type: Token_Type) -> Binary_O
     return .ADD;
 }
 
-parse_postfix_enum :: (parser: *Parser, tt: Token_Type) -> type_of(Expr_Ast.postfix) {
+parse_postfix_enum :: (parser: *Parser, tt: Token_Type) -> Postfix_Operator {
     if tt == {
-        case .MINUS_MINUS; return .DECR;
-        case .PLUS_PLUS;   return .INCR;
+        case .MINUS_MINUS; return .SUBTRACT;
+        case .PLUS_PLUS;   return .ADD;
         case;              parse_err(parser, "Wanted postfix unary operator found %", tt);
     }
     parse_err(parser, "Wanted postfix unary operator found %", tt);
-    return .NONE;
+    return 0;
 }
 
 is_binary_operator :: (tt: Token_Type) -> bool {
