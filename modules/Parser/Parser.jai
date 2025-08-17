@@ -202,7 +202,7 @@ parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
         while peek(parser).type != .RCURLY {
             peeked_token := peek(parser);
             item := parse_block_item(parser);
-            if item.type == .STMT && item.as.stmt.type == .CASE || item.as.stmt.type == .DEFAULT {
+            if item.type == .STMT && (item.block_item_stmt.type == .CASE || item.block_item_stmt.type == .DEFAULT) {
                 case_found = true;
             }
             if case_found && item.type == .DECL {
@@ -217,7 +217,7 @@ parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
     block_item := parse_block_item(parser);
     array_add(*body, block_item);
     
-    if block_item.type == .STMT && block_item.as.stmt.type  == .CASE {
+    if block_item.type == .STMT && block_item.block_item_stmt.type  == .CASE {
         case_stmt := parse_block_item(parser);
         array_add(*body, case_stmt);
     }
@@ -270,7 +270,7 @@ parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
     consume(parser, .LPAREN);
 
     for_init := parse_for_init(parser);
-    if for_init.type == .INIT_EXPR consume(parser, .SEMICOLON);
+    if for_init.type == .EXPR consume(parser, .SEMICOLON);
 
     condition := parse_optional_expr(parser, 0);
     consume(parser, .SEMICOLON);
@@ -550,7 +550,7 @@ precedence :: (parser: *Parser, token_type: Token_Type) -> int {
     return 0;
 }
 
-parse_unary_op :: (parser: *Parser, token_type: Token_Type) -> type_of(Expr_Ast.as.unary.op) {
+parse_unary_op :: (parser: *Parser, token_type: Token_Type) -> type_of(Expr_Ast.expr_unary.op) {
     if token_type == {
         case .BITWISE_NOT; return .BITWISE_NOT;
         case .MINUS;       return .NEGATE;

@@ -36,9 +36,10 @@ label_fn :: (fn: *Fn_Decl_Ast, erp: *Error_Reporter) {
 
 resolve_block :: (block: *Block_Ast, goto_labels: *Label_Store, label_store: *Label_Store, erp: *Error_Reporter) {
     for block.items {
-        if #complete it.type == {
+        using it;
+        if #complete type == {
             case .DECL; // noop
-            case .STMT; resolve_stmt(it.as.stmt, goto_labels, label_store, erp);
+            case .STMT; resolve_stmt(block_item_stmt, goto_labels, label_store, erp);
         }
     }
 }
@@ -49,48 +50,45 @@ label_block :: (block: *Block_Ast, label_store: *Label_Store, erp: *Error_Report
 
 label_block_item :: (block_items: *[..]*Block_Item_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
     for block_items.* {
-        if #complete it.type == {
+        using it;
+        if #complete type == {
             case .DECL; // noop
-            case .STMT; label_stmt(it.as.stmt, label_store, erp);
+            case .STMT; label_stmt(block_item_stmt, label_store, erp);
         }
     }
 
 }
 
-label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
-    if #complete stmt.type == {
+label_stmt :: (using stmt: *Stmt_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
+    if #complete type == {
         case .RETURN;
-            label_expr(stmt.as.return_stmt.expr, label_store, erp);
+            label_expr(stmt_return.expr, label_store, erp);
         case .EXPR;
-            label_expr(stmt.as.expr, label_store, erp);
+            label_expr(stmt_expr, label_store, erp);
         case .IF;
-            if_stmt := stmt.as.if_stmt;
-            label_expr(if_stmt.condition, label_store, erp);
-            label_stmt(if_stmt.if_block, label_store, erp);
-            if stmt.as.if_stmt.else_block != null
-                label_stmt(if_stmt.else_block, label_store, erp);
+            label_expr(stmt_if.condition, label_store, erp);
+            label_stmt(stmt_if.if_block, label_store, erp);
+            if stmt_if.else_block != null label_stmt(stmt_if.else_block, label_store, erp);
         case .LABEL;
-            if table_contains(label_store, stmt.as.label.label) {
-                error_report(erp, stmt.loc.line, stmt.loc.start, "duplicate label declaration! : %", stmt.as.label);
+            if table_contains(label_store, stmt_label.label) {
+            error_report(erp, stmt.loc.line, stmt.loc.start, "duplicate label declaration! : %", stmt_label);
             }
-            new_label := make_goto_label(stmt.as.label.label);
-            table_set(label_store, stmt.as.label.label, .{true, new_label, stmt.loc});
-            stmt.* = .{ .LABEL, .{ label = .{new_label, stmt.as.label.stmt }}, stmt.loc};
-            label_stmt(stmt.as.label.stmt, label_store, erp);
+            new_label := make_goto_label(stmt_label.label);
+            table_set(label_store, stmt_label.label, .{true, new_label, stmt.loc});
+            stmt.* = .{ .LABEL, .{ stmt_label = .{new_label, stmt_label.stmt }}, stmt.loc};
+            label_stmt(stmt_label.stmt, label_store, erp);
         case .COMPOUND;
-            compound := stmt.as.compound;
+            compound := stmt_compound;
             label_block(compound, label_store, erp);
         case .FOR;
-            for_stmt := stmt.as.for_stmt;
-            label_stmt(for_stmt.body, label_store, erp);
+            label_stmt(stmt_for.body, label_store, erp);
         case .DO_WHILE;
-            do_while_stmt := stmt.as.do_while;
+            do_while_stmt := stmt_do_while;
             label_stmt(do_while_stmt.body, label_store, erp);
         case .WHILE;
-            while_stmt := stmt.as.while_stmt;
-            label_stmt(while_stmt.body, label_store, erp);
+            label_stmt(stmt_while.body, label_store, erp);
         case .SWITCH;
-            label_block_item(*stmt.as.switch.body, label_store, erp);
+            label_block_item(*stmt_switch.body, label_store, erp);
         case .GOTO;     #through;
         case .CONTINUE; #through;
         case .BREAK;    #through;
@@ -100,44 +98,44 @@ label_stmt :: (stmt: *Stmt_Ast, label_store: *Label_Store, erp: *Error_Reporter)
     }
 }
 
-resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, erp: *Error_Reporter) {
-    if #complete stmt.type == {
+resolve_stmt :: (using stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label_Store, erp: *Error_Reporter) {
+    if #complete type == {
         case .SWITCH;
-            for stmt.as.switch.body {
-                if #complete it.type == {
+            for stmt_switch.body {
+                using it;
+                if #complete type == {
                     case .DECL; // noop
-                    case .STMT; resolve_stmt(it.as.stmt, goto_labels, label_store, erp);
+                    case .STMT; resolve_stmt(block_item_stmt, goto_labels, label_store, erp);
                 }
             }
         case .RETURN;
-            resolve_expr(stmt.as.return_stmt.expr, goto_labels, label_store, erp);
+            resolve_expr(stmt_return.expr, goto_labels, label_store, erp);
         case .EXPR;
-            resolve_expr(stmt.as.expr, goto_labels, label_store, erp);
+            resolve_expr(stmt_expr, goto_labels, label_store, erp);
         case .IF;
-            resolve_expr(stmt.as.if_stmt.condition, goto_labels, label_store, erp);
-            resolve_stmt(stmt.as.if_stmt.if_block, goto_labels,label_store, erp);
-            if stmt.as.if_stmt.else_block != null resolve_stmt(stmt.as.if_stmt.else_block, goto_labels, label_store, erp);
+            resolve_expr(stmt_if.condition, goto_labels, label_store, erp);
+            resolve_stmt(stmt_if.if_block, goto_labels,label_store, erp);
+            if stmt_if.else_block != null resolve_stmt(stmt_if.else_block, goto_labels, label_store, erp);
         case .GOTO;
-            success, value := table_find_new(label_store, stmt.as.goto);
+            success, value := table_find_new(label_store, stmt_goto);
             if !success {
-                error_report(erp, stmt.loc.line, stmt.loc.start, "undeclared label: '%'", stmt.as.goto);
+                error_report(erp, stmt.loc.line, stmt.loc.start, "undeclared label: '%'", stmt_goto);
             }
-            table_set(goto_labels, stmt.as.goto, value);
-            stmt.* = .{.GOTO, .{goto = value.processed_label}, .{stmt.loc.line, stmt.loc.start}};
+            table_set(goto_labels, stmt_goto, value);
+            // mark
+            stmt.* = .{ type = .GOTO, stmt_goto = value.processed_label, line = line, start = start };
         case .COMPOUND;
-            compound := stmt.as.compound;
-            resolve_block(compound, goto_labels, label_store, erp);
+            resolve_block(stmt_compound, goto_labels, label_store, erp);
         case .FOR;
-            for_stmt := stmt.as.for_stmt;
-            resolve_stmt(stmt.as.for_stmt.body, goto_labels, label_store, erp);
+            resolve_stmt(stmt_for.body, goto_labels, label_store, erp);
         case .DO_WHILE;
-            resolve_expr(stmt.as.do_while.condition, goto_labels, label_store, erp);
-            resolve_stmt(stmt.as.do_while.body, goto_labels, label_store, erp);
+            resolve_expr(stmt_do_while.condition, goto_labels, label_store, erp);
+            resolve_stmt(stmt_do_while.body, goto_labels, label_store, erp);
         case .WHILE;
-            resolve_expr(stmt.as.while_stmt.condition, goto_labels, label_store, erp);
-            resolve_stmt(stmt.as.while_stmt.body, goto_labels, label_store, erp);
+            resolve_expr(stmt_while.condition, goto_labels, label_store, erp);
+            resolve_stmt(stmt_while.body, goto_labels, label_store, erp);
         case .LABEL;
-            resolve_stmt(stmt.as.label.stmt, goto_labels, label_store, erp);
+            resolve_stmt(stmt_label.stmt, goto_labels, label_store, erp);
         case .CONTINUE;  #through;
         case .BREAK;     #through;
         case .DEFAULT;   #through;
@@ -146,23 +144,19 @@ resolve_stmt :: (stmt: *Stmt_Ast, goto_labels: *Label_Store, label_store: *Label
     }
 }
 
-resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, erp: *Error_Reporter) {
-    if #complete expr.type == {
+resolve_expr :: (using expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_Store, erp: *Error_Reporter) {
+    if #complete type == {
         case .POSTFIX;
-            postfix := expr.as.postfix_expr;
-            resolve_expr(postfix.expr, goto_labels, label_store, erp);
+            resolve_expr(expr_postfix.expr, goto_labels, label_store, erp);
         case .PREFIX;
-            prefix := expr.as.prefix_expr;
-            resolve_expr(prefix.expr, goto_labels, label_store, erp);
+            resolve_expr(expr_prefix.expr, goto_labels, label_store, erp);
         case .GROUP;
-            resolve_expr(expr.as.group, goto_labels, label_store, erp);
+            resolve_expr(expr_group, goto_labels, label_store, erp);
         case .TERNARY;
-            ternary := expr.as.ternary;
-            resolve_expr(ternary.true_expr, goto_labels, label_store, erp);
-            resolve_expr(ternary.false_expr, goto_labels, label_store, erp);
+            resolve_expr(expr_ternary.true_expr, goto_labels, label_store, erp);
+            resolve_expr(expr_ternary.false_expr, goto_labels, label_store, erp);
         case .FN_CALL; 
-            fn_call := expr.as.fn_call;
-            for arg_expr: fn_call.args resolve_expr(arg_expr, goto_labels, label_store, erp);
+            for arg_expr: expr_fn_call.args resolve_expr(arg_expr, goto_labels, label_store, erp);
         case .CONSTANT;   #through;
         case .UNARY;      #through;
         case .BINARY;     #through;
@@ -171,26 +165,19 @@ resolve_expr :: (expr: *Expr_Ast, goto_labels: *Label_Store, label_store: Label_
     }
 }
 
-label_expr :: (expr: *Expr_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
-    if #complete expr.type == {
+label_expr :: (using expr: *Expr_Ast, label_store: *Label_Store, erp: *Error_Reporter) {
+    if #complete type == {
         case .POSTFIX;
-            postfix := expr.as.postfix_expr;
-            label_expr(postfix.expr, label_store, erp);
+            label_expr(expr_postfix.expr, label_store, erp);
         case .PREFIX;
-            prefix := expr.as.prefix_expr;
-            label_expr(prefix.expr, label_store, erp);
+            label_expr(expr_prefix.expr, label_store, erp);
         case .FN_CALL;  
-            fn_call := expr.as.fn_call;
-            for arg_expr: fn_call.args label_expr(arg_expr, label_store, erp);
-                
+            for arg_expr: expr_fn_call.args label_expr(arg_expr, label_store, erp);
         case .GROUP;
-            label_expr(expr.as.group, label_store, erp);
-        
+            label_expr(expr_group, label_store, erp);
         case .TERNARY;
-            ternary := expr.as.ternary;
-            label_expr(ternary.true_expr, label_store, erp);
-            label_expr(ternary.false_expr, label_store, erp);
-            
+            label_expr(expr_ternary.true_expr, label_store, erp);
+            label_expr(expr_ternary.false_expr, label_store, erp);
         case .ASSIGNMENT; #through;
         case .BINARY;     #through;
         case .CONSTANT;   #through;

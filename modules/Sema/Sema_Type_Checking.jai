@@ -45,19 +45,17 @@ typecheck_block :: (block: *Block_Ast, st: *Symbol_Table, erp: *Error_Reporter) 
     for block.items typecheck_block_item(it, st, erp);
 }
 
-typecheck_block_item :: (item: *Block_Item_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
-    if #complete item.type == {
-        case .STMT;
-            typecheck_stmt(item.as.stmt, st, erp);
-        case .DECL;
-            typecheck_decl(item.as.decl, st, erp);
+typecheck_block_item :: (using item: *Block_Item_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
+    if #complete type == {
+        case .STMT; typecheck_stmt(block_item_stmt, st, erp);
+        case .DECL; typecheck_decl(block_item_decl, st, erp);
     }
 }
 
-typecheck_decl :: (decl: *Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
+typecheck_decl :: (using decl: *Decl_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     if decl.type == {
-        case .FN; typecheck_fn_decl(decl.as.fn, st, erp);
-        case .VAR; typecheck_var_decl(decl.as.var, st, erp);
+        case .FN; typecheck_fn_decl(decl_fn, st, erp);
+        case .VAR; typecheck_var_decl(decl_var, st, erp);
     }
 }
 
@@ -69,46 +67,44 @@ typecheck_var_decl :: (var_decl: *Var_Decl_Ast, st: *Symbol_Table, erp: *Error_R
     if var_decl.init typecheck_expr(var_decl.init, st, erp);
 }
 
-typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
+typecheck_stmt :: (using stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     assert(stmt != null, "stmt should not be null");
-    if #complete stmt.type == {
+    if #complete type == {
         case .RETURN;
-            typecheck_expr(stmt.as.return_stmt.expr, st, erp);
+            typecheck_expr(stmt_return.expr, st, erp);
         case .EXPR;
-            typecheck_expr(stmt.as.expr, st, erp);
+            typecheck_expr(stmt_expr, st, erp);
         case .IF;
-            typecheck_expr(stmt.as.if_stmt.condition, st, erp);
-            typecheck_stmt(stmt.as.if_stmt.if_block, st, erp);
-            if stmt.as.if_stmt.else_block != null {
-                typecheck_stmt(stmt.as.if_stmt.else_block, st, erp);
+            typecheck_expr(stmt_if.condition, st, erp);
+            typecheck_stmt(stmt_if.if_block, st, erp);
+            if stmt_if.else_block != null {
+            typecheck_stmt(stmt_if.else_block, st, erp);
             }
         case .LABEL;
-            typecheck_stmt(stmt.as.label.stmt, st, erp);
+            typecheck_stmt(stmt_label.stmt, st, erp);
         case .COMPOUND;
-            typecheck_block(stmt.as.compound, st, erp);
+            typecheck_block(stmt_compound, st, erp);
         case .WHILE;
-            typecheck_expr(stmt.as.while_stmt.condition, st, erp);
-            typecheck_stmt(stmt.as.while_stmt.body, st, erp);
+            typecheck_expr(stmt_while.condition, st, erp);
+            typecheck_stmt(stmt_while.body, st, erp);
         case .DO_WHILE;
-            typecheck_stmt(stmt.as.do_while.body, st, erp);
-            typecheck_expr(stmt.as.do_while.condition, st, erp);
+            typecheck_stmt(stmt_do_while.body, st, erp);
+            typecheck_expr(stmt_do_while.condition, st, erp);
         case .FOR;
-            for_stmt := stmt.as.for_stmt;
-            if #complete for_stmt.init.type == {
-                case .INIT_DECL; typecheck_decl(for_stmt.init.as.decl, st, erp);
-                case .INIT_EXPR; if for_stmt.init.as.expr typecheck_expr(for_stmt.init.as.expr, st, erp);
+            using stmt_for .init;
+            if #complete stmt_for .init.type == {
+                case .DECL; typecheck_decl(for_init_decl, st, erp);
+                case .EXPR; if for_init_expr typecheck_expr(for_init_expr, st, erp);
             }
-            if for_stmt.condition typecheck_expr(for_stmt.condition, st, erp);
-            if for_stmt.post typecheck_expr(for_stmt.post, st, erp);
-            typecheck_stmt(stmt.as.for_stmt.body, st, erp);
+            if stmt_for .condition typecheck_expr(stmt_for .condition, st, erp);
+            if stmt_for .post typecheck_expr(stmt_for .post, st, erp);
+            typecheck_stmt(stmt_for.body, st, erp);
         case .SWITCH;
-            switch_stmt := stmt.as.switch;
+            switch_stmt := stmt_switch;
             if switch_stmt.condition.type == .VAR {
-                var_stmt := switch_stmt.condition.as.var;
-                success, entry := table_find_new(st, var_stmt);
-                if success && entry.type == .FN {
-                    error_report(erp, stmt.line, stmt.start, "switch condition % must be a variable", var_stmt);
-                }
+                expr_var := switch_stmt.condition.expr_var;
+                success, entry := table_find_new(st, expr_var);
+                if success && entry.type == .FN error_report(erp, stmt.line, stmt.start, "switch condition % must be a variable", expr_var);
             }
             for switch_stmt.body typecheck_block_item(it, st, erp);
         case .CASE;     #through;
@@ -120,48 +116,41 @@ typecheck_stmt :: (stmt: *Stmt_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
     }
 }
 
-typecheck_expr :: (expr: *Expr_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
-    if #complete expr.type == {
+typecheck_expr :: (using expr: *Expr_Ast, st: *Symbol_Table, erp: *Error_Reporter) {
+    if #complete type == {
         case .POSTFIX;
-            postfix := expr.as.postfix_expr;
-            typecheck_expr(postfix.expr, st, erp);
+            typecheck_expr(expr_postfix.expr, st, erp);
         case .PREFIX;
-            prefix := expr.as.prefix_expr;
-            typecheck_expr(prefix.expr, st, erp);
+            typecheck_expr(expr_prefix.expr, st, erp);
         case .UNARY;
-            typecheck_expr(expr.as.unary.expr, st, erp);
+            typecheck_expr(expr_unary.expr, st, erp);
         case .BINARY;
-            binary := expr.as.binary;
-            typecheck_expr(binary.left, st, erp);
-            typecheck_expr(binary.right, st, erp);
+            typecheck_expr(expr_binary.left, st, erp);
+            typecheck_expr(expr_binary.right, st, erp);
         case .GROUP;
-            typecheck_expr(expr.as.group, st, erp);
+            typecheck_expr(expr_group, st, erp);
         case .ASSIGNMENT;
-            assignment := expr.as.assignment;
-            typecheck_expr(assignment.src, st, erp);
-            typecheck_expr(assignment.dst, st, erp);
+            typecheck_expr(expr_assignment.src, st, erp);
+            typecheck_expr(expr_assignment.dst, st, erp);
         case .TERNARY;
-            ternary := expr.as.ternary;
-            typecheck_expr(ternary.condition, st, erp);
-            typecheck_expr(ternary.true_expr, st, erp);
-            typecheck_expr(ternary.false_expr, st, erp);
+            typecheck_expr(expr_ternary.condition, st, erp);
+            typecheck_expr(expr_ternary.true_expr, st, erp);
+            typecheck_expr(expr_ternary.false_expr, st, erp);
         case .FN_CALL;
-            fn_call := expr.as.fn_call;
-            success, saved_symbol := table_find_new(st, fn_call.ident);
+            success, saved_symbol := table_find_new(st, expr_fn_call.ident);
             
-            if !success error_report(erp, expr.line, expr.start, "function % not defined", fn_call.ident);
+            if !success error_report(erp, expr.line, expr.start, "function % not defined", expr_fn_call.ident);
             if saved_symbol.type != .FN error_report(erp, expr.line, expr.start, "only function can be called", saved_symbol.type);
                 
             saved_fn_symbol := saved_symbol.as.fn;
-            if saved_fn_symbol.params.count != fn_call.args.count
-                error_report(erp, expr.line, expr.start, "function % expected % arguments, got %", fn_call.ident, saved_fn_symbol.params.count, fn_call.args.count);
+            if saved_fn_symbol.params.count != expr_fn_call.args.count
+                error_report(erp, expr.line, expr.start, "function % expected % arguments, got %", expr_fn_call.ident, saved_fn_symbol.params.count, expr_fn_call.args.count);
                 
-            for fn_call.args typecheck_expr(it, st, erp);
+            for expr_fn_call.args typecheck_expr(it, st, erp);
         case .VAR;
-            var := expr.as.var; 
-            success, saved_symbol := table_find_new(st, var);
+            success, saved_symbol := table_find_new(st, expr_var);
             if success && saved_symbol.type != .INT {
-                error_report(erp, expr.line, expr.start, "function % cannot be used as variable", var);
+                error_report(erp, expr.line, expr.start, "function % cannot be used as variable", expr_var);
             }
         case .CONSTANT; // noop
     }
