@@ -37,25 +37,17 @@ print_block_ast :: (writer: *Writer, block: *Block_Ast, depth: int, new_line: bo
     }
 }
 
-print_block_item_ast :: (writer: *Writer, block_item: *Block_Item_Ast, depth: int, new_line: bool) {
+print_block_item_ast :: (writer: *Writer, using block_item: *Block_Item_Ast, depth: int, new_line: bool) {
     if #complete block_item.type == {
-        case .STMT;
-            stmt := block_item.as.stmt;
-            print_stmt_ast(writer, stmt, depth);
-        case .DECL;
-            decl := block_item.as.decl;
-            print_decl_ast(writer, decl, depth, new_line);
+        case .STMT; print_stmt_ast(writer, block_item_stmt, depth);
+        case .DECL; print_decl_ast(writer, block_item_decl, depth, new_line);
     }
 }
 
-print_decl_ast :: (writer: *Writer, decl: *Decl_Ast, depth: int, new_line: bool) {
+print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int, new_line: bool) {
     if #complete decl.type == {
-        case .FN;
-            fn_decl := decl.as.fn;
-            print_fn_decl_ast(writer, fn_decl, depth);
-        case .VAR;
-            var := decl.as.var;
-            print_var_decl_ast(writer, var, depth, new_line);
+        case .FN; print_fn_decl_ast(writer, decl_fn, depth);
+        case .VAR; print_var_decl_ast(writer, decl_var, depth, new_line);
     }
 }
 
@@ -71,20 +63,19 @@ print_var_decl_ast :: (writer: *Writer, var_decl: *Var_Decl_Ast, depth: int, new
     if new_line write(writer, ";\n");
 }
 
-print_if_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
-    if stmt.type != .IF unreachable("** compiler bug ** wanted if statement got %", stmt.type);
-    if_stmt := stmt.as.if_stmt;
+print_if_stmt_ast :: (writer: *Writer, using stmt: *Stmt_Ast, depth: int) {
+    if type != .IF unreachable("** compiler bug ** wanted if statement got %", stmt.type);
 
     write(writer, "if (");
-    print_expr_ast(writer, if_stmt.condition);
+    print_expr_ast(writer, stmt_if.condition);
     write(writer, ")\n");
 
-    if_depth := ifx if_stmt.if_block.type == .COMPOUND depth else depth + 1;
+    if_depth := ifx stmt_if.if_block.type == .COMPOUND depth else depth + 1;
     print_space(writer, if_depth);
-    print_stmt_ast(writer, if_stmt.if_block, if_depth);
-    if if_stmt.else_block {
-        else_stmt := if_stmt.else_block;
-        if if_stmt.if_block.type == .COMPOUND write(writer, "\n");
+    print_stmt_ast(writer, stmt_if.if_block, if_depth);
+    if stmt_if.else_block {
+        else_stmt := stmt_if.else_block;
+        if stmt_if.if_block.type == .COMPOUND write(writer, "\n");
         
         print_space(writer, depth);
         write(writer, "else");
@@ -93,7 +84,7 @@ print_if_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
             print_if_stmt_ast(writer, else_stmt, depth);
         } else {
             write(writer, "\n");
-            else_depth := ifx if_stmt.if_block.type == .COMPOUND depth else depth + 1;
+            else_depth := ifx stmt_if.if_block.type == .COMPOUND depth else depth + 1;
             print_space(writer, else_depth);
             print_stmt_ast(writer, else_stmt, else_depth);
         }
@@ -101,90 +92,80 @@ print_if_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
     write(writer, "\n");
 }
 
-print_do_while_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
-    if stmt.type != .DO_WHILE unreachable("** compiler bug ** wanted do while statement got %", stmt.type);
-    do_while := stmt.as.do_while;
+print_do_while_stmt_ast :: (writer: *Writer, using stmt: *Stmt_Ast, depth: int) {
+    if type != .DO_WHILE unreachable("** compiler bug ** wanted do while statement got %", stmt.type);
+    
     write(writer, "do\n");
     print_space(writer, depth);
-    do_depth := ifx (do_while.body.type == .COMPOUND) depth else depth + 1;
-    print_stmt_ast(writer, do_while.body, do_depth);
+    do_depth := ifx (stmt_do_while.body.type == .COMPOUND) depth else depth + 1;
+    print_stmt_ast(writer, stmt_do_while.body, do_depth);
     write(writer, " while ( ");
-    print_expr_ast(writer, do_while.condition);
+    print_expr_ast(writer, stmt_do_while.condition);
     write(writer, " );\n");
 }
 
-print_while_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
-    if stmt.type != .WHILE unreachable("** compiler bug ** wanted while statement got %", stmt.type);
-    while_stmt := stmt.as.while_stmt;
+print_while_stmt_ast :: (writer: *Writer, using stmt: *Stmt_Ast, depth: int) {
+    if type != .WHILE unreachable("** compiler bug ** wanted while statement got %", stmt.type);
     
     write(writer, "while ( ");
-    print_expr_ast(writer, while_stmt.condition);
+    print_expr_ast(writer, stmt_while.condition);
     write(writer, " )\n");
 
-    while_depth := ifx while_stmt.body.type == .COMPOUND depth else depth + 1;
+    while_depth := ifx stmt_while.body.type == .COMPOUND depth else depth + 1;
 
     print_space(writer, depth);
-    print_stmt_ast(writer, while_stmt.body, while_depth);
+    print_stmt_ast(writer, stmt_while.body, while_depth);
     write(writer, "\n");
 }
 
-print_for_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
-    if stmt.type != .FOR unreachable("** compiler bug ** wanted for statement got %", stmt.type);
-    for_stmt := stmt.as.for_stmt;
+print_for_stmt_ast :: (writer: *Writer, using stmt: *Stmt_Ast, depth: int) {
+    if type != .FOR unreachable("** compiler bug ** wanted for statement got %", stmt.type);
     
     write(writer, "for (");
-    if #complete for_stmt.init.type == {
-        case .INIT_DECL;
-            decl := for_stmt.init.as.decl;
-            print_decl_ast(writer, decl, depth + 1, false);
-        case .INIT_EXPR;
-            expr := for_stmt.init.as.expr;
-            if expr print_expr_ast(writer, expr);
+    init := stmt_for.init;
+    if #complete init.type == {
+        case .DECL; print_decl_ast(writer, init.for_init_decl, depth + 1, false);
+        case .EXPR; if init.for_init_expr print_expr_ast(writer, init.for_init_expr);
     }
     write(writer, " ; ");
 
-    if for_stmt.condition {
-        print_expr_ast(writer,  for_stmt.condition);
+    if stmt_for.condition {
+        print_expr_ast(writer,  stmt_for.condition);
     }
     write(writer, " ; ");
 
-    if for_stmt.post {
-        print_expr_ast(writer, for_stmt.post);
+    if stmt_for.post {
+        print_expr_ast(writer, stmt_for.post);
     }
 
     write(writer, " )\n");
 
     print_space(writer, depth);
-    for_depth := ifx for_stmt.body.type == .COMPOUND depth else depth + 1;
-    print_stmt_ast(writer, for_stmt.body, for_depth);
+    for_depth := ifx stmt_for.body.type == .COMPOUND depth else depth + 1;
+    print_stmt_ast(writer, stmt_for.body, for_depth);
     write(writer, "\n");
 }
 
-print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
-    if #complete stmt.type == {
+print_stmt_ast :: (writer: *Writer, using stmt: *Stmt_Ast, depth: int) {
+    if #complete type == {
         case .SWITCH; 
-            switch_stmt := stmt.as.switch;
             write(writer, "switch (");
-            print_expr_ast(writer, switch_stmt.condition);
+            print_expr_ast(writer, stmt_switch.condition);
             write(writer, ")\n");
             print_space(writer, depth);
             write(writer, "{\n");
-            for item: switch_stmt.body {
-                if (item.type == .STMT && item.as.stmt.type == .CASE) {
-                    print_space(writer, depth + 1);
-                } else if (item.type == .STMT && item.as.stmt.type == .DEFAULT) {
-                    print_space(writer, depth + 1);
-                } else {
-                    print_space(writer, depth + 2);
-                }
+            for item: stmt_switch.body {
+                using item;
+                is_default_or_case_stmt := type == .STMT && (block_item_stmt.type == .CASE || block_item_stmt.type == .DEFAULT); 
+                if is_default_or_case_stmt print_space(writer, depth + 1);
+                else print_space(writer, depth + 2);
                 print_block_item_ast(writer, item, depth, true);
             }
             print_space(writer, depth);
             write(writer, "}\n");
         case .CASE;
-            case_stmt := stmt.as.case_stmt;
             write(writer, "case ");
-            write(writer, "%:\n", case_stmt.value);
+            write(writer, "%:\n", stmt_case.value);
         case .DEFAULT;
             write(writer, "default:\n");
         case .BREAK;
@@ -200,96 +181,85 @@ print_stmt_ast :: (writer: *Writer, stmt: *Stmt_Ast, depth: int) {
         case .FOR;
             print_for_stmt_ast(writer, stmt, depth);
         case .LABEL;
-            label_stmt := stmt.as.label;
+            label_stmt := stmt_label;
             write(writer, "%:\n", label_stmt.label);
             print_stmt_ast(writer, label_stmt.stmt, depth + 1);
         case .GOTO;
-            goto_stmt := stmt.as.goto;
+            goto_stmt := stmt_goto;
             write(writer, "goto %;\n", goto_stmt);
         case .IF; 
             print_if_stmt_ast(writer, stmt, depth);
         case .COMPOUND;
-            compound_stmt := stmt.as.compound;
+            compound_stmt := stmt_compound;
             write(writer, "{\n");
             print_block_ast(writer, compound_stmt, depth + 1, true);
             print_space(writer, depth);
             write(writer, "}");
         case .RETURN;
-            return_stmt := stmt.as.return_stmt;
             write(writer, "return");
             write(writer, " ");
-            print_expr_ast(writer, return_stmt.expr);
+            print_expr_ast(writer, stmt_return.expr);
             write(writer, ";\n");
         case .EXPR;
-            expr := stmt.as.expr;
+            expr := stmt_expr;
             print_expr_ast(writer, expr);
             write(writer, ";\n");
         case .NULL;
             write(writer, ";\n");
     }
 }
-print_expr_ast :: (writer: *Writer, expr: *Expr_Ast) {
-    if #complete expr.type == {
+print_expr_ast :: (writer: *Writer, using expr: *Expr_Ast) {
+    if #complete type == {
         case .PREFIX;
-           prefix_expr := expr.as.prefix_expr;
-            write(writer, "%", ifx prefix_expr.op == .ADD "++" else "--");
-            print_expr_ast(writer, prefix_expr.expr);
+            write(writer, "%", ifx expr_prefix.op == .ADD "++" else "--");
+            print_expr_ast(writer, expr_prefix.expr);
         case .FN_CALL;
-            fn_call_expr := expr.as.fn_call;
-            write(writer, "%(", fn_call_expr.ident);
-            for arg: fn_call_expr.args {
+            write(writer, "%(", expr_fn_call.ident);
+            for arg: expr_fn_call.args {
                 print_expr_ast(writer, arg);
-                if (it_index < fn_call_expr.args.count - 1) write(writer, ", ");
+                if (it_index < expr_fn_call.args.count - 1) write(writer, ", ");
             }
             write(writer, ")");
         case .TERNARY; 
-            ternary_expr := expr.as.ternary;
-            print_expr_ast(writer, ternary_expr.condition);
+            print_expr_ast(writer, expr_ternary.condition);
             write(writer, " ? ");
-            print_expr_ast(writer, ternary_expr.true_expr);
+            print_expr_ast(writer, expr_ternary.true_expr);
             write(writer, " : ");
-            print_expr_ast(writer, ternary_expr.false_expr);
+            print_expr_ast(writer, expr_ternary.false_expr);
         case .VAR;
-            var_expr := expr.as.var;
-            write(writer, "%", var_expr);
+            write(writer, "%", expr_var);
         case .POSTFIX; 
-            postfix_expr := expr.as.postfix_expr;
-            print_expr_ast(writer, postfix_expr.expr);
-            if #complete postfix_expr.op == {
+            print_expr_ast(writer, expr_postfix.expr);
+            if #complete expr_postfix.op == {
                 case .ADD; write(writer, "++");
                 case .SUBTRACT; write(writer, "--");
             }
         case .GROUP;
-            group_expr := expr.as.group;
             write(writer, "(");
-            print_expr_ast(writer, group_expr);
+            print_expr_ast(writer, expr_group);
             write(writer, ")");
         case .ASSIGNMENT;
-            assignment_expr := expr.as.assignment;
-            print_expr_ast(writer, assignment_expr.dst);
+            print_expr_ast(writer, expr_assignment.dst);
             write(writer, " = ");
-            print_expr_ast(writer, assignment_expr.src);
+            print_expr_ast(writer, expr_assignment.src);
         case .CONSTANT;
-            constant_expr := expr.as.constant;
-            write(writer, "%", constant_expr);
+            write(writer, "%", expr_constant);
         case .UNARY;
-            unary_expr := expr.as.unary;
             write(writer, "(");
             op : string = ---;
-            if #complete unary_expr.op == {
+            if #complete expr_unary.op == {
                 case .NEGATE; op =  "-";
                 case .BITWISE_NOT; op =  "~";
                 case .NOT; op =  "!";
             }
             write(writer, "%", op);
-            print_expr_ast(writer, unary_expr.expr);
+            print_expr_ast(writer, expr_unary.expr);
             write(writer, ")");
         case .BINARY;
-            binary_expr := expr.as.binary;
             write(writer, "(");
-            print_expr_ast(writer, binary_expr.left);
+            print_expr_ast(writer, expr_binary.left);
             op: string = ---;
-            if #complete binary_expr.op == {
+            if #complete expr_binary.op == {
                 case .ADD; op = "+";
                 case .SUB; op = "-";
                 case .MUL; op = "*";
@@ -310,7 +280,7 @@ print_expr_ast :: (writer: *Writer, expr: *Expr_Ast) {
                 case .GREATER_EQUAL; op = ">=";
             };
             write(writer, " % ", op);
-            print_expr_ast(writer, binary_expr.right);
+            print_expr_ast(writer, expr_binary.right);
             write(writer, ")");
     }
 }

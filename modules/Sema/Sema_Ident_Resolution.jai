@@ -15,44 +15,43 @@ resolve_block :: (block: *Block_Ast, scope: *Scope_Idents, erp: *Error_Reporter)
 
 resolve_block_item :: (block_items: *[..]*Block_Item_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     for block_items.* {
-        if #complete it.type == {
-            case .DECL; resolve_decl(it.as.decl, scope, erp);
-            case .STMT; resolve_stmt(it.as.stmt, scope, erp);
+        using it;
+        if #complete type == {
+            case .DECL; resolve_decl(block_item_decl, scope, erp);
+            case .STMT; resolve_stmt(block_item_stmt, scope, erp);
         }
     }
 }
 
-resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-    if #complete stmt.type == {
+resolve_stmt :: (using stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    if #complete type == {
         case .SWITCH;
-            resolve_expr(stmt.as.switch.condition, scope, erp);
+            resolve_expr(stmt_switch.condition, scope, erp);
             nested_scope := create_new_scope(scope);
-            resolve_block_item(*stmt.as.switch.body, *nested_scope, erp);
+            resolve_block_item(*stmt_switch.body, *nested_scope, erp);
         case .RETURN;
-            resolve_expr(stmt.as.return_stmt.expr, scope, erp);
+            resolve_expr(stmt_return.expr, scope, erp);
         case .EXPR;
-            resolve_expr(stmt.as.expr, scope, erp);
+            resolve_expr(stmt_expr, scope, erp);
         case .IF;
-            if_stmt := stmt.as.if_stmt;
-            resolve_expr(if_stmt.condition, scope, erp);
-            resolve_stmt(if_stmt.if_block, scope, erp);
-            if if_stmt.else_block != null
-                resolve_stmt(if_stmt.else_block, scope, erp);
+            resolve_expr(stmt_if.condition, scope, erp);
+            resolve_stmt(stmt_if.if_block, scope, erp);
+            if stmt_if.else_block != null
+            resolve_stmt(stmt_if.else_block, scope, erp);
         case .COMPOUND;
-            compound := stmt.as.compound;
+            compound := stmt_compound;
             nested_scope := create_new_scope(scope);
             resolve_block(compound, *nested_scope, erp);
-        case .FOR; resolve_for_stmt(stmt.as.for_stmt, scope, erp);
+        case .FOR; resolve_for_stmt(stmt_for, scope, erp);
         case .DO_WHILE;
-            do_while_stmt := stmt.as.do_while;
+            do_while_stmt := stmt_do_while;
             resolve_stmt(do_while_stmt.body, scope, erp);
             resolve_expr(do_while_stmt.condition, scope, erp);
         case .WHILE;
-            while_stmt := stmt.as.while_stmt;
-            resolve_expr(while_stmt.condition, scope, erp);
-            resolve_stmt(while_stmt.body, scope, erp);
+            resolve_expr(stmt_while.condition, scope, erp);
+            resolve_stmt(stmt_while.body, scope, erp);
         case .LABEL;
-            resolve_stmt(stmt.as.label.stmt, scope, erp);
+            resolve_stmt(stmt_label.stmt, scope, erp);
         case .CONTINUE; #through;
         case .BREAK;    #through;
         case .GOTO;     #through;
@@ -62,34 +61,31 @@ resolve_stmt :: (stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     }
 }
 
-resolve_decl :: (decl: *Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-    if #complete decl.type == {
+resolve_decl :: (using decl: *Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    if #complete type == {
         case .VAR;
-            var_decl := decl.as.var;
-            success, entry := table_find_new(scope, var_decl.ident);
+            success, entry := table_find_new(scope, decl_var.ident);
             if success && entry.from_current_scope {
                 if entry.type == .VAR {
-                    error_report(erp, var_decl.line, var_decl.start, "duplicate variable declaration! : %", var_decl.ident);
+                    error_report(erp, decl_var.line, decl_var.start, "duplicate variable declaration! : %", decl_var.ident);
                 }
                 if entry.type == .FN && entry.external_linkage {
-                    error_report(erp, var_decl.line, var_decl.start, "variable name conflicts with function name: %", var_decl.ident);
+                    error_report(erp, decl_var.line, decl_var.start, "variable name conflicts with function name: %", decl_var.ident);
                 }
             }
                 
-            new_ident := make_variable(var_decl.ident); 
+            new_ident := make_variable(decl_var.ident); 
             ident := Ident(string).{ 
                 from_current_scope = true,
                 external_linkage   = false,
                 name               = new_ident,
                 type               = .VAR 
             };
-            table_set(scope, var_decl.ident, ident);
+            table_set(scope, decl_var.ident, ident);
 
-            if var_decl.init resolve_expr(var_decl.init, scope, erp);
-            // var_decl.* = .{ new_ident, var_decl.init, var_decl.loc };
-            var_decl.ident = new_ident;
-        case .FN; 
-            resolve_fn_decl(decl.as.fn, scope, erp, can_have_body=false);
+            if decl_var.init resolve_expr(decl_var.init, scope, erp);
+            decl_var.ident = new_ident;
+        case .FN; resolve_fn_decl(decl_fn, scope, erp, can_have_body=false);
     }
 }
 
@@ -139,85 +135,75 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
     if fn_decl.block resolve_block(fn_decl.block, *scope_for_fn_param, erp);
 }
 
-unwrap_group_expr :: (expr: *Expr_Ast) -> *Expr_Ast {
-    if expr.type == .GROUP return unwrap_group_expr(expr.as.group);
+unwrap_group_expr :: (using expr: *Expr_Ast) -> *Expr_Ast {
+    if type == .GROUP return unwrap_group_expr(expr_group);
     return expr;
 }
 
-resolve_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-    if #complete expr.type == {
+resolve_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    if #complete type == {
         case .POSTFIX;
-            postfix := expr.as.postfix_expr;
-            inner_expr := unwrap_group_expr(postfix.expr);
+            inner_expr := unwrap_group_expr(expr_postfix.expr);
             if inner_expr.type != .VAR {
-                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in postfix expression, found: %", inner_expr.*);
+                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in expr_postfix expression, found: %", inner_expr.*);
             }
-            resolve_expr(postfix.expr, scope, erp);
+            resolve_expr(expr_postfix.expr, scope, erp);
         case .PREFIX;
-            prefix := expr.as.prefix_expr;
-            inner_expr := unwrap_group_expr(prefix.expr);
+            inner_expr := unwrap_group_expr(expr_prefix.expr);
             if inner_expr.type != .VAR {
-                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in prefix expression, found: %", inner_expr.*);
+                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in expr_prefix expression, found: %", inner_expr.*);
             }
-            resolve_expr(prefix.expr, scope, erp);
+            resolve_expr(expr_prefix.expr, scope, erp);
         case .UNARY;
-            resolve_expr(expr.as.unary.expr, scope, erp);
+            resolve_expr(expr_unary.expr, scope, erp);
         case .BINARY;
-            resolve_expr(expr.as.binary.left, scope, erp);
-            resolve_expr(expr.as.binary.right, scope, erp);
+            resolve_expr(expr_binary.left, scope, erp);
+            resolve_expr(expr_binary.right, scope, erp);
         case .GROUP;
-            resolve_expr(expr.as.group, scope, erp);
+            resolve_expr(expr_group, scope, erp);
         case .VAR;
-            success, ident := table_find_new(scope, expr.as.var);
-            if !success error_report(erp, expr.loc.line, expr.loc.start, "undeclared variable: %", expr.as.var);
-            expr.as.var = ident.name;
+            success, ident := table_find_new(scope, expr_var);
+            if !success error_report(erp, expr.loc.line, expr.loc.start, "undeclared variable: %", expr_var);
+            expr_var = ident.name;
         case .FN_CALL; 
-            fn_call := expr.*.as.fn_call;
-            success, ident := table_find_new(scope, fn_call.ident);
+            success, ident := table_find_new(scope, expr_fn_call.ident);
             
-            if !success error_report(erp, expr.line, expr.start, "undeclared function: %", fn_call.ident);
+            if !success error_report(erp, expr.line, expr.start, "undeclared function: %", expr_fn_call.ident);
             
             if success && ident.from_current_scope {
-                fn_call.ident = ident.name;
-                expr.as.fn_call = fn_call;
+                expr_fn_call.ident = ident.name;
+                expr.as.expr_fn_call = expr_fn_call;
             }
-            for fn_call.args resolve_expr(it, scope, erp);
+            for expr_fn_call.args resolve_expr(it, scope, erp);
         case .ASSIGNMENT;
             resolve_assignment_expr(expr, scope, erp);
         case .TERNARY;
-            ternary := expr.as.ternary;
-            resolve_expr(ternary.condition, scope, erp);
-            resolve_expr(ternary.true_expr, scope, erp);
-            resolve_expr(ternary.false_expr, scope, erp);
+            resolve_expr(expr_ternary.condition, scope, erp);
+            resolve_expr(expr_ternary.true_expr, scope, erp);
+            resolve_expr(expr_ternary.false_expr, scope, erp);
         case .CONSTANT; // noop
     }
 }
 
-resolve_assignment_expr :: (expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
-    assignment := expr.as.assignment;
-    // verify dst is valid lvalue
-    if !(assignment.dst.type == .VAR || (assignment.dst.type == .GROUP && assignment.dst.as.group.type == .VAR)) {
-        error_report(erp, expr.loc.line, expr.loc.start,"expected variable (invalid lvalue) found: %", expr.as.assignment.dst.*);
-    }
-    
-    dst := ifx assignment.dst.type == .VAR then assignment.dst 
-           else assignment.dst.as.group;
-           
-    resolve_expr(dst, scope, erp);
-    resolve_expr(assignment.src, scope, erp);
+resolve_assignment_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    dst_inner_expr := unwrap_group_expr(expr_assignment.dst);
+    if dst_inner_expr.type != .VAR 
+        error_report(erp, expr.loc.line, expr.loc.start,"expected variable (invalid lvalue) found: %", expr.as.expr_assignment.dst.*);
+        
+    resolve_expr(dst_inner_expr, scope, erp);
+    resolve_expr(expr_assignment.src, scope, erp);
 }
 
-For_Stmt_Ast :: type_of(Stmt_Ast.as.for_stmt);
+For_Stmt_Ast :: type_of(Stmt_Ast.stmt_for);
 
 resolve_for_stmt :: (for_stmt: For_Stmt_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     scope_for_init : Scope_Idents;
     scope_for_init = create_new_scope(scope);
 
+    using for_stmt.init;
     if #complete for_stmt.init.type == {
-        case .INIT_DECL; 
-            resolve_decl(for_stmt.init.as.decl, *scope_for_init, erp);
-        case .INIT_EXPR;
-            if for_stmt.init.as.expr resolve_expr(for_stmt.init.as.expr, *scope_for_init, erp);
+        case .DECL; resolve_decl(for_init_decl, *scope_for_init, erp);
+        case .EXPR; if for_init_expr resolve_expr(for_init_expr, *scope_for_init, erp);
     }
     
     if for_stmt.condition resolve_expr(for_stmt.condition, *scope_for_init, erp);
