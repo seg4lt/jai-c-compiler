@@ -1,14 +1,14 @@
 print_program_ast :: (writer: *Writer, pg: *Program_Ast) {
     write(writer, "-- AST --\n");
     for fn_decl: pg.fns {
-        print_fn_decl_ast(writer, fn_decl, 1);
+        print_fn_decl_ast(writer, fn_decl, 1, true);
         write(writer, "\n");
     }
     write(writer, "\n");
 }
 
-print_fn_decl_ast :: (writer: *Writer, fn_decl: *Fn_Decl_Ast, depth: int) {
-    if fn_decl.block != null print_space(writer, depth);
+print_fn_decl_ast :: (writer: *Writer, fn_decl: *Fn_Decl_Ast, depth: int, indent: bool = false) {
+    if indent print_space(writer, depth);
     write(writer, "int %( ", fn_decl.ident);
     for param: fn_decl.params {
         if fn_decl.block != null write(writer, "int ");
