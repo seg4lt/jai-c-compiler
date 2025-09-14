@@ -1,6 +1,4 @@
-int x(void);
-
 int main(void) {
-  x++;
-  return 0;
+    // test case w/ multi-digit constant
+    return 100;
 }
