@@ -200,10 +200,9 @@ scan :: (using lexer: *Lexer) {
 
 #scope_file
 
-lex_err :: (using lexer: *Lexer, msg_fmt: string, args: .. Any) {
+lex_err :: (using lexer: *Lexer, msg_fmt: string, args: .. Any, loc := #caller_location) #expand {
     error_report(error_reporter, line, start, msg_fmt, .. args);
 }
-
 
 comment :: (using lexer: *Lexer) {
     if peek(lexer) == {

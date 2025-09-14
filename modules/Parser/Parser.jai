@@ -18,13 +18,19 @@ parse_ast :: (tokens: []Token, error_reporter: *Error_Reporter, debug_log: bool 
 
 #scope_module
 
-parse_err :: (parser: *Parser, msg_fmt: string, args: .. Any) #expand {
-    cur_token := peek(parser);
-    error_report(parser.error_reporter, cur_token.line, cur_token.start, msg_fmt, .. args);
+parse_err :: (parser: *Parser, msg_fmt: string, args: .. Any) {
+    token := peek(parser);
+    parse_err(parser, token, msg_fmt, .. args);
 }
 
-parse_err :: (parser: *Parser, tok: Token, msg_fmt: string, args: .. Any) #expand {
-    error_report(parser.error_reporter, tok.line, tok.start, msg_fmt, .. args);
+parse_err :: (using parser: *Parser, token: Token, msg_fmt: string, args: .. Any) {
+    error_report(error_reporter, token.line, token.start, msg_fmt, .. args);
+    
+    // Maybe move to next line and try to parse again, so we collect as much information as we can?
+    current_line := token.line;
+    while peek(parser).line <= current_line && !is_at_end(parser) {
+        parser.current += 1;
+    }
 }
 
 #scope_file
@@ -362,7 +368,7 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
         case .INT_LITERAL;
             int_literal := consume(parser, .INT_LITERAL);
             int_value, success := string_to_int(int_literal.value);
-            if !success  parse_err(parser, "Expected int found %", int_literal.value);
+            if !success  parse_err(parser, "expected int found %", int_literal.value);
             return expr_constant_new(int_value, int_literal.line , int_literal.start);
         case .MINUS; #through;
         case .NOT; #through;
@@ -391,8 +397,9 @@ parse_factor :: (parser: *Parser) -> *Expr_Ast {
             return parse_postfix_expr_ast(parser, expr);
         case .IDENT;
             ident := consume(parser);
-            expr := ifx peek(parser).*.type != .LPAREN  expr_var_new(ident.value, ident.line, ident.start)
-                    else expr_fn_call_new(ident.value, parse_args_expr(parser), ident.line, ident.start);
+            expr := ifx peek(parser).*.type != .LPAREN
+                          expr_var_new(ident.value, ident.line, ident.start)
+                    else  expr_fn_call_new(ident.value, parse_args_expr(parser), ident.line, ident.start);
             return parse_postfix_expr_ast(parser, expr);
     }
     parse_err(parser, "This expression is not something I can handle. Duh!! %", peek(parser).*);
