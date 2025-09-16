@@ -1,5 +1,11 @@
 sema_loop_labeling :: (ast: *Program_Ast, error_reporter: *Error_Reporter) {
-    for fn: ast.fns label_fn(fn, error_reporter);
+    for *decl: ast.decls {
+        using decl.*;
+        if #complete type == {
+            case .FN;  label_fn(decl_fn, error_reporter); 
+            case .VAR; // noop;
+        }
+    }
 }
 
 #scope_file

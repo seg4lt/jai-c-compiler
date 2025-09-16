@@ -14,6 +14,76 @@ Token :: struct {
     start: int;
 }
 
+Token_Type :: enum {
+    // single char tokens
+    COMMA;
+    LCURLY;
+    LPAREN;
+    RCURLY;
+    RPAREN;
+    SEMICOLON;
+
+    // ident and literals
+    IDENT;
+    INT_LITERAL;
+    
+    // Keyword
+    BREAK;
+    CASE;
+    COLON;
+    CONTINUE;
+    DEFAULT;
+    DO;
+    ELSE;
+    EXTERN;
+    FOR;
+    GOTO;
+    IF;
+    INT;
+    QUESTION_MARK;
+    RETURN;
+    STATIC;
+    SWITCH;
+    VOID;
+    WHILE;
+    
+    // Operator
+    AND;
+    ASSIGN;
+    BITWISE_AND;
+    BITWISE_AND_EQUAL;
+    BITWISE_NOT;
+    BITWISE_OR;
+    BITWISE_OR_EQUAL;
+    BITWISE_XOR;
+    BITWISE_XOR_EQUAL;
+    DIVIDE;
+    DIVIDE_EQUAL;
+    EQUAL_EQUAL;
+    GREATER;
+    GREATER_EQUAL;
+    LEFT_SHIFT;
+    LEFT_SHIFT_EQUAL;
+    LESS;
+    LESS_EQUAL;
+    MINUS;
+    MINUS_EQUAL;
+    MINUS_MINUS;
+    MOD;
+    MOD_EQUAL;
+    MULTIPLY;
+    MULTIPLY_EQUAL;
+    NOT;
+    NOT_EQUAL;
+    OR;
+    PLUS;
+    PLUS_EQUAL;
+    PLUS_PLUS;
+    RIGHT_SHIFT;
+    RIGHT_SHIFT_EQUAL;
+}
+
+
 scan_tokens :: (src: string, error_reporter: *Error_Reporter, debug_log: bool = true) -> []Token {
     lexer := Lexer.{ src = src, error_reporter = error_reporter };
     scan(*lexer);
@@ -267,6 +337,8 @@ ident :: (str: string) -> Token_Type {
         case "switch";   return .SWITCH;
         case "case";     return .CASE;
         case "default";  return .DEFAULT;
+        case "static";   return .STATIC;
+        case "extern";   return .EXTERN;
         case;            return .IDENT;
     }
 }

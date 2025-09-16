@@ -16,11 +16,12 @@ Error_Item :: struct {
     column: int;
 }
 
-print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) {
+print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) #expand {
     if error_reporter.error_items.count == 0 return;
     for error_item: error_reporter.error_items {
         log_error("%", error_item.msg);
     }
+    if panic exit(1);
 }
 
 error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, loc := #caller_location) #expand {

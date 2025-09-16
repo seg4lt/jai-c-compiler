@@ -1,15 +1,12 @@
-Source_Location :: struct {
-    line  : int;
-    start : int;
+Program_Ast :: struct {
+    decls: [..]*Decl_Ast;
 }
 
-Program_Ast :: struct {
-    fns: [..]*Fn_Decl_Ast;
-}
+Storage_Class_Ast :: enum { EXTERN; STATIC; NONE; };
 
 Block_Ast :: struct {
-    items     : [..]*Block_Item_Ast;
-    using loc : Source_Location;
+    items:     [..]*Block_Item_Ast;
+    using loc: Source_Location;
 }
 
 Block_Item_Ast :: struct {
@@ -29,21 +26,23 @@ Decl_Ast :: struct {
 }
 
 Fn_Decl_Ast :: struct {
-    ident:      string;
-    params:     [..]*Fn_Param;
-    block:      *Block_Ast;
-    using loc:  Source_Location;
+    ident:         string;
+    params:        [..]*Fn_Param;
+    block:         *Block_Ast;
+    storage_class: Storage_Class_Ast;
+    using loc:     Source_Location;
 }
 
 Fn_Param :: struct {
-    ident     : string;
-    using loc : Source_Location;
+    ident:     string;
+    using loc: Source_Location;
 }
 
 Var_Decl_Ast :: struct {
-    ident     : string;
-    init      : *Expr_Ast; @Optional
-    using loc : Source_Location;
+    ident:         string;
+    init:          *Expr_Ast; @Optional
+    storage_class: Storage_Class_Ast;
+    using loc:     Source_Location;
 }
 
 For_Init_Ast :: struct {
@@ -160,10 +159,14 @@ Binary_Operator :: enum {
     SUB;
 };
 
+Source_Location :: struct {
+    line, start: int;
+}
+
 #scope_module
 
-program_new :: (fns: [..]*Fn_Decl_Ast) -> *Program_Ast #expand {
-    return New(Program_Ast, .{ fns = fns });
+program_new :: (decls: [..]*Decl_Ast) -> *Program_Ast #expand {
+    return New(Program_Ast, .{ decls });
 }
 
 decl_fn_new :: (fn: *Fn_Decl_Ast) -> *Decl_Ast #expand {
@@ -171,9 +174,11 @@ decl_fn_new :: (fn: *Fn_Decl_Ast) -> *Decl_Ast #expand {
     return New(Decl_Ast, .{ type = .FN, as = .{ decl_fn = fn } });
 }
 
-fn_decl_new :: (ident: string, params: [..]*Fn_Param, block: *Block_Ast, line: int, start: int) -> *Fn_Decl_Ast #expand {
+fn_decl_new :: (ident: string, params: [..]*Fn_Param, block: *Block_Ast, storage_class: Storage_Class_Ast, line: int, start: int) -> *Fn_Decl_Ast #expand {
     assert(ident != "", "ident can't be null");
-    return New(Fn_Decl_Ast, .{ident, params, block, .{line, start}});
+    return New(Fn_Decl_Ast, .{
+        ident, params, block, storage_class, .{line, start}
+    });
 }
 
 block_new :: (items: [..]*Block_Item_Ast, line: int, start: int) -> *Block_Ast #expand {
@@ -190,9 +195,9 @@ block_item_decl_new :: (decl: *Decl_Ast) -> *Block_Item_Ast #expand {
     return New(Block_Item_Ast, .{ type = .DECL, as = .{ block_item_decl = decl } });
 }
 
-decl_var_new :: (ident: string, init: *Expr_Ast, line: int, start: int) -> *Decl_Ast #expand {
+decl_var_new :: (ident: string, init: *Expr_Ast, storage_class: Storage_Class_Ast, line: int, start: int) -> *Decl_Ast #expand {
     assert(ident != "", "ident can't be null");
-    var := New(Var_Decl_Ast, .{ident, init, .{line, start}});
+    var := New(Var_Decl_Ast, .{ident, init, storage_class, .{line, start}});
     return New(Decl_Ast, .{ type = .VAR, as = .{ decl_var = var } });
 }
 

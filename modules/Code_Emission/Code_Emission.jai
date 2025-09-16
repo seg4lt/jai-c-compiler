@@ -24,17 +24,44 @@ emm_pg :: (writer: *Writer, using program: *Program_Asm, symbols: Symbol_Table) 
             write(writer, progbits);
         }
     };
-    for * fn: program.fns emm_fn(writer, fn, symbols);
+    for * program.top_level {
+        using it.*;
+        if #complete it.kind == {
+            case .FN; 
+                emm_fn(writer, top_level_fn, symbols);
+            case .STATIC; 
+                symbol_name: string = ---;
+                #if OS == .MACOS {
+                    symbol_name = sprint("_%", top_level_static_var.ident);
+                } else {
+                    symbol_name = top_level_static_var.ident;
+                }
+                write(writer, "\n");
+                if top_level_static_var.global write(writer, "\t.global %\n", symbol_name);
+                // write(writer, "\t.text\n");
+                
+                if top_level_static_var.init != 0 write(writer, "\t.data\n");
+                else                              write(writer, "\t.bss\n");
+                
+                write(writer, "\t.balign 4\n");
+                write(writer, "%:\n", symbol_name);
+                if top_level_static_var.init != 0  write(writer, "\t.long %\n", top_level_static_var.init); 
+                else  write(writer, "\t.zero 4\n");
+        }
+    }
 }
 
 emm_fn :: (writer: *Writer, using fn: Fn_Asm, symbols: Symbol_Table) {
-    write(writer, "\t.globl\t%\n", ident);
+    write(writer, "\n");
+    symbol_name : string = ---;
     
-    #if OS == .LINUX {
-        write(writer, "%:\n", ident);
-    } else #if OS == .MACOS {
-        write(writer, "_%:\n", ident);
-    }
+    #if OS == .MACOS  symbol_name = sprint("_%", ident);
+    else              symbol_name = ident;
+    
+    if global  write(writer, "\t.globl\t%\n", symbol_name);
+    else       write(writer, "\t.local\t%\n", symbol_name);
+    write(writer, "\t.text\n");
+    write(writer, "%:\n", symbol_name);
 
     { // save caller stack pointer: prologue
         write(writer, "\tpushq\t%\n", fmt_reg(.{.RBP, .QWORD}));
@@ -50,7 +77,7 @@ emm_instructions :: (writer: *Writer, using inst: Instruction_Asm, symbols: Symb
             #if OS == .LINUX {
                 success, entry := table_find_new(*symbols, fn_name);
                 add_plt := false;
-                if success && entry.type == .FN && !entry.as.fn.defined {
+                if success && entry.type == .FN && !entry.attr.fn.defined {
                     add_plt = true;
                 }
                 write(writer, "\tcall\t%", fn_name); 
@@ -129,7 +156,7 @@ fmt_operand :: (op: Unary_Op_Asm) -> string {
     if #complete op == {
         case .BITWISE_NOT; return "notl";
         case .NEG;         return "negl";
-        case .NNOT;        assert(false, "unreachable");  return "**COMPILER BUG**";
+        case .NNOT;        assert(false, "unreachable");  return "** compiler bug ** fmt_operand";
     }
 }
 
@@ -148,7 +175,7 @@ fmt_operand :: (op : type_of(Instruction_Asm.as.binary.op)) -> string {
         case .GREATER_EQUAL; #through;
         case .NOT_EQUAL;     #through;
         case .GREATER;       #through;
-        case .EQUAL_EQUAL;   unreachable("** Compiler Bug ** unexpected binary operator."); return "";
+        case .EQUAL_EQUAL;   unreachable("** compiler bug ** unexpected binary operator."); return "";
     }
 
 }
@@ -158,7 +185,12 @@ fmt_operand :: (operand: Operand_Asm) -> string {
         case .IMM;    return sprint("$%", operand.as.imm);
         case .REG;    return fmt_reg(operand.as.reg);
         case .STACK;  return sprint("%(%)", operand.as.stack, fmt_reg(.{.RBP, .QWORD}));
-        case .PSEUDO; unreachable("** Compiler Bug ** pseudo operand shouldn't exist anymore."); return "";
+        case .DATA;  
+            #if OS == .MACOS { 
+                return sprint("_%(%)", operand.as.data, fmt_reg(.{.RIP, .QWORD}));
+            }
+            return sprint("%(%)", operand.as.data, fmt_reg(.{.RIP, .QWORD}));
+        case .PSEUDO; unreachable("** compiler bug ** pseudo operand shouldn't exist anymore."); return "";
     }
 }
 
@@ -241,7 +273,16 @@ fmt_reg :: (using r: Register_Asm) -> string {
                 case .WORD;  return "%di"; 
                 case .BYTE;  return "%dil"; 
             };
+        case .RIP;
+            if #complete size == {
+                case .QWORD; return "%rip"; 
+                case .DWORD; unreachable("can't use rip like this");
+                case .WORD;  unreachable("can't use rip like this");
+                case .BYTE;  unreachable("can't use rip like this");
+            };
     }
+    unreachable("What!!!");
+    return "";
 }
 
 #scope_module

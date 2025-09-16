@@ -1,35 +1,42 @@
 #scope_module
 
 map_to_asm :: (pgt: *Program_Tacky, st: Symbol_Table) -> *Program_Asm {
-    fns : [..]Fn_Asm;
-    for * pgt.fns {
-        fn := map_fn(it, st);
-        array_add(*fns, fn);
+    top_level_asms: [..]Top_Level_Asm;
+    for * pgt.items {
+        using it.*;
+        if #complete kind == {
+            case .STATIC_VAR;
+                var := Static_Var_Asm.{ top_level_static_var.ident, top_level_static_var.global, top_level_static_var.init };
+                array_add(*top_level_asms, .{ .STATIC , .{ top_level_static_var = var }});
+            case .FN;
+                fn := map_fn(*top_level_fn, st);
+                array_add(*top_level_asms, .{.FN, .{ top_level_fn = fn }});
+        }
     }
-    return New(Program_Asm, .{ fns });
+    return New(Program_Asm, .{ top_level_asms });
 }
 
 #scope_file
 
-map_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
+map_fn :: (fn_tacky: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
     instructions : [..]Instruction_Asm;
     
-    success, entry := table_find_new(*st, fnt.ident);
-    if !success assert(false, "function % not found in symbol table", fnt.ident);
-    if entry.type != .FN assert(false, "Symbol % is not a function", fnt.ident);
+    found_sym, sym := table_find_new(*st, fn_tacky.ident);
+    if !found_sym assert(false, "function % not found in symbol table", fn_tacky.ident);
+    if sym.type != .FN assert(false, "Symbol % is not a function", fn_tacky.ident);
     
     // fn args already has a name - but they don't have values
     // we need to move value as per System V calling convention to respective pseudo registers
-    fn_symbol := entry.as.fn;
-    fn_params := fn_symbol.params;
-    args_registers : [COUNT_REGISTER_FOR_ARGS]Register : .[.DI, .SI, .DX, .CX, .R8, .R9];
+    fn_sym := sym.fn;
+    fn_params := fn_sym.params;
+    
     register_args  := array_view(fn_params, 0, min(fn_params.count, COUNT_REGISTER_FOR_ARGS));
-    stack_args := ifx fn_params.count > COUNT_REGISTER_FOR_ARGS 
-                        array_view(fn_params, COUNT_REGISTER_FOR_ARGS, fn_params.count - COUNT_REGISTER_FOR_ARGS) 
-                  else  .[];
+    stack_args     := ifx fn_params.count > COUNT_REGISTER_FOR_ARGS 
+                            array_view(fn_params, COUNT_REGISTER_FOR_ARGS, fn_params.count - COUNT_REGISTER_FOR_ARGS) 
+                      else  .[];
     
     for register_args {
-        register_to_use := args_registers[it_index];
+        register_to_use := ARGS_REGISTERS[it_index];
         asm_arg         := pseudo(it.ident);
         array_add(*instructions, mov(reg(register_to_use, .DWORD), asm_arg));
     }
@@ -39,10 +46,12 @@ map_fn :: (fnt: *Fn_Tacky, st: Symbol_Table) -> Fn_Asm {
         array_add(*instructions, mov(src, asm_arg));
     }
     
-    for fnt.instructions map_instructions(*instructions, *it);
+    for * fn_tacky.instructions map_instructions(*instructions, it);
+    
     INITIAL_STACK_SIZE :: 0; // this will be updated in later stages
-    return .{ copy_string(fnt.ident), instructions, INITIAL_STACK_SIZE };
+    return .{ copy_string(fn_tacky.ident), instructions, INITIAL_STACK_SIZE, fn_tacky.global };
 }
+
 map_instructions :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
     if #complete instt.type == {
         case .RETURN;
@@ -156,8 +165,6 @@ map_instructions :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             array_add(insts, jmp(instt.as.jump));
         case .FN_CALL;
             fn_call := instt.as.fn_call;
-            args_registers : [COUNT_REGISTER_FOR_ARGS]Register : .[.DI, .SI, .DX, .CX, .R8, .R9];
-            
             register_args := array_view(fn_call.args, 0, min(fn_call.args.count, COUNT_REGISTER_FOR_ARGS));
             stack_args    := ifx fn_call.args.count > COUNT_REGISTER_FOR_ARGS 
                                     array_view(fn_call.args, COUNT_REGISTER_FOR_ARGS, fn_call.args.count - COUNT_REGISTER_FOR_ARGS) 
@@ -167,7 +174,7 @@ map_instructions :: (insts: *[..]Instruction_Asm, instt: *Instruction_Tacky) {
             if stack_padding != 0 array_add(insts, allocate_stack(stack_padding));
             
             for * register_args {
-                register_to_use := args_registers[it_index];
+                register_to_use := ARGS_REGISTERS[it_index];
                 assembly_arg := to_operand(it);
                 array_add(insts, mov(assembly_arg, reg(register_to_use, .DWORD)));
             }

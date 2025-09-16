@@ -1,14 +1,35 @@
-gen_tacky :: (pg: *Program_Ast, debug_log: bool = false) -> *Program_Tacky {
+gen_tacky :: (pg: *Program_Ast, st: *Symbol_Table, debug_log: bool = false) -> *Program_Tacky {
     tc : Tacky_Ctx;
     
-    fns: [..]Fn_Tacky;
-    for fn_ast: pg.fns {
-        if fn_ast.block {
-            fn := gen_fn_tacky(*tc, fn_ast);
-            array_add(*fns, fn);
+    top_level_tac: [..]Top_Level_Tacky;
+    for *decl: pg.decls {
+        using decl.*;
+        if #complete type == {
+            case .FN; if decl_fn.block {
+                fn := gen_fn_tacky(*tc, decl_fn, st);
+                array_add(*top_level_tac, top_level_fn_tac(fn));
+            }
+            case .VAR; // noop - handled differently
         }
     }
-    program := New(Program_Tacky, .{ fns });
+    
+    for value, key: st {
+        if #complete value.attr.kind == {
+            case .STATIC;
+                sv := value.attr.static;
+                if #complete sv.initial_value.kind == {
+                    case .INITIAL; 
+                        array_add(*top_level_tac, top_level_static_var_tac(.{key, sv.global, sv.initial_value.initial}));
+                    case .TENTATIVE; 
+                        array_add(*top_level_tac, top_level_static_var_tac(.{key, sv.global, 0}));
+                    case .NO_INITIALIZER; // noop
+                }
+            case .FN;    #through;
+            case .LOCAL; // noop
+        }
+    }
+    
+    program := New(Program_Tacky, .{ top_level_tac });
 
     if debug_log print_tacky(program, *stdout_writer_new());
     return program;
@@ -16,26 +37,29 @@ gen_tacky :: (pg: *Program_Ast, debug_log: bool = false) -> *Program_Tacky {
 
 #scope_file
 
-gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast) -> Fn_Tacky {
+gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast, st: *Symbol_Table) -> Fn_Tacky {
     instructions: [..]Instruction_Tacky;
     if fn_ast.block  {
-        gen_instructions(tc, *instructions, fn_ast.block);
+        gen_instructions(tc, *instructions, fn_ast.block, st);
         // Always add return 0 as there might be case where we don't have one
         // Potentially we can optimize this away later.
         array_add(*instructions, ret(constant(0)));
     }
-    return .{ copy_string(fn_ast.ident), instructions };
+    found_symbol, symbol := table_find_new(st, fn_ast.ident);
+    assert(found_symbol, "Something went wrong.. fn symbol not found on table");
+    assert(symbol.attr.kind == .FN, "Symbol should be fn kind");
+    return .{ copy_string(fn_ast.ident), symbol.attr.fn.global, instructions };
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast) {
-    gen_instructions(tc, instructions, block_ast.items);
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast, st: *Symbol_Table) {
+    gen_instructions(tc, instructions, block_ast.items, st);
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_item_ast: [..]*Block_Item_Ast) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_item_ast: [..]*Block_Item_Ast, st: *Symbol_Table) {
     for block_item_ast  {
         using it;
         if #complete type == {
-            case .STMT; gen_instructions(tc, instructions, block_item_stmt);
+            case .STMT; gen_instructions(tc, instructions, block_item_stmt, st);
             case .DECL; gen_instructions_decl(tc, instructions, block_item_decl);
         }
     }
@@ -47,15 +71,18 @@ gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, 
             // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
             if (decl_var.init == null)  return;
             
+            // Static variables are initialized in the data section, not in function body
+            if (decl_var.storage_class == .STATIC)  return;
+            
             result := gen_expr(tc, instructions, decl_var.init);
             dst := variable(decl_var.ident);
             array_add(instructions, copy(result, dst));
         case .FN;
-            if decl_fn.block != null  assert(false, "Hmm.. this should not have happened - fn decl can't have body.");
+            if decl_fn.block != null assert(false, "Hmm.. this should not have happened - fn decl can't have body.");
     }
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using stmt_ast: *Stmt_Ast) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using stmt_ast: *Stmt_Ast, st: *Symbol_Table) {
     if #complete type == {
         case .DEFAULT; 
             array_add(instructions, label(stmt_default));
@@ -65,15 +92,23 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
             src := gen_expr(tc, instructions, stmt_return.expr);
             array_add(instructions, ret(src));
         case .SWITCH; 
-            gen_stmt_switch(tc, instructions, stmt_switch);
+            gen_stmt_switch(tc, instructions, stmt_switch, st);
         case .EXPR; 
+            if stmt_expr.type == .VAR  {
+                success, ident := table_find_new(st, stmt_expr.expr_var);
+                if success {
+                    if ident.attr.kind == .STATIC {
+                        return;
+                    }
+                }
+            }
             gen_expr(tc, instructions, stmt_expr);
         case .IF;
             if stmt_if.else_block == null {
                 if_end_label := make_label(tc, "if_end");
                 condition := gen_expr(tc, instructions, stmt_if.condition);
                 array_add(instructions, jump_if_zero(condition, if_end_label.as.label));
-                gen_instructions(tc, instructions, stmt_if.if_block);
+                gen_instructions(tc, instructions, stmt_if.if_block, st);
                 array_add(instructions, if_end_label);
             } else {
                 if_end_label := make_label(tc, "if_end");
@@ -83,22 +118,22 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
 
                 array_add(instructions, jump_if_zero(condition, else_label.as.label));
 
-                gen_instructions(tc, instructions, stmt_if.if_block);
+                gen_instructions(tc, instructions, stmt_if.if_block, st);
                 array_add(instructions, jump(if_end_label.as.label));
 
                 array_add(instructions, else_label);
-                gen_instructions(tc, instructions, stmt_if.else_block);
+                gen_instructions(tc, instructions, stmt_if.else_block, st);
 
                 array_add(instructions, if_end_label);
             }
         case .LABEL;
             goto_label := label(stmt_label.label);
             array_add(instructions, goto_label);
-            gen_instructions(tc, instructions, stmt_label.stmt);
+            gen_instructions(tc, instructions, stmt_label.stmt, st);
         case .GOTO;
             array_add(instructions, jump(stmt_goto));
         case .COMPOUND;
-            gen_instructions(tc, instructions, stmt_compound);
+            gen_instructions(tc, instructions, stmt_compound, st);
         case .FOR;
             loop_start_label     := sprint("%_start", stmt_for.label);
             loop_post_expr_label := sprint("%_post_expr", stmt_for.label);
@@ -122,14 +157,14 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
                 array_add(instructions, jump_if_zero(condition, loop_end_label));
             }
 
-            gen_instructions(tc, instructions, stmt_for.body);
+            gen_instructions(tc, instructions, stmt_for.body, st);
 
             array_add(instructions, jump(loop_post_expr_label));
             array_add(instructions, label(loop_end_label));
         case .DO_WHILE;
             loop_start_label := sprint("%_start", stmt_do_while.label);
             loop_end_label := sprint("%_end", stmt_do_while.label);
-            // TODO(Aman): Refactor  
+            // TODO(seg4lt): Refactor  
             // adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
             // Maybe there is a better way to do this but..... this is what we have for now
@@ -137,7 +172,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
 
             array_add(instructions, label(loop_start_label));
 
-            gen_instructions(tc, instructions, stmt_do_while.body);
+            gen_instructions(tc, instructions, stmt_do_while.body, st);
 
             array_add(instructions, label(loop_post_expr_label));
             condition := gen_expr(tc, instructions, stmt_do_while.condition);
@@ -147,7 +182,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
         case .WHILE;
             loop_start_label := sprint("%_start", stmt_while.label);
             loop_end_label := sprint("%_end", stmt_while.label);
-            // TODO(Aman): Refactor
+            // TODO(seg4lt): Refactor
             // adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
             // Maybe there is a better way to do this but..... this is what we have for now
@@ -159,7 +194,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
             condition := gen_expr(tc, instructions, stmt_while.condition);
             array_add(instructions, jump_if_zero(condition, loop_end_label));
 
-            gen_instructions(tc, instructions, stmt_while.body);
+            gen_instructions(tc, instructions, stmt_while.body, st);
 
             array_add(instructions, jump(loop_start_label));
             array_add(instructions, label(loop_end_label));
@@ -174,7 +209,7 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
     }
 }
 
-gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast) {
+gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast, st: *Symbol_Table) {
     switch_condition := switch_ast.condition;
     switch_expr_val := gen_expr(tc, instructions, switch_condition);
 
@@ -207,7 +242,7 @@ gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_
     array_add(instructions, jump(switch_end_label));
 
     // now add instruction for all cases
-    gen_instructions(tc, instructions, switch_ast.body);
+    gen_instructions(tc, instructions, switch_ast.body, st);
 
     // this is to mark end of switch to jump if nothing matches
     array_add(instructions, label(switch_end_label));
@@ -217,7 +252,6 @@ gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using expr_as
     if #complete type == {
         case .PREFIX;
             inner_expr_result := gen_expr(tc, instructions, expr_prefix.expr);
-            
             one := constant(1);
             dst := make_var(tc);
             if #complete expr_prefix.op == {

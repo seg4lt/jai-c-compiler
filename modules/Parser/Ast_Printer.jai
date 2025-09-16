@@ -1,14 +1,32 @@
 print_program_ast :: (writer: *Writer, pg: *Program_Ast) {
     write(writer, "-- AST --\n");
-    for fn_decl: pg.fns {
-        print_fn_decl_ast(writer, fn_decl, 1, true);
-        write(writer, "\n");
+    
+    for decl: pg.decls {
+        using decl;
+        if decl.type == {
+            case .FN; print_fn_decl_ast(writer, decl_fn, 0);
+            case .VAR; 
+                print_var_decl_ast(writer, decl_var, 0, false);
+                write(writer, ";");
+        }
+        if it_index < pg.decls.count - 1 write(writer, "\n");
     }
+    
     write(writer, "\n");
 }
 
+print_storage_class :: (writer: *Writer, class: Storage_Class_Ast) {
+    if #complete class == {
+        case .EXTERN; write(writer, "% ", "extern");
+        case .STATIC; write(writer, "% ", "static");
+        case .NONE;   // noop
+    }
+}
+    
+
 print_fn_decl_ast :: (writer: *Writer, fn_decl: *Fn_Decl_Ast, depth: int, indent: bool = false) {
     if indent print_space(writer, depth);
+    print_storage_class(writer, fn_decl.storage_class);
     write(writer, "int %( ", fn_decl.ident);
     for param: fn_decl.params {
         if fn_decl.block != null write(writer, "int ");
@@ -26,7 +44,7 @@ print_fn_decl_ast :: (writer: *Writer, fn_decl: *Fn_Decl_Ast, depth: int, indent
         print_space(writer, depth);
         write(writer, "}");
     } else {
-        write(writer, ";\n");
+        write(writer, ";");
     }
 }
 
@@ -51,8 +69,12 @@ print_decl_ast :: (writer: *Writer, using decl: *Decl_Ast, depth: int, new_line:
     }
 }
 
-print_var_decl_ast :: (writer: *Writer, var_decl: *Var_Decl_Ast, depth: int, new_line: bool) {
-    _ = depth;
+print_var_decl_ast :: (writer: *Writer, using var_decl: *Var_Decl_Ast, depth: int, new_line: bool) {
+    if #complete storage_class == {
+        case .STATIC; write(writer, "static ");
+        case .EXTERN; write(writer, "extern ");
+        case .NONE; // noop
+    }
     write(writer, "int ");
     write(writer, "%", var_decl.ident);
     if var_decl.init != null {

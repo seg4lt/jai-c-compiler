@@ -3,9 +3,11 @@
 
 if [ -n "$TC" ]; then
   echo "Running tests..."
-  docker-compose exec box bash -c "jai build.jai && tests/test_compiler ./out/jcc --verbose --failfast $1"
+  # --latest-only
+  # --keep-asm-on-failure 
+  docker-compose exec -T box bash -c "jai-linux build.jai && tests/test_compiler ./out/jcc --verbose --failfast --verbose $1"
   exit 0
 fi
 
 echo "Compiling ./c/main.c"
-docker-compose exec box bash -c "jai build.jai && ./out/jcc -- ./c/main.c $1"
+docker-compose exec -T box bash -c "jai-linux build.jai && ./out/jcc -- ./c/main.c $1"

@@ -43,14 +43,14 @@ run_compiler :: (ctx: *Compiler_Context) -> success: bool = true {
     tacky: *Program_Tacky = null;
     if args.flags & .TACKY && ast != null {
         defer deinit(ctx, .PARSER);
-        tacky = gen_tacky(ast, DEBUG_LOG,, ctx.tacky_arena);
+        tacky = gen_tacky(ast, *symbols, DEBUG_LOG,, ctx.tacky_arena);
         fail_fast();
     }
     
     asm_ir: *Program_Asm = null; 
     if args.flags & .CODE_GEN && tacky != null {
         defer deinit(ctx, .TACKY);
-        asm_ir = asm_gen(tacky, symbols, DEBUG_LOG,, ctx.asm_ir_arena);
+        asm_ir = asm_gen(tacky, *symbols, DEBUG_LOG,, ctx.asm_ir_arena);
     }
     
     if args.flags & .ALL && asm_ir != null {
