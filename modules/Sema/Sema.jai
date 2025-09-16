@@ -7,8 +7,7 @@ sema :: (ast: *Program_Ast, st: *Symbol_Table, erp: *Error_Reporter, debug_log: 
     if debug_log {
         print("\n-- AFTER SEMA --\n");
         print_program_ast(*stdout_writer_new(), ast);
-        print("\n-- SYMBOL TABLE --\n"); 
-        for st print("%: %\n", it_index, it);
+        // TODO(seg4lt): add proper symbol printer for debugging
     }
 }
 
@@ -29,5 +28,6 @@ make_goto_label :: (name: string) -> string {
 #import "Error_Reporter";
 #import "Not_Basic";
 #import "Symbol_Table";
+#import "Print_Vars";
 
 #scope_export

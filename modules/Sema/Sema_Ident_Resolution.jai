@@ -2,8 +2,12 @@ sema_ident_resolution :: (ast: *Program_Ast, erp: *Error_Reporter) {
     new_scope: Scope_Idents;
     init(*new_scope);
     
-    for fn: ast.fns {
-        resolve_fn_decl(fn, *new_scope, erp, can_have_body=true);
+    for *decl: ast.decls {
+        using decl.*;
+        if #complete type == {
+            case .VAR; resolve_file_scope_var_decl(decl_var, *new_scope, erp);
+            case .FN; resolve_fn_decl(decl_fn, *new_scope, erp, can_have_body=true);
+        }
     }
 }
 
@@ -36,13 +40,13 @@ resolve_stmt :: (using stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Report
         case .IF;
             resolve_expr(stmt_if.condition, scope, erp);
             resolve_stmt(stmt_if.if_block, scope, erp);
-            if stmt_if.else_block != null
-            resolve_stmt(stmt_if.else_block, scope, erp);
+            if stmt_if.else_block != null resolve_stmt(stmt_if.else_block, scope, erp);
         case .COMPOUND;
             compound := stmt_compound;
             nested_scope := create_new_scope(scope);
             resolve_block(compound, *nested_scope, erp);
-        case .FOR; resolve_for_stmt(stmt_for, scope, erp);
+        case .FOR; 
+            resolve_for_stmt(stmt_for, scope, erp);
         case .DO_WHILE;
             do_while_stmt := stmt_do_while;
             resolve_stmt(do_while_stmt.body, scope, erp);
@@ -63,55 +67,80 @@ resolve_stmt :: (using stmt: *Stmt_Ast, scope: *Scope_Idents, erp: *Error_Report
 
 resolve_decl :: (using decl: *Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     if #complete type == {
-        case .VAR;
-            success, entry := table_find_new(scope, decl_var.ident);
-            if success && entry.from_current_scope {
-                if entry.type == .VAR {
-                    error_report(erp, decl_var.line, decl_var.start, "duplicate variable declaration! : %", decl_var.ident);
-                }
-                if entry.type == .FN && entry.external_linkage {
-                    error_report(erp, decl_var.line, decl_var.start, "variable name conflicts with function name: %", decl_var.ident);
-                }
-            }
-                
-            new_ident := make_variable(decl_var.ident); 
-            ident := Ident(string).{ 
-                from_current_scope = true,
-                external_linkage   = false,
-                name               = new_ident,
-                type               = .VAR 
-            };
-            table_set(scope, decl_var.ident, ident);
-
-            if decl_var.init resolve_expr(decl_var.init, scope, erp);
-            decl_var.ident = new_ident;
+        case .VAR; resolve_local_var_decl(decl_var, scope, erp);
         case .FN; resolve_fn_decl(decl_fn, scope, erp, can_have_body=false);
     }
 }
 
-resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter, can_have_body: bool = true) {
-    success, entry := table_find_new(scope, fn_decl.ident);
-    if success {
-        if entry.type == .FN && entry.has_body {
-            error_report(erp, fn_decl.line, fn_decl.start, "duplicate function declaration! : %", fn_decl.ident);
+resolve_file_scope_var_decl :: (using decl_var: *Var_Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    ident_info := Ident(string).{ 
+        from_current_scope = true,
+        external_linkage   = true,
+        name               = ident,
+        type               = .VAR 
+    };
+    table_set(scope, ident, ident_info);
+    if init resolve_expr(init, scope, erp);
+}
+
+resolve_local_var_decl :: (using decl_var: *Var_Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
+    found_old_entry, old_entry := table_find_new(scope, ident);
+    if found_old_entry && old_entry.from_current_scope {
+        if !(old_entry.external_linkage && storage_class == .EXTERN) {
+            error_report(erp, line, start, "conflicting declaration! : %", ident);
         }
-        if entry.type == .VAR && entry.from_current_scope {
-            error_report(erp, fn_decl.line, fn_decl.start, "function name conflicts with variable name: %", fn_decl.ident);
+        if old_entry.type == .FN && old_entry.external_linkage {
+            error_report(erp, line, start, "variable name conflicts with function name: %", ident);
+        }
+    }
+    
+    if storage_class == .EXTERN {
+        ident_info := Ident(string).{ 
+            from_current_scope = true,
+            external_linkage   = true,
+            name               = ident,
+            type               = .VAR 
+        };
+        table_set(scope, ident, ident_info);
+        if init resolve_expr(init, scope, erp);
+        return;
+    }
+    
+    new_ident  := make_variable(ident); 
+    ident_info := Ident(string).{ 
+        from_current_scope = true,
+        external_linkage   = false,
+        name               = new_ident,
+        type               = .VAR 
+    };
+    table_set(scope, ident, ident_info);
+    if init resolve_expr(init, scope, erp);
+    ident = new_ident;
+}
+
+resolve_fn_decl :: (using fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Reporter, can_have_body: bool = true) {
+    found_old_entry, old_entry := table_find_new(scope, ident);
+    if found_old_entry {
+        if old_entry.type == .FN && old_entry.has_body && block != null {
+            error_report(erp, line, start, "duplicate function declaration! : %", ident);
+        }
+        if old_entry.type == .VAR && old_entry.from_current_scope {
+            error_report(erp, line, start, "function name conflicts with variable name: %", ident);
         }
     }
         
-    ident := Ident(string).{
+    ident_info := Ident(string).{
         from_current_scope  = true,
         type                = .FN,
         external_linkage    = true,
-        name                = fn_decl.ident,
-        has_body            = fn_decl.block != null,
+        name                = ident,
+        has_body            = block != null,
     };
-    table_set(scope, fn_decl.ident, ident);
+    table_set(scope, ident, ident_info);
     
     scope_for_fn_param := create_new_scope(scope);
     
-    for * param: fn_decl.params  {
+    for * param: params  {
         success, entry := table_find_new(*scope_for_fn_param, param.*.ident);
         if success && entry.from_current_scope {
             error_report(erp, param.*.line, param.*.start, "duplicate param name found: %", param.*.ident);
@@ -128,11 +157,11 @@ resolve_fn_decl :: (fn_decl: *Fn_Decl_Ast, scope: *Scope_Idents, erp: *Error_Rep
         param.*.ident = mapped_ident;
     }
     
-    if !can_have_body && fn_decl.block != null {
-        error_report(erp, fn_decl.line, fn_decl.start, "function declaration cannot have body: %", fn_decl.ident);
+    if !can_have_body && block != null {
+        error_report(erp, line, start, "function declaration cannot have body: %", ident);
     }
     
-    if fn_decl.block resolve_block(fn_decl.block, *scope_for_fn_param, erp);
+    if block resolve_block(block, *scope_for_fn_param, erp);
 }
 
 unwrap_group_expr :: (using expr: *Expr_Ast) -> *Expr_Ast {
@@ -145,13 +174,13 @@ resolve_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Report
         case .POSTFIX;
             inner_expr := unwrap_group_expr(expr_postfix.expr);
             if inner_expr.type != .VAR {
-                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in expr_postfix expression, found: %", inner_expr.*);
+                error_report(erp, line, start, "expected variable in expr_postfix expression, found: %", inner_expr.*);
             }
             resolve_expr(expr_postfix.expr, scope, erp);
         case .PREFIX;
             inner_expr := unwrap_group_expr(expr_prefix.expr);
             if inner_expr.type != .VAR {
-                error_report(erp, expr.loc.line, expr.loc.start, "expected variable in expr_prefix expression, found: %", inner_expr.*);
+                error_report(erp, expr.line, expr.start, "expected variable in expr_prefix expression, found: %", inner_expr.*);
             }
             resolve_expr(expr_prefix.expr, scope, erp);
         case .UNARY;
@@ -163,16 +192,14 @@ resolve_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Report
             resolve_expr(expr_group, scope, erp);
         case .VAR;
             success, ident := table_find_new(scope, expr_var);
-            if !success error_report(erp, expr.loc.line, expr.loc.start, "undeclared variable: %", expr_var);
+            if !success error_report(erp, line, start, "undeclared variable: %", expr_var);
             expr_var = ident.name;
         case .FN_CALL; 
             success, ident := table_find_new(scope, expr_fn_call.ident);
-            
-            if !success error_report(erp, expr.line, expr.start, "undeclared function: %", expr_fn_call.ident);
-            
+            if !success error_report(erp, line, start, "undeclared function: %", expr_fn_call.ident);
             if success && ident.from_current_scope {
                 expr_fn_call.ident = ident.name;
-                expr.as.expr_fn_call = expr_fn_call;
+                expr_fn_call = expr_fn_call;
             }
             for expr_fn_call.args resolve_expr(it, scope, erp);
         case .ASSIGNMENT;
@@ -188,7 +215,7 @@ resolve_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Report
 resolve_assignment_expr :: (using expr: *Expr_Ast, scope: *Scope_Idents, erp: *Error_Reporter) {
     dst_inner_expr := unwrap_group_expr(expr_assignment.dst);
     if dst_inner_expr.type != .VAR 
-        error_report(erp, expr.loc.line, expr.loc.start,"expected variable (invalid lvalue) found: %", expr.as.expr_assignment.dst.*);
+        error_report(erp, line, start,"expected variable (invalid lvalue) found: %", expr.as.expr_assignment.dst.*);
         
     resolve_expr(dst_inner_expr, scope, erp);
     resolve_expr(expr_assignment.src, scope, erp);
@@ -208,7 +235,6 @@ resolve_for_stmt :: (for_stmt: For_Stmt_Ast, scope: *Scope_Idents, erp: *Error_R
     
     if for_stmt.condition resolve_expr(for_stmt.condition, *scope_for_init, erp);
     if for_stmt.post      resolve_expr(for_stmt.post, *scope_for_init, erp);
-
     {
         scope_for_body : Scope_Idents;
         scope_for_body = create_new_scope(*scope_for_init);

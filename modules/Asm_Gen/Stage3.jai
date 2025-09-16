@@ -1,19 +1,31 @@
 #scope_module
 
 // Fix assembly instruction
-fix_asm:: (pg: *Program_Asm) -> *Program_Asm {
-    fns : [..]Fn_Asm;
+fix_asm :: (pg: *Program_Asm) -> *Program_Asm {
+    fixed_top_level: [..]Top_Level_Asm;
     
-    for fn: pg.fns {
-        stack_size := fn.stack_size;
-        old_instructions  := fn.instructions;
-        new_insts  := fix_instructions(old_instructions, stack_size);
-        array_add(*fns, .{fn.ident, new_insts, stack_size});
+    for pg.top_level {
+        if #complete it.kind == {
+            case .FN;
+                fn := it.top_level_fn;
+                stack_size := fn.stack_size;
+                old_instructions  := fn.instructions;
+                
+                new_insts  := fix_instructions(old_instructions, stack_size);
+                fn_inst := Fn_Asm.{fn.ident, new_insts, stack_size, fn.global};
+                array_add(*fixed_top_level, .{ .FN, .{ top_level_fn = fn_inst }});
+            case .STATIC;
+                array_add(*fixed_top_level, it);
+        }
     }
-    return New(Program_Asm, .{ fns });
+    return New(Program_Asm, .{ fixed_top_level });
 }
 
 #scope_file
+
+is_memory_addr :: (using op: Operand_Asm) -> bool {
+    return type == .STACK || type == .DATA;
+}
 
 fix_instructions :: (old_instructions: []Instruction_Asm, stack_size: int) -> [..]Instruction_Asm {
     insts : [..]Instruction_Asm;
@@ -25,7 +37,7 @@ fix_instructions :: (old_instructions: []Instruction_Asm, stack_size: int) -> [.
         if #complete oi.type == {
             case .MOV;
                 movi := oi.as.mov;
-                if movi.src.type == .STACK && movi.dst.type == .STACK {
+                if is_memory_addr(movi.src) && is_memory_addr(movi.dst) {
                     ireg := reg(.R10, .DWORD);
                     array_add(*insts, mov(movi.src, ireg));
                     array_add(*insts, mov(ireg, movi.dst));
@@ -70,7 +82,7 @@ fix_instructions :: (old_instructions: []Instruction_Asm, stack_size: int) -> [.
                 }
             case .CMP;
                 cmpi := oi.as.cmp;
-                if cmpi.op1.type == .STACK && cmpi.op2.type == .STACK {
+                if is_memory_addr(cmpi.op1) && is_memory_addr(cmpi.op2) {
                     ireg := reg(.R10, .DWORD);
                     array_add(*insts, mov(cmpi.op1, ireg));
                     array_add(*insts, cmp(ireg, cmpi.op2));

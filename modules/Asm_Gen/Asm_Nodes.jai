@@ -1,11 +1,26 @@
 Program_Asm :: struct {
-    fns: [..]Fn_Asm;
+    top_level: [..]Top_Level_Asm;
+}
+
+Top_Level_Asm :: struct {
+    kind: enum { STATIC; FN; };
+    using as: union {
+        top_level_static_var: Static_Var_Asm;
+        top_level_fn: Fn_Asm;
+    }
+};
+
+Static_Var_Asm :: struct {
+    ident: string;
+    global: bool;
+    init: int;
 }
 
 Fn_Asm :: struct {
-    ident        : string;
-    instructions : [..]Instruction_Asm;
-    stack_size   : int = 0;
+    ident:        string;
+    instructions: [..]Instruction_Asm;
+    stack_size:   int = 0;
+    global:       bool;
 }
 
 Instruction_Asm :: struct {
@@ -50,12 +65,13 @@ Instruction_Asm_Type :: enum {
 Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; }; 
 
 Operand_Asm :: struct {
-    type : enum { IMM; REG; PSEUDO; STACK; };
-    using as   : union { 
-        imm     : int;
-        pseudo  : string;
-        reg     : Register_Asm;
-        stack   : int; 
+    type:     enum { IMM; REG; PSEUDO; STACK; DATA; };
+    using as: union { 
+        imm:    int;
+        pseudo: string;
+        reg:    Register_Asm;
+        stack:  int; 
+        data:   string;
     }; 
 };
 
@@ -102,6 +118,7 @@ Register :: enum {
     RBP;
     RSP;
     SI;
+    RIP;
 }
 
 #scope_module
@@ -109,6 +126,7 @@ Register :: enum {
 COUNT_REGISTER_FOR_ARGS :: 6;
 STACK_ALIGNMENT         :: 16;
 PUSH_SIZE               :: 8; // we use push and it only works with 8 bytes
+ARGS_REGISTERS          : [COUNT_REGISTER_FOR_ARGS]Register : .[.DI, .SI, .DX, .CX, .R8, .R9];
 
 
 reg :: (register: Register, size: Register_Size) -> Operand_Asm #expand {
@@ -121,6 +139,10 @@ pseudo :: (ident: string) -> Operand_Asm #expand {
 
 stack :: (position: int) -> Operand_Asm #expand {
     return .{ .STACK, .{ stack = position } }; 
+}
+
+data :: (ident: string) -> Operand_Asm #expand {
+    return .{ .DATA , .{ data = ident } }; 
 }
 
 imm :: (value: int) -> Operand_Asm #expand {

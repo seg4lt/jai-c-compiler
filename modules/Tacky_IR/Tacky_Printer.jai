@@ -1,10 +1,19 @@
 print_tacky :: (program: *Program_Tacky, writer: *Writer) {
     write(writer, "\n\n-- Tacky --\n");
     write(writer, "    .program\n");
-    for fn: program.fns {
-        print_tacky_fn(*fn, writer);
+    
+    
+    for *item: program.items {
+        using item.*;
+        if #complete kind == {
+            case .FN; print_tacky_fn(*top_level_fn, writer);
+            case .STATIC_VAR; print_static_var(*top_level_static_var, writer);
+        }
         write(writer, "\n");
     }
+}
+print_static_var:: (var: Static_Var_Tacky, writer: *Writer) {
+    write(writer, "    StaticVar(ident: %, global: %, init: %)", var.ident, var.global, var.init);
 }
 
 print_tacky_fn :: (fn: *Fn_Tacky, writer: *Writer) {

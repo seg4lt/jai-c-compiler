@@ -13,6 +13,7 @@ run_preprocessor :: (src_path: string) -> src_content: string = "", success: boo
 }
 
 assember_and_linker :: (src_path_without_ext: string, output_type: Output_Type)  {
+    push_allocator(temp);
     if #complete output_type == {
         case .EXE;
             command: [..] string;

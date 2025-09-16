@@ -8,7 +8,7 @@
     "cwd": "$ZED_WORKTREE_ROOT",
     "build": {
       "label": "Compile jcc",
-      "command": "jai",
+      "command": "jai-macos",
       "args": ["build.jai"]
     }
   }

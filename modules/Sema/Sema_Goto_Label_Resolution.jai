@@ -1,5 +1,11 @@
 sema_label_resolution :: (ast: *Program_Ast, erp: *Error_Reporter) {
-    for fn: ast.fns label_fn(fn, erp);
+    for *decl: ast.decls {
+        using decl.*;
+        if #complete type == {
+            case .FN; label_fn(decl_fn, erp);
+            case .VAR; // noop;
+        }
+    }
 }
 
 #scope_file
@@ -7,9 +13,9 @@ sema_label_resolution :: (ast: *Program_Ast, erp: *Error_Reporter) {
 Label_Store :: Table(
     string,
     struct {
-        owing_block     : bool;
-        processed_label : string;
-        loc             : Source_Location;
+        owing_block:     bool;
+        processed_label: string;
+        using loc:       Source_Location;
     }
 );
 

@@ -1,7 +1,16 @@
 print_asm :: (writer: *Writer, pg: *Program_Asm, stage: int) {
     write(writer, "\n\n---- ASM GEN % --- \n", stage);
     write(writer, ".program\n");
-    for pg.fns print_asm_fn(writer, it);
+    for pg.top_level {
+        using it;
+        if #complete it.kind == {
+            case .FN;
+                print_asm_fn(writer, top_level_fn);
+            case .STATIC;
+                write(writer, ".data ");
+                write(writer, ".%: .long %\n", it.as.top_level_static_var.ident, it.as.top_level_static_var.init);
+        } 
+    }
 }
 
 print_asm_fn :: (writer: *Writer, fn: Fn_Asm) {
@@ -92,5 +101,7 @@ print_asm_operand :: (writer: *Writer, using operand: Operand_Asm) {
             write(writer, "pseudo(%)", pseudo);
         case .STACK;
             write(writer, "stack(%)", stack);
+        case .DATA;
+            write(writer, "data(%)", data);
     }
 }

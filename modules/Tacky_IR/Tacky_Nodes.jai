@@ -1,10 +1,25 @@
 Program_Tacky :: struct {
-    fns: [..]Fn_Tacky;
+    items: [..]Top_Level_Tacky;
+}
+
+Top_Level_Tacky :: struct {
+    kind:       enum {FN; STATIC_VAR;};
+    using as: union {
+        top_level_fn: Fn_Tacky;
+        top_level_static_var: Static_Var_Tacky;
+    };
+}
+
+Static_Var_Tacky :: struct {
+    ident:  string;
+    global: bool;
+    init:   int;
 }
 
 Fn_Tacky :: struct {
-    ident        : string;
-    instructions : []Instruction_Tacky;
+    ident:        string;
+    global:       bool;
+    instructions: []Instruction_Tacky;
 }
 
 Instruction_Type_Tacky :: enum {
@@ -73,4 +88,14 @@ Val_Tacky :: struct {
 Tacky_Ctx :: struct {
     temp_var_index  : int = 0;
     label_index     : int = 0;
+}
+
+#scope_module
+
+top_level_fn_tac :: (fn: Fn_Tacky) -> Top_Level_Tacky {
+    return .{ kind = .FN, as = .{ top_level_fn = fn } };
+}
+
+top_level_static_var_tac :: (sv: Static_Var_Tacky) -> Top_Level_Tacky {
+    return .{ kind = .STATIC_VAR, as = .{ top_level_static_var = sv } };
 }

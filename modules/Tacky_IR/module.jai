@@ -6,3 +6,5 @@
 #import "Parser";
 #import "Basic";
 #import "Not_Basic";
+#import "Symbol_Table";
+#import "Hash_Table";
