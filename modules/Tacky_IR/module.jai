@@ -3,6 +3,8 @@
 #load "Tacky_Printer.jai";
 
 #scope_module
+using Tacky;
+
 #import "Parser";
 #import "Basic";
 #import "Not_Basic";

@@ -4,14 +4,14 @@ Parser :: struct {
     error_reporter: *Error_Reporter;
 }
 
-parse_ast :: (tokens: []Token, error_reporter: *Error_Reporter, debug_log: bool = false) -> *Program_Ast {
+parse_ast :: (tokens: []Token, error_reporter: *Error_Reporter, debug_log: bool = false) -> *Program {
     parser := Parser.{ tokens = tokens, error_reporter = error_reporter };
-    
+
     program := parse_program(*parser);
     if !is_at_end(*parser) parse_err(*parser, "All token not consumed\n");
-    
+
     if debug_log print_program_ast(*stdout_writer_new(), program);
-    
+
     return program;
 }
 
@@ -32,16 +32,16 @@ parse_err :: (parser: *Parser, token: Token, msg_fmt: string, args: .. Any) #exp
 
 #scope_file
 
-parse_program :: (parser: *Parser) -> *Program_Ast {
-    decls: [..]*Decl_Ast;
-    while !is_at_end(parser) 
+parse_program :: (parser: *Parser) -> *Program {
+    decls: [..]*Decl;
+    while !is_at_end(parser)
         array_add(*decls, parse_decl(parser, only_fn_decl = false));
-        return program_new(decls);
+    return Program.new(decls);
 }
 
-parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl_Ast {
+parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl {
     ret_type, storage_class := parse_type_and_storage_class_for_decl(parser);
-    
+
     using ident_token := consume(parser, .IDENT);
 
     consume(parser, .LPAREN);
@@ -50,27 +50,27 @@ parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl_Ast {
 
     if peek(parser).type == .SEMICOLON {
         consume(parser, .SEMICOLON);
-        return fn_decl_new(value, params, null, storage_class, line, start);
+        return Fn_Decl.new(value, params, null, storage_class, line, start);
     }
 
     body := parse_block(parser);
-    return fn_decl_new(value, params, body, storage_class, line, start);
+    return Fn_Decl.new(value, params, body, storage_class, line, start);
 }
 
-parse_fn_params :: (parser: *Parser) -> [..]*Fn_Param {
-    params: [..]*Fn_Param;
+parse_fn_params :: (parser: *Parser) -> [..]*Fn_Decl.Fn_Param {
+    params: [..]*Fn_Decl.Fn_Param;
     if peek(parser).type == .VOID {
         consume(parser, .VOID);
         return params;
     }
     while peek(parser).type != .RPAREN {
         // we only support int type for now
-        type := consume(parser, .INT); 
+        type := consume(parser, .INT);
         ident := consume(parser, .IDENT);
-        
-        fn_param := New(Fn_Param, .{ ident = ident.value, line = ident.line, start = ident.start });
+
+        fn_param := New(Fn_Decl.Fn_Param, .{ ident = ident.value, line = ident.line, start = ident.start });
         array_add(*params, fn_param);
-        
+
         if peek(parser).type == .COMMA {
             consume(parser, .COMMA);
             if peek(parser).type == .RPAREN parse_err(parser, "trailing comma on parameter list is not allowed");
@@ -79,43 +79,43 @@ parse_fn_params :: (parser: *Parser) -> [..]*Fn_Param {
     return params;
 }
 
-parse_block :: (parser: *Parser) -> *Block_Ast {
+parse_block :: (parser: *Parser) -> *Block {
     start_tok := consume(parser, .LCURLY);
-    body: [..]*Block_Item_Ast;
-    
+    body: [..]*Block_Item;
+
     while peek(parser).type != .RCURLY array_add(*body, parse_block_item(parser));
-        
+
     consume(parser, .RCURLY);
-    return block_new(body, start_tok.line, start_tok.start);
+    return Block.new(body, start_tok.line, start_tok.start);
 }
 
-parse_block_item :: (parser: *Parser) -> *Block_Item_Ast {
+parse_block_item :: (parser: *Parser) -> *Block_Item {
     if is_decl(parser) {
         decl := parse_decl(parser, only_fn_decl = true);
-        return block_item_decl_new(decl);
+        return Block_Item_Decl.new(decl);
     }
-        
+
     if peek(parser).type == .SEMICOLON {
         tok := consume(parser);
-        stmt := stmt_null_new(tok.line, tok.start);
-        return block_item_stmt_new(stmt);
+        stmt := Stmt_Null.new(tok.line, tok.start);
+        return Block_Item_Stmt.new(stmt);
     }
     stmt := parse_stmt(parser);
-    return block_item_stmt_new(stmt);
+    return Block_Item_Stmt.new(stmt);
 }
 
 
 is_fn_decl :: (parser: *Parser) -> bool {
     peek_offset := 0;
     while is_decl(parser, peek_offset) peek_offset += 1;
-    
+
     if peek_offset < 1 return false; // expect at least return type
-    
+
     if peek(parser, peek_offset).type != .IDENT return false;
     peek_offset += 1;
-    
+
     if peek(parser, peek_offset).type != .LPAREN return false;
-    
+
     return true;
 }
 
@@ -129,10 +129,10 @@ is_decl :: (parser: *Parser, offset: int = 0) -> bool {
     return false;
 }
 
-parse_type_and_storage_class_for_decl :: (parser: *Parser) -> (string, Storage_Class_Ast) {
+parse_type_and_storage_class_for_decl :: (parser: *Parser) -> (string, Storage_Class) {
     types: [..]string;
-    storage_classes: [..]Storage_Class_Ast;
-    
+    storage_classes: [..]Storage_Class;
+
     while (true) {
         using token := peek(parser);
         if type == {
@@ -144,15 +144,15 @@ parse_type_and_storage_class_for_decl :: (parser: *Parser) -> (string, Storage_C
     }
     if types.count != 1 parse_err(parser, "decl can only have one type. Found `%`", types);
     if storage_classes.count > 1 parse_err(parser, "decl can only have one storage class found `%`", storage_classes);
-    
-    return types[0], 
+
+    return types[0],
            ifx storage_classes.count == 0 then .NONE else storage_classes[0];
 }
 
-parse_decl :: (parser: *Parser, only_fn_decl: bool) -> *Decl_Ast {
+parse_decl :: (parser: *Parser, only_fn_decl: bool) -> *Decl {
     if is_fn_decl(parser) {
         fn_decl_ast := parse_fn_decl(parser, only_decl = only_fn_decl);
-        return decl_fn_new(fn_decl_ast);
+        return Fn_Decl.as_decl(fn_decl_ast);
     }
     _, storage_class := parse_type_and_storage_class_for_decl(parser);
     using ident_tok := consume(parser);
@@ -164,111 +164,119 @@ parse_decl :: (parser: *Parser, only_fn_decl: bool) -> *Decl_Ast {
         expr = parse_expr(parser, 0);
     }
     consume(parser, .SEMICOLON);
-    return decl_var_new(value, expr, storage_class, line, start);
+    return Var_Decl.new(value, expr, storage_class, line, start);
 }
 
-parse_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_stmt :: (parser: *Parser) -> *Stmt {
     if peek(parser).type == {
         case .LCURLY;
             body := parse_block(parser);
-            return stmt_compound_new(body);
+            return Stmt_Compound.new(body);
         case .BREAK;
             using break_tok := consume(parser);
-            stmt := stmt_break_new(line, start);
+            stmt := Stmt_Break.new(line, start);
             consume(parser, .SEMICOLON);
             return stmt;
         case .CONTINUE;
             using continue_tok := consume(parser);
             consume(parser, .SEMICOLON);
-            return stmt_continue_new(line, start);
-        case .WHILE; 
+            return Stmt_Continue.new(line, start);
+        case .WHILE;
             return parse_while_stmt(parser) ;
-        case .DO; 
+        case .DO;
             return parse_do_while_stmt(parser);
-        case .FOR; 
+        case .FOR;
             return parse_for_stmt(parser);
-        case .RETURN; 
+        case .RETURN;
             return parse_return_stmt(parser);
-        case .IF; 
+        case .IF;
             return parse_if_stmt(parser);
-        case .SWITCH; 
+        case .SWITCH;
             return parse_switch_stmt(parser);
         case .CASE;
             consume(parser, .CASE);
             using token := consume(parser, .INT_LITERAL);
             consume(parser, .COLON);
-            return stmt_case_new(value, line, start);
+            return Stmt_Case.new(value, line, start);
         case .DEFAULT;
             using token := consume(parser, .DEFAULT);
             consume(parser, .COLON);
-            return stmt_default_new(line, start);
+            return Stmt_Default.new(line, start);
         case .GOTO;
             consume(parser, .GOTO);
             using token := consume(parser, .IDENT);
             consume(parser, .SEMICOLON);
-            return stmt_goto_new(value, line, start);
+            return Stmt_Goto.new(value, line, start);
         case .SEMICOLON;
             using null_tok := consume(parser, .SEMICOLON);
-            return stmt_null_new(line, start);
+            return Stmt_Null.new(line, start);
     }
     // .LABEL;
     if peek(parser).type == .IDENT && peek(parser, 1).type == .COLON {
         using token := consume(parser, .IDENT);
         consume(parser, .COLON);
         label_stmt := parse_stmt(parser);
-        return stmt_label_new(value, label_stmt, line, start);
+        return Stmt_Label.new(value, label_stmt, line, start);
     }
     using expr := parse_expr(parser, 0);
     consume(parser, .SEMICOLON);
-    return stmt_expr_new(expr, line, start);
+    return Stmt_Expr.new(expr, line, start);
 }
 
-parse_switch_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_switch_stmt :: (parser: *Parser) -> *Stmt {
     switch_tok := consume(parser, .SWITCH);
     consume(parser, .LPAREN);
 
     condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
 
-    body: [..]*Block_Item_Ast;
+    body: [..]*Block_Item;
     if peek(parser).type == .LCURLY {
         consume(parser, .LCURLY);
-        
+
         case_found := false;
         while peek(parser).type != .RCURLY {
             peeked_token := peek(parser);
             item := parse_block_item(parser);
-            if item.type == .STMT && (item.block_item_stmt.type == .CASE || item.block_item_stmt.type == .DEFAULT) {
-                case_found = true;
+            if item.kind == .STMT {
+                item_stmt := cast(*Block_Item_Stmt) item;
+                if item_stmt.stmt.kind == .CASE || item_stmt.stmt.kind == .DEFAULT {
+                    case_found = true;
+                }
             }
-            
-            if case_found && item.type == .DECL {
-                if !is_static_decl(item.block_item_decl) {
+
+            if case_found && item.kind == .DECL {
+                item_decl := cast(*Block_Item_Decl) item;
+                if !is_static_decl(item_decl.decl) {
                     parse_err(parser, peeked_token, "switch case should not have decl");
                 }
             }
             array_add(*body, item);
         }
         consume(parser, .RCURLY);
-        return stmt_switch_new(condition, body, switch_tok.line, switch_tok.start);
+        return Stmt_Switch.new(condition, body, switch_tok.line, switch_tok.start);
     }
     // if switch doesn't have block `{}` then it might have one case stmt
     block_item := parse_block_item(parser);
     array_add(*body, block_item);
-    
-    if block_item.type == .STMT && block_item.block_item_stmt.type  == .CASE {
-        case_stmt := parse_block_item(parser);
-        array_add(*body, case_stmt);
+
+    if block_item.kind == .STMT {
+        item_stmt := cast(*Block_Item_Stmt) block_item;
+        if item_stmt.stmt.kind == .CASE {
+            case_stmt := parse_block_item(parser);
+            array_add(*body, case_stmt);
+        }
     }
-    return stmt_switch_new(condition, body, switch_tok.line, switch_tok.start);
+    return Stmt_Switch.new(condition, body, switch_tok.line, switch_tok.start);
 }
 
-is_static_decl :: (decl: Decl_Ast) -> bool {
-    if decl.type != .VAR return false;
-    return decl.decl_var.storage_class == .EXTERN || decl.decl_var.storage_class == .STATIC;
+is_static_decl :: (decl: Decl) -> bool {
+    if decl.kind != .VAR return false;
+    var_decl := cast(*Var_Decl) *decl;
+    return var_decl.storage_class == .EXTERN || var_decl.storage_class == .STATIC;
 }
 
-parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_while_stmt :: (parser: *Parser) -> *Stmt {
     using while_token := consume(parser, .WHILE);
 
     consume(parser, .LPAREN);
@@ -276,45 +284,45 @@ parse_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
     consume(parser, .RPAREN);
 
     body := parse_stmt(parser);
-    return stmt_while_new(condition, body, line, start);
+    return Stmt_While.new(condition, body, line, start);
 }
 
-parse_do_while_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_do_while_stmt :: (parser: *Parser) -> *Stmt {
     using do_token := consume(parser, .DO);
     body := parse_stmt(parser);
 
     consume(parser, .WHILE);
-    
+
     consume(parser, .LPAREN);
     condition := parse_expr(parser, 0);
     consume(parser, .RPAREN);
-    
+
     consume(parser, .SEMICOLON);
 
-    return stmt_do_while_new(body, condition, line, start);
+    return Stmt_Do_While.new(body, condition, line, start);
 }
 
-parse_for_init :: (parser: *Parser) -> *For_Init_Ast {
+parse_for_init :: (parser: *Parser) -> *For_Init {
     peek_token := peek(parser);
     if is_decl(parser) {
         decl := parse_decl(parser, only_fn_decl = true);
-        if decl.type != .VAR {
-            parse_err(parser, peek_token, "Expected variable declaration in for loop init, found %", decl.type);
+        if decl.kind != .VAR {
+            parse_err(parser, peek_token, "Expected variable declaration in for loop init, found %", decl.kind);
             return null;
         }
-        return for_init_decl_new(decl);
+        return For_Init_Decl.new(decl);
     }
 
     expr := parse_optional_expr(parser, 0);
-    return for_init_expr_new(expr);
+    return For_Init_Expr.new(expr);
 }
 
-parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_for_stmt :: (parser: *Parser) -> *Stmt {
     for_tok := consume(parser, .FOR);
     consume(parser, .LPAREN);
 
     for_init := parse_for_init(parser);
-    if for_init.type == .EXPR consume(parser, .SEMICOLON);
+    if for_init.kind == .EXPR consume(parser, .SEMICOLON);
 
     condition := parse_optional_expr(parser, 0);
     consume(parser, .SEMICOLON);
@@ -326,10 +334,10 @@ parse_for_stmt :: (parser: *Parser) -> *Stmt_Ast {
 
     body := parse_stmt(parser);
 
-    return stmt_for_new(for_init, condition, post, body, for_tok.line, for_tok.start);
+    return Stmt_For.new(for_init, condition, post, body, for_tok.line, for_tok.start);
 }
 
-parse_if_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_if_stmt :: (parser: *Parser) -> *Stmt {
     using if_tok := consume(parser, .IF);
     consume(parser, .LPAREN);
     condition := parse_expr(parser, 0);
@@ -341,24 +349,24 @@ parse_if_stmt :: (parser: *Parser) -> *Stmt_Ast {
     if peek(parser).type == .ELSE {
         consume(parser, .ELSE);
         else_block = parse_stmt(parser);
-    } 
+    }
 
-    return stmt_if_new(condition, if_block, else_block, line, start);
+    return Stmt_If.new(condition, if_block, else_block, line, start);
 }
 
-parse_return_stmt :: (parser: *Parser) -> *Stmt_Ast {
+parse_return_stmt :: (parser: *Parser) -> *Stmt {
     using ret_tok := consume(parser, .RETURN);
     expr := parse_expr(parser, 0);
     consume(parser, .SEMICOLON);
-    return stmt_return_new(expr, line, start);
+    return Stmt_Return.new(expr, line, start);
 }
 
-parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr_Ast {
+parse_optional_expr :: (parser: *Parser, min_prec: int) -> *Expr {
     if peek(parser).type == .SEMICOLON return null;
     return parse_expr(parser, min_prec);
 }
 
-parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
+parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr {
     left := parse_factor(parser);
     next_token := peek(parser);
 
@@ -366,7 +374,7 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
         if next_token.type == .ASSIGN {
             assign_tok := consume(parser);
             right := parse_expr(parser, precedence(parser, next_token.type));
-            assignment := expr_assignment_new(left, right, assign_tok.line, assign_tok.start);
+            assignment := Expr_Assignment.new(left, right, assign_tok.line, assign_tok.start);
             left = assignment;
         } else if is_compound_assignment_operator(next_token.type) {
             op_tok := consume(parser);
@@ -376,10 +384,10 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
             // @note
             // cloning here because on sema phase we replace variable identifier
             // if we use same pointer, it will look for updated name on our map which is wrong
-            left_clone := New(Expr_Ast, left.*);
+            left_clone := expr_clone(left);
 
-            binary := expr_binary_new(op, left_clone, right, op_tok.line, op_tok.start);
-            assignment := expr_assignment_new(left, binary, op_tok.line, op_tok.start);
+            binary := Expr_Binary.new(op, left_clone, right, op_tok.line, op_tok.start);
+            assignment := Expr_Assignment.new(left, binary, op_tok.line, op_tok.start);
 
             left = assignment;
         } else if next_token.type == .QUESTION_MARK {
@@ -387,13 +395,13 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
             true_block := parse_expr(parser, 0);
             consume(parser, .COLON);
             false_block := parse_expr(parser, precedence(parser, next_token.type));
-            conditional := expr_ternary_new(left, true_block, false_block, q_tok.line, q_tok.start);
+            conditional := Expr_Ternary.new(left, true_block, false_block, q_tok.line, q_tok.start);
             left = conditional;
         } else {
             op_tok := consume(parser);
             op := parse_binary_op(parser, op_tok.type);
             right := parse_expr(parser, precedence(parser, next_token.type) + 1);
-            binary := expr_binary_new(op, left, right, op_tok.line, op_tok.start);
+            binary := Expr_Binary.new(op, left, right, op_tok.line, op_tok.start);
             left = binary;
         }
         next_token = peek(parser);
@@ -401,51 +409,51 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr_Ast {
     return left;
 }
 
-parse_factor :: (parser: *Parser) -> *Expr_Ast {
+parse_factor :: (parser: *Parser) -> *Expr {
     if peek(parser).*.type ==  {
         case .INT_LITERAL;
             int_literal := consume(parser, .INT_LITERAL);
             int_value, success := string_to_int(int_literal.value);
             if !success  parse_err(parser, "expected int found %", int_literal.value);
-            return expr_constant_new(int_value, int_literal.line , int_literal.start);
+            return Expr_Constant.new(int_value, int_literal.line , int_literal.start);
         case .MINUS; #through;
         case .NOT; #through;
         case .BITWISE_NOT;
             op_tok := consume(parser);
             op := parse_unary_op(parser, op_tok.type);
             inner_expr := parse_factor(parser);
-            expr := expr_unary_new(op, inner_expr, op_tok.line, op_tok.start);
+            expr := Expr_Unary.new(op, inner_expr, op_tok.line, op_tok.start);
             return expr;
         case .MINUS_MINUS; #through;
         case .PLUS_PLUS;
             prefix_op_token := consume(parser);
             inner_expr := parse_factor(parser);
-            op: Prefix_Operator = ---; 
+            op: Prefix_Operator = ---;
             if prefix_op_token.type == {
                 case .MINUS_MINUS; op = .SUBTRACT;
                 case .PLUS_PLUS;   op = .ADD;
                 case; unreachable("** compiler bug ** only incr/decr operator support in this path");
             }
-            return expr_prefix_new(op, inner_expr, prefix_op_token.line, prefix_op_token.start);
+            return Expr_Prefix.new(op, inner_expr, prefix_op_token.line, prefix_op_token.start);
         case .LPAREN;
             grp_start_tok := consume(parser, .LPAREN);
             inner_expr := parse_expr(parser, 0);
-            expr := expr_group_new(inner_expr, grp_start_tok.line, grp_start_tok.start);
+            expr := Expr_Group.new(inner_expr, grp_start_tok.line, grp_start_tok.start);
             consume(parser, .RPAREN);
             return parse_postfix_expr_ast(parser, expr);
         case .IDENT;
             using ident := consume(parser);
             expr := ifx peek(parser).*.type != .LPAREN
-                          expr_var_new(value, line, start)
-                    else  expr_fn_call_new(value, parse_args_expr(parser), line, start);
+                          Expr_Var.new(value, line, start)
+                    else  Expr_Fn_Call.new(value, parse_args_expr(parser), line, start);
             return parse_postfix_expr_ast(parser, expr);
     }
     parse_err(parser, "This expression is not something I can handle. Duh!! %", print_vars(peek(parser).*));
     return null;
 }
 
-parse_args_expr :: (parser: *Parser) -> [..]*Expr_Ast {
-    args: [..]*Expr_Ast;
+parse_args_expr :: (parser: *Parser) -> [..]*Expr {
+    args: [..]*Expr;
     consume(parser, .LPAREN);
     while peek(parser).type != .RPAREN {
         expr := parse_expr(parser, 0);
@@ -461,17 +469,17 @@ parse_args_expr :: (parser: *Parser) -> [..]*Expr_Ast {
     return args;
 }
 
-parse_postfix_expr_ast :: (parser: *Parser, inner_expr: *Expr_Ast) -> *Expr_Ast {
+parse_postfix_expr_ast :: (parser: *Parser, inner_expr: *Expr) -> *Expr {
     if peek(parser).type != .MINUS_MINUS && peek(parser).type != .PLUS_PLUS return inner_expr;
-    
+
     using postfix_op_token := consume(parser);
-    op: Postfix_Operator = ---; 
+    op: Postfix_Operator = ---;
     if type == {
         case .MINUS_MINUS; op = .SUBTRACT;
         case .PLUS_PLUS;   op = .ADD;
         case; unreachable("** compiler bug ** only incr/decr operator support in this path");
     }
-    return expr_postfix_new(op, inner_expr, line, start);
+    return Expr_Postfix.new(op, inner_expr, line, start);
 }
 
 is_compound_assignment_operator :: (token_type: Token_Type) -> bool {
@@ -595,7 +603,48 @@ precedence :: (parser: *Parser, token_type: Token_Type) -> int {
     return 0;
 }
 
-parse_unary_op :: (parser: *Parser, token_type: Token_Type) -> type_of(Expr_Ast.expr_unary.op) {
+expr_clone :: (expr: *Expr) -> *Expr {
+    if expr.kind == {
+        case .VAR;
+            expr_var := cast(*Expr_Var) expr;
+            return Expr_Var.new(expr_var.ident, expr_var.line, expr_var.start);
+        case .CONSTANT;
+            expr_constant := cast(*Expr_Constant) expr;
+            return Expr_Constant.new(expr_constant.value, expr_constant.line, expr_constant.start);
+        case .UNARY;
+            expr_unary := cast(*Expr_Unary) expr;
+            return Expr_Unary.new(expr_unary.op, expr_clone(expr_unary.expr), expr_unary.line, expr_unary.start);
+        case .BINARY;
+            expr_binary := cast(*Expr_Binary) expr;
+            return Expr_Binary.new(expr_binary.op, expr_clone(expr_binary.left), expr_clone(expr_binary.right), expr_binary.line, expr_binary.start);
+        case .GROUP;
+            expr_group := cast(*Expr_Group) expr;
+            return Expr_Group.new(expr_clone(expr_group.expr), expr_group.line, expr_group.start);
+        case .POSTFIX;
+            expr_postfix := cast(*Expr_Postfix) expr;
+            return Expr_Postfix.new(expr_postfix.op, expr_clone(expr_postfix.expr), expr_postfix.line, expr_postfix.start);
+        case .PREFIX;
+            expr_prefix := cast(*Expr_Prefix) expr;
+            return Expr_Prefix.new(expr_prefix.op, expr_clone(expr_prefix.expr), expr_prefix.line, expr_prefix.start);
+        case .ASSIGNMENT;
+            expr_assignment := cast(*Expr_Assignment) expr;
+            return Expr_Assignment.new(expr_clone(expr_assignment.dst), expr_clone(expr_assignment.src), expr_assignment.line, expr_assignment.start);
+        case .TERNARY;
+            expr_ternary := cast(*Expr_Ternary) expr;
+            return Expr_Ternary.new(expr_clone(expr_ternary.condition), expr_clone(expr_ternary.true_expr), expr_clone(expr_ternary.false_expr), expr_ternary.line, expr_ternary.start);
+        case .FN_CALL;
+            expr_fn_call := cast(*Expr_Fn_Call) expr;
+            cloned_args: [..]*Expr;
+            for expr_fn_call.args {
+                array_add(*cloned_args, expr_clone(it));
+            }
+            return Expr_Fn_Call.new(expr_fn_call.ident, cloned_args, expr_fn_call.line, expr_fn_call.start);
+    }
+    assert(false, "Unhandled expression type in clone");
+    return null;
+}
+
+parse_unary_op :: (parser: *Parser, token_type: Token_Type) -> Unary_Operator {
     if token_type == {
         case .BITWISE_NOT; return .BITWISE_NOT;
         case .MINUS;       return .NEGATE;
@@ -681,3 +730,4 @@ is_at_end :: (using parser: *Parser, offset: int = 0) -> bool {
 
 #scope_file
 #import "Print_Vars";
+using Ast;

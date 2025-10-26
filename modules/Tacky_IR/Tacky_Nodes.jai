@@ -1,101 +1,259 @@
-Program_Tacky :: struct {
-    items: [..]Top_Level_Tacky;
-}
+Tacky :: struct {
+    Instruction_Kind :: enum {
+        BINARY;
+        COPY;
+        FN_CALL;
+        JUMP;
+        JUMP_IF_NOT_ZERO;
+        JUMP_IF_ZERO;
+        LABEL;
+        RETURN;
+        UNARY;
+    }
 
-Top_Level_Tacky :: struct {
-    kind:       enum {FN; STATIC_VAR;};
-    using as: union {
-        top_level_fn: Fn_Tacky;
-        top_level_static_var: Static_Var_Tacky;
-    };
-}
+    Unary_Op :: enum {
+        BITWISE_NOT;
+        NEGATE;
+        NOT;
+    }
 
-Static_Var_Tacky :: struct {
-    ident:  string;
-    global: bool;
-    init:   int;
-}
+    Bin_Op :: enum {
+        ADD;
+        BITWISE_AND;
+        BITWISE_OR;
+        BITWISE_XOR;
+        DIV;
+        EQUAL_EQUAL;
+        GREATER;
+        GREATER_EQUAL;
+        LEFT_SHIFT;
+        LESS;
+        LESS_EQUAL;
+        MOD;
+        MUL;
+        NOT_EQUAL;
+        RIGHT_SHIFT;
+        SUB;
+    }
 
-Fn_Tacky :: struct {
-    ident:        string;
-    global:       bool;
-    instructions: []Instruction_Tacky;
-}
+    Val_Kind :: enum {
+        CONSTANT;
+        VARIABLE;
+    }
 
-Instruction_Type_Tacky :: enum {
-    BINARY;
-    COPY;
-    FN_CALL;
-    JUMP;
-    JUMP_IF_NOT_ZERO;
-    JUMP_IF_ZERO;
-    LABEL;
-    RETURN; 
-    UNARY; 
-}
+    Top_Level_Kind :: enum {
+        FN;
+        STATIC_VAR;
+    }
 
-Instruction_Tacky :: struct {
-    type  : Instruction_Type_Tacky;
-    as    : union {
-        binary            : struct { op: Bin_Op_Type_Tacky; src1: Val_Tacky; src2: Val_Tacky; dst: Val_Tacky; };
-        copy              : struct { src: Val_Tacky; dst: Val_Tacky; };
-        fn_call           : struct { ident: string; args: [..]Val_Tacky; dst: Val_Tacky; };
-        jump              : string;
-        jump_if_not_zero  : struct { condition: Val_Tacky; ident: string; };
-        jump_if_zero      : struct { condition: Val_Tacky; ident: string; };
-        label             : string;
-        ret               : Val_Tacky;
-        unary             : struct { op: Unary_Op_Type_Tacky; src: Val_Tacky; dst: Val_Tacky; };
-    };
-}
+    Val :: struct {
+        kind: Val_Kind;
+    }
 
-Unary_Op_Type_Tacky :: enum {
-  BITWISE_NOT; 
-  NEGATE; 
-  NOT;
-}
+    Val_Constant :: struct {
+        #as using base: Val;
+        kind = Val_Kind.CONSTANT;
+        constant: int;
 
-Bin_Op_Type_Tacky :: enum {
-    ADD;
-    BITWISE_AND;
-    BITWISE_OR;
-    BITWISE_XOR;
-    DIV;
-    EQUAL_EQUAL; 
-    GREATER; 
-    GREATER_EQUAL;
-    LEFT_SHIFT;
-    LESS; 
-    LESS_EQUAL;
-    MOD;
-    MUL;
-    NOT_EQUAL;
-    RIGHT_SHIFT;
-    SUB;
-}
+        new :: (value: int) -> *Val_Constant {
+            v := New(Val_Constant);
+            v.constant = value;
+            return v;
+        }
+    }
 
-Val_Tacky :: struct {
-    type : enum { 
-        CONSTANT; 
-        VARIABLE; 
-    };
-    using as : union {
-        constant : int;
-        variable : string;
-    };
+    Val_Variable :: struct {
+        #as using base: Val;
+        kind = Val_Kind.VARIABLE;
+        variable: string;
+
+        new :: (ident: string) -> *Val_Variable {
+            v := New(Val_Variable);
+            v.variable = copy_string(ident);
+            return v;
+        }
+    }
+
+    Instruction :: struct {
+        kind: Instruction_Kind;
+    }
+
+    Instruction_Binary :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.BINARY;
+        op: Bin_Op;
+        src1: *Val;
+        src2: *Val;
+        dst: *Val;
+
+        new :: (op: Bin_Op, src1: *Val, src2: *Val, dst: *Val) -> *Instruction_Binary {
+            i := New(Instruction_Binary);
+            i.op = op;
+            i.src1 = src1;
+            i.src2 = src2;
+            i.dst = dst;
+            return i;
+        }
+    }
+
+    Instruction_Copy :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.COPY;
+        src: *Val;
+        dst: *Val;
+
+        new :: (src: *Val, dst: *Val) -> *Instruction_Copy {
+            i := New(Instruction_Copy);
+            i.src = src;
+            i.dst = dst;
+            return i;
+        }
+    }
+
+    Instruction_Fn_Call :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.FN_CALL;
+        ident: string;
+        args: [..]*Val;
+        dst: *Val;
+
+        new :: (ident: string, args: [..]*Val, dst: *Val) -> *Instruction_Fn_Call {
+            i := New(Instruction_Fn_Call);
+            i.ident = copy_string(ident);
+            i.args = args;
+            i.dst = dst;
+            return i;
+        }
+    }
+
+    Instruction_Jump :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.JUMP;
+        target: string;
+
+        new :: (target: string) -> *Instruction_Jump {
+            i := New(Instruction_Jump);
+            i.target = copy_string(target);
+            return i;
+        }
+    }
+
+    Instruction_Jump_If_Not_Zero :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.JUMP_IF_NOT_ZERO;
+        condition: *Val;
+        target: string;
+
+        new :: (condition: *Val, target: string) -> *Instruction_Jump_If_Not_Zero {
+            i := New(Instruction_Jump_If_Not_Zero);
+            i.condition = condition;
+            i.target = copy_string(target);
+            return i;
+        }
+    }
+
+    Instruction_Jump_If_Zero :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.JUMP_IF_ZERO;
+        condition: *Val;
+        target: string;
+
+        new :: (condition: *Val, target: string) -> *Instruction_Jump_If_Zero {
+            i := New(Instruction_Jump_If_Zero);
+            i.condition = condition;
+            i.target = copy_string(target);
+            return i;
+        }
+    }
+
+    Instruction_Label :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.LABEL;
+        name: string;
+
+        new :: (name: string) -> *Instruction_Label {
+            i := New(Instruction_Label);
+            i.name = copy_string(name);
+            return i;
+        }
+    }
+
+    Instruction_Return :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.RETURN;
+        val: *Val;
+
+        new :: (val: *Val) -> *Instruction_Return {
+            i := New(Instruction_Return);
+            i.val = val;
+            return i;
+        }
+    }
+
+    Instruction_Unary :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.UNARY;
+        op: Unary_Op;
+        src: *Val;
+        dst: *Val;
+
+        new :: (op: Unary_Op, src: *Val, dst: *Val) -> *Instruction_Unary {
+            i := New(Instruction_Unary);
+            i.op = op;
+            i.src = src;
+            i.dst = dst;
+            return i;
+        }
+    }
+
+    Top_Level :: struct {
+        kind: Top_Level_Kind;
+    }
+
+    Top_Level_Fn :: struct {
+        #as using base: Top_Level;
+        kind = Top_Level_Kind.FN;
+        ident: string;
+        global: bool;
+        instructions: [..]*Instruction;
+
+        new :: (ident: string, global: bool, instructions: [..]*Instruction) -> *Top_Level_Fn {
+            fn := New(Top_Level_Fn);
+            fn.ident = copy_string(ident);
+            fn.global = global;
+            fn.instructions = instructions;
+            return fn;
+        }
+    }
+
+    Top_Level_Static_Var :: struct {
+        #as using base: Top_Level;
+        kind = Top_Level_Kind.STATIC_VAR;
+        ident: string;
+        global: bool;
+        init: int;
+
+        new :: (ident: string, global: bool, init: int) -> *Top_Level_Static_Var {
+            sv := New(Top_Level_Static_Var);
+            sv.ident = copy_string(ident);
+            sv.global = global;
+            sv.init = init;
+            return sv;
+        }
+    }
+
+    Program :: struct {
+        items: [..]*Top_Level;
+
+        new :: (items: [..]*Top_Level) -> *Program {
+            pg := New(Program);
+            pg.items = items;
+            return pg;
+        }
+    }
 }
 
 Tacky_Ctx :: struct {
     temp_var_index  : int = 0;
     label_index     : int = 0;
-}
-
-#scope_module
-
-top_level_fn_tac :: (fn: Fn_Tacky) -> Top_Level_Tacky {
-    return .{ kind = .FN, as = .{ top_level_fn = fn } };
-}
-
-top_level_static_var_tac :: (sv: Static_Var_Tacky) -> Top_Level_Tacky {
-    return .{ kind = .STATIC_VAR, as = .{ top_level_static_var = sv } };
 }

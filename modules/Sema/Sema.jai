@@ -1,4 +1,4 @@
-sema :: (ast: *Program_Ast, st: *Symbol_Table, erp: *Error_Reporter, debug_log: bool = false) {
+sema :: (ast: *Ast.Program, st: *Symbol_Table, erp: *Error_Reporter, debug_log: bool = false) {
     sema_ident_resolution(ast, erp);
     sema_label_resolution(ast, erp);
     sema_loop_labeling(ast, erp);

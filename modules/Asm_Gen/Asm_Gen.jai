@@ -1,4 +1,4 @@
-asm_gen :: (pgt: *Program_Tacky, st: *Symbol_Table, $debug_log: bool = false) -> *Program_Asm {
+asm_gen :: (pgt: *Tacky.Program, st: *Symbol_Table, $debug_log: bool = false) -> *Program {
     program_asm := map_to_asm(pgt, st);
     if debug_log print_asm(*stdout_writer_new(), program_asm, 1);
     

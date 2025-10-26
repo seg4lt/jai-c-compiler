@@ -2,7 +2,6 @@
 out/
 jails.json
 
-.zig-cache/
-zig-out
 .DS_Store
 .idea/
+*.bak*

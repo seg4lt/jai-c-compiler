@@ -1,35 +1,37 @@
-gen_tacky :: (pg: *Program_Ast, st: *Symbol_Table, debug_log: bool = false) -> *Program_Tacky {
+gen_tacky :: (pg: *Ast.Program, st: *Symbol_Table, debug_log: bool = false) -> *Program {
     tc : Tacky_Ctx;
-    
-    top_level_tac: [..]Top_Level_Tacky;
-    for *decl: pg.decls {
-        using decl.*;
-        if #complete type == {
-            case .FN; if decl_fn.block {
-                fn := gen_fn_tacky(*tc, decl_fn, st);
-                array_add(*top_level_tac, top_level_fn_tac(fn));
-            }
+
+    top_level_tac: [..]*Top_Level;
+    for decl: pg.decls {
+        if #complete decl.kind == {
+            case .FN;
+                fn_decl := cast(*Ast.Fn_Decl) decl;
+                if fn_decl.body {
+                    fn := gen_fn_tacky(*tc, fn_decl, st);
+                    array_add(*top_level_tac, fn);
+                }
             case .VAR; // noop - handled differently
         }
     }
-    
+
     for value, key: st {
         if #complete value.attr.kind == {
             case .STATIC;
-                sv := value.attr.static;
+                sv := cast(*Symbol_Table.Ident_Attr_Static) value.attr;
                 if #complete sv.initial_value.kind == {
-                    case .INITIAL; 
-                        array_add(*top_level_tac, top_level_static_var_tac(.{key, sv.global, sv.initial_value.initial}));
-                    case .TENTATIVE; 
-                        array_add(*top_level_tac, top_level_static_var_tac(.{key, sv.global, 0}));
+                    case .INITIAL;
+                        init_val := cast(*Symbol_Table.Ident_Initial_Value_Initial) sv.initial_value;
+                        array_add(*top_level_tac, Top_Level_Static_Var.new(key, sv.global, init_val.value));
+                    case .TENTATIVE;
+                        array_add(*top_level_tac, Top_Level_Static_Var.new(key, sv.global, 0));
                     case .NO_INITIALIZER; // noop
                 }
             case .FN;    #through;
             case .LOCAL; // noop
         }
     }
-    
-    program := New(Program_Tacky, .{ top_level_tac });
+
+    program := Program.new(top_level_tac);
 
     if debug_log print_tacky(program, *stdout_writer_new());
     return program;
@@ -37,112 +39,132 @@ gen_tacky :: (pg: *Program_Ast, st: *Symbol_Table, debug_log: bool = false) -> *
 
 #scope_file
 
-gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Fn_Decl_Ast, st: *Symbol_Table) -> Fn_Tacky {
-    instructions: [..]Instruction_Tacky;
-    if fn_ast.block  {
-        gen_instructions(tc, *instructions, fn_ast.block, st);
+gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Ast.Fn_Decl, st: *Symbol_Table) -> *Top_Level_Fn {
+    instructions: [..]*Instruction;
+    if fn_ast.body  {
+        gen_instructions(tc, *instructions, fn_ast.body, st);
         // Always add return 0 as there might be case where we don't have one
         // Potentially we can optimize this away later.
         array_add(*instructions, ret(constant(0)));
     }
-    found_symbol, symbol := table_find_new(st, fn_ast.ident);
+    found_symbol, symbol := table_find(st, fn_ast.ident);
     assert(found_symbol, "Something went wrong.. fn symbol not found on table");
     assert(symbol.attr.kind == .FN, "Symbol should be fn kind");
-    return .{ copy_string(fn_ast.ident), symbol.attr.fn.global, instructions };
+    attr_fn := cast(*Symbol_Table.Ident_Attr_Fn) symbol.attr;
+    return Top_Level_Fn.new(fn_ast.ident, attr_fn.global, instructions);
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_ast: *Block_Ast, st: *Symbol_Table) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, block_ast: *Ast.Block, st: *Symbol_Table) {
     gen_instructions(tc, instructions, block_ast.items, st);
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, block_item_ast: [..]*Block_Item_Ast, st: *Symbol_Table) {
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, block_item_ast: [..]*Ast.Block_Item, st: *Symbol_Table) {
     for block_item_ast  {
-        using it;
-        if #complete type == {
-            case .STMT; gen_instructions(tc, instructions, block_item_stmt, st);
-            case .DECL; gen_instructions_decl(tc, instructions, block_item_decl);
+        if #complete it.kind == {
+            case .STMT;
+                item_stmt := cast(*Ast.Block_Item_Stmt) it;
+                gen_instructions(tc, instructions, item_stmt.stmt, st);
+            case .DECL;
+                item_decl := cast(*Ast.Block_Item_Decl) it;
+                gen_instructions_decl(tc, instructions, item_decl.decl);
         }
     }
 }
 
-gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using decl_ast: *Decl_Ast) {
-    if #complete type == {
+gen_instructions_decl :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, decl_ast: *Ast.Decl) {
+    if #complete decl_ast.kind == {
         case .VAR;
+            decl_var := cast(*Ast.Var_Decl) decl_ast;
             // if we only have declaration without any initializer, we can skip it as it has already fulfilled its purpose
             if (decl_var.init == null)  return;
-            
+
             // Static variables are initialized in the data section, not in function body
             if (decl_var.storage_class == .STATIC)  return;
-            
+
             result := gen_expr(tc, instructions, decl_var.init);
             dst := variable(decl_var.ident);
             array_add(instructions, copy(result, dst));
         case .FN;
-            if decl_fn.block != null assert(false, "Hmm.. this should not have happened - fn decl can't have body.");
+            decl_fn := cast(*Ast.Fn_Decl) decl_ast;
+            if decl_fn.body != null assert(false, "Hmm.. this should not have happened - fn decl can't have body.");
     }
 }
 
-gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using stmt_ast: *Stmt_Ast, st: *Symbol_Table) {
-    if #complete type == {
-        case .DEFAULT; 
-            array_add(instructions, label(stmt_default));
+gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, stmt_ast: *Ast.Stmt, st: *Symbol_Table) {
+    if #complete stmt_ast.kind == {
+        case .DEFAULT;
+            stmt_default := cast(*Ast.Stmt_Default) stmt_ast;
+            array_add(instructions, label(stmt_default.label));
         case .CASE;
+            stmt_case := cast(*Ast.Stmt_Case) stmt_ast;
             array_add(instructions, label(stmt_case.label));
         case .RETURN;
+            stmt_return := cast(*Ast.Stmt_Return) stmt_ast;
             src := gen_expr(tc, instructions, stmt_return.expr);
             array_add(instructions, ret(src));
-        case .SWITCH; 
+        case .SWITCH;
+            stmt_switch := cast(*Ast.Stmt_Switch) stmt_ast;
             gen_stmt_switch(tc, instructions, stmt_switch, st);
-        case .EXPR; 
-            if stmt_expr.type == .VAR  {
-                success, ident := table_find_new(st, stmt_expr.expr_var);
+        case .EXPR;
+            stmt_expr := cast(*Ast.Stmt_Expr) stmt_ast;
+            if stmt_expr.expr.kind == .VAR  {
+                expr_var := cast(*Ast.Expr_Var) stmt_expr.expr;
+                success, ident := table_find(st, expr_var.ident);
                 if success {
                     if ident.attr.kind == .STATIC {
                         return;
                     }
                 }
             }
-            gen_expr(tc, instructions, stmt_expr);
+            gen_expr(tc, instructions, stmt_expr.expr);
         case .IF;
+            stmt_if := cast(*Ast.Stmt_If) stmt_ast;
             if stmt_if.else_block == null {
                 if_end_label := make_label(tc, "if_end");
                 condition := gen_expr(tc, instructions, stmt_if.condition);
-                array_add(instructions, jump_if_zero(condition, if_end_label.as.label));
+                array_add(instructions, jump_if_zero(condition, if_end_label));
                 gen_instructions(tc, instructions, stmt_if.if_block, st);
-                array_add(instructions, if_end_label);
+                array_add(instructions, label(if_end_label));
             } else {
                 if_end_label := make_label(tc, "if_end");
                 else_label := make_label(tc, "else");
 
                 condition := gen_expr(tc, instructions, stmt_if.condition);
 
-                array_add(instructions, jump_if_zero(condition, else_label.as.label));
+                array_add(instructions, jump_if_zero(condition, else_label));
 
                 gen_instructions(tc, instructions, stmt_if.if_block, st);
-                array_add(instructions, jump(if_end_label.as.label));
+                array_add(instructions, jump(if_end_label));
 
-                array_add(instructions, else_label);
+                array_add(instructions, label(else_label));
                 gen_instructions(tc, instructions, stmt_if.else_block, st);
 
-                array_add(instructions, if_end_label);
+                array_add(instructions, label(if_end_label));
             }
         case .LABEL;
+            stmt_label := cast(*Ast.Stmt_Label) stmt_ast;
             goto_label := label(stmt_label.label);
             array_add(instructions, goto_label);
             gen_instructions(tc, instructions, stmt_label.stmt, st);
         case .GOTO;
-            array_add(instructions, jump(stmt_goto));
+            stmt_goto := cast(*Ast.Stmt_Goto) stmt_ast;
+            array_add(instructions, jump(stmt_goto.label));
         case .COMPOUND;
-            gen_instructions(tc, instructions, stmt_compound, st);
+            stmt_compound := cast(*Ast.Stmt_Compound) stmt_ast;
+            gen_instructions(tc, instructions, stmt_compound.block, st);
         case .FOR;
+            stmt_for := cast(*Ast.Stmt_For) stmt_ast;
             loop_start_label     := sprint("%_start", stmt_for.label);
             loop_post_expr_label := sprint("%_post_expr", stmt_for.label);
             loop_end_label       := sprint("%_end", stmt_for.label);
 
-            using stmt_for.init;
-            if #complete stmt_for.init.type == {
-                case .DECL; gen_instructions_decl(tc, instructions, for_init_decl);
-                case .EXPR; if for_init_expr != null gen_expr(tc, instructions, for_init_expr);
+            if #complete stmt_for.init.kind == {
+                case .DECL;
+                    init_decl := cast(*Ast.For_Init_Decl) stmt_for.init;
+                    gen_instructions_decl(tc, instructions, init_decl.decl);
+                case .EXPR;
+                    init_expr := cast(*Ast.For_Init_Expr) stmt_for.init;
+                    if init_expr.expr != null gen_expr(tc, instructions, init_expr.expr);
             }
             // jump to loop start - as first time you come into this phase, you don't want to run post expr
             array_add(instructions, jump(loop_start_label));
@@ -162,9 +184,10 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
             array_add(instructions, jump(loop_post_expr_label));
             array_add(instructions, label(loop_end_label));
         case .DO_WHILE;
+            stmt_do_while := cast(*Ast.Stmt_Do_While) stmt_ast;
             loop_start_label := sprint("%_start", stmt_do_while.label);
-            loop_end_label := sprint("%_end", stmt_do_while.label);
-            // TODO(seg4lt): Refactor  
+            loop_end_label   := sprint("%_end", stmt_do_while.label);
+            // TODO(seg4lt): Refactor
             // adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
             // Maybe there is a better way to do this but..... this is what we have for now
@@ -180,8 +203,9 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
 
             array_add(instructions, label(loop_end_label));
         case .WHILE;
+            stmt_while := cast(*Ast.Stmt_While) stmt_ast;
             loop_start_label := sprint("%_start", stmt_while.label);
-            loop_end_label := sprint("%_end", stmt_while.label);
+            loop_end_label   := sprint("%_end", stmt_while.label);
             // TODO(seg4lt): Refactor
             // adding post expr just because I am handling continue to go to post expr
             // this makes it easier to model for loop
@@ -199,17 +223,19 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using
             array_add(instructions, jump(loop_start_label));
             array_add(instructions, label(loop_end_label));
         case .BREAK;
-            loop_end_label := sprint("%_end", stmt_break);
+            stmt_break := cast(*Ast.Stmt_Break) stmt_ast;
+            loop_end_label := sprint("%_end", stmt_break.label);
             array_add(instructions, jump(loop_end_label));
         case .CONTINUE;
-            loop_start_label := sprint("%_post_expr", stmt_continue);
+            stmt_continue := cast(*Ast.Stmt_Continue) stmt_ast;
+            loop_start_label := sprint("%_post_expr", stmt_continue.label);
             array_add(instructions, jump(loop_start_label));
-        case .NULL; 
+        case .NULL;
             // pass through - nothing to do when null stmt is received
     }
 }
 
-gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_ast: Switch_Stmt_Ast, st: *Symbol_Table) {
+gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, switch_ast: *Ast.Stmt_Switch, st: *Symbol_Table) {
     switch_condition := switch_ast.condition;
     switch_expr_val := gen_expr(tc, instructions, switch_condition);
 
@@ -248,42 +274,45 @@ gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, switch_
     array_add(instructions, label(switch_end_label));
 }
 
-gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using expr_ast: *Expr_Ast) -> dst: Val_Tacky {
-    if #complete type == {
+gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *Ast.Expr) -> dst: *Val {
+    if #complete expr_ast.kind == {
         case .PREFIX;
+            expr_prefix := cast(*Ast.Expr_Prefix) expr_ast;
             inner_expr_result := gen_expr(tc, instructions, expr_prefix.expr);
             one := constant(1);
             dst := make_var(tc);
             if #complete expr_prefix.op == {
-                case .ADD; 
+                case .ADD;
                     array_add(instructions, binary(.ADD, inner_expr_result, one, dst));
                     array_add(instructions, copy(dst, inner_expr_result));
-                case .SUBTRACT; 
+                case .SUBTRACT;
                     array_add(instructions, binary(.SUB, inner_expr_result, one, dst));
                     array_add(instructions, copy(dst, inner_expr_result));
             }
             return inner_expr_result;
         case .POSTFIX;
+            expr_postfix := cast(*Ast.Expr_Postfix) expr_ast;
             expr_val_tacky := gen_expr(tc, instructions, expr_postfix.expr);
-            
+
             old_value_dst := make_var(tc);
             old_value     := copy(expr_val_tacky, old_value_dst);
             array_add(instructions, old_value);
-        
+
             one := constant(1);
             if #complete expr_postfix.op == {
-                case .ADD; 
+                case .ADD;
                     dst := make_var(tc);
                     array_add(instructions, binary(.ADD, expr_val_tacky, one, dst));
                     array_add(instructions, copy(dst, expr_val_tacky));
-                case .SUBTRACT; 
+                case .SUBTRACT;
                     dst := make_var(tc);
                     array_add(instructions, binary(.SUB, expr_val_tacky, one, dst));
                     array_add(instructions, copy(dst, expr_val_tacky));
             }
             return old_value_dst;
         case .FN_CALL;
-            args: [..]Val_Tacky;
+            expr_fn_call := cast(*Ast.Expr_Fn_Call) expr_ast;
+            args: [..]*Val;
             for expr_fn_call.args {
                 arg_val := gen_expr(tc, instructions, it);
                 array_add(*args, arg_val);
@@ -292,22 +321,24 @@ gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using expr_as
             array_add(instructions, fn_call(expr_fn_call.ident, args, dst));
             return dst;
         case .UNARY;
+            expr_unary := cast(*Ast.Expr_Unary) expr_ast;
             src := gen_expr(tc, instructions, expr_unary.expr);
             dst := make_var(tc);
-            op : Unary_Op_Type_Tacky = ---;
+            op : Unary_Op = ---;
             if #complete expr_unary.op == {
                 case .BITWISE_NOT; op = .BITWISE_NOT;
                 case .NEGATE ;     op = .NEGATE;
-                case .NOT;         op = .NOT; 
-            }; 
+                case .NOT;         op = .NOT;
+            };
             array_add(instructions, unary(op, src, dst));
             return dst;
         case .BINARY;
+            expr_binary := cast(*Ast.Expr_Binary) expr_ast;
             if expr_binary.op == {
-                case .AND; 
-                    return gen_logical_and(tc, instructions, expr_binary);
+                case .AND;
+                    return gen_logical_and(tc, instructions, <<expr_binary);
                 case .OR;
-                    return gen_logical_or(tc, instructions, expr_binary);
+                    return gen_logical_or(tc, instructions, <<expr_binary);
                 case;
                     src1 := gen_expr(tc, instructions, expr_binary.left);
                     src2 := gen_expr(tc, instructions, expr_binary.right);
@@ -317,122 +348,107 @@ gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, using expr_as
                     return dst;
             }
         case .GROUP;
-            return gen_expr(tc, instructions, expr_group);
+            expr_group := cast(*Ast.Expr_Group) expr_ast;
+            return gen_expr(tc, instructions, expr_group.expr);
         case .CONSTANT;
-            return constant(expr_constant);
+            expr_constant := cast(*Ast.Expr_Constant) expr_ast;
+            return constant(expr_constant.value);
         case .VAR;
-            return variable(expr_var);
-        case .ASSIGNMENT; 
+            expr_var := cast(*Ast.Expr_Var) expr_ast;
+            return variable(expr_var.ident);
+        case .ASSIGNMENT;
+            expr_assignment := cast(*Ast.Expr_Assignment) expr_ast;
             result := gen_expr(tc, instructions, expr_assignment.src);
-            
-            if expr_assignment.dst.type != .VAR
+
+            if expr_assignment.dst.kind != .VAR
                 assert(false, "What!! dst has to be variable. sema didn't catch this!!! : %", expr_assignment.dst);
-                
-            dst := variable(expr_assignment.dst.expr_var);
+
+            dst_var := cast(*Ast.Expr_Var) expr_assignment.dst;
+            dst := variable(dst_var.ident);
             array_add(instructions, copy(result, dst));
             return dst;
         case .TERNARY;
-            dst     := make_var(tc);
-            result  : Val_Tacky = ---;
+            expr_ternary := cast(*Ast.Expr_Ternary) expr_ast;
+            dst := make_var(tc);
 
             ternary_end  := make_label(tc, "ternary_end");
             ternary_else := make_label(tc, "ternary_else");
 
             condition := gen_expr(tc, instructions, expr_ternary.condition);
 
-            array_add(instructions, jump_if_zero(condition, ternary_else.as.label));
+            array_add(instructions, jump_if_zero(condition, ternary_else));
 
             { // true
-                result = gen_expr(tc, instructions, expr_ternary.true_expr);
+                result := gen_expr(tc, instructions, expr_ternary.true_expr);
                 array_add(instructions, copy(result, dst));
-                array_add(instructions, jump(ternary_end.as.label));
+                array_add(instructions, jump(ternary_end));
             }
 
             { // false
-                array_add(instructions, ternary_else);
-                result = gen_expr(tc, instructions, expr_ternary.false_expr);
+                array_add(instructions, label(ternary_else));
+                result := gen_expr(tc, instructions, expr_ternary.false_expr);
                 array_add(instructions, copy(result, dst));
             }
-            array_add(instructions, ternary_end); 
+            array_add(instructions, label(ternary_end));
             return dst;
     }
 }
 
-gen_postfix :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, expr_ast: *Expr_Ast, expr_val_tacky: Val_Tacky) -> Val_Tacky {
-    if expr_ast.postfix == .NONE return expr_val_tacky;
 
-    old_value_dst := make_var(tc);
-    old_value     := copy(expr_val_tacky, old_value_dst);
-    array_add(instructions, old_value);
 
-    one := constant(1);
-    if #complete expr_ast.postfix == {
-        case .INCR; 
-            dst := make_var(tc);
-            array_add(instructions, binary(.ADD, expr_val_tacky, one, dst));
-            array_add(instructions, copy(dst, expr_val_tacky));
-        case .DECR; 
-            dst := make_var(tc);
-            array_add(instructions, binary(.SUB, expr_val_tacky, one, dst));
-            array_add(instructions, copy(dst, expr_val_tacky));
-        case .NONE; 
-            assert(false, "unreachable");
-    }
-    return old_value_dst;
-}
-
-gen_logical_and :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.expr_binary)) -> Val_Tacky {
+gen_logical_and :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: Ast.Expr_Binary) -> *Val {
     label_false := make_label(tc, "cond_false");
 
     src1 := gen_expr(tc, instructions, bin_ast.left);
-    array_add(instructions, jump_if_zero(src1, label_false.as.label));
+    array_add(instructions, jump_if_zero(src1, label_false));
 
     src2 := gen_expr(tc, instructions, bin_ast.right);
-    array_add(instructions, jump_if_zero(src2, label_false.as.label));
+    array_add(instructions, jump_if_zero(src2, label_false));
 
     result_var := make_var(tc);
     one        := constant(1);
+
     array_add(instructions, copy(one, result_var));
 
     label_end := make_label(tc, "logical_cmp_end");
 
-    array_add(instructions, jump(label_end.as.label));
-    array_add(instructions, label_false);
+    array_add(instructions, jump(label_end));
+    array_add(instructions, label(label_false));
 
     zero := constant(0);
     array_add(instructions, copy(zero, result_var));
 
-    array_add(instructions, label_end);
-
+    array_add(instructions, label(label_end));
     return result_var;
 }
 
-gen_logical_or :: (tc: *Tacky_Ctx, instructions: *[..]Instruction_Tacky, bin_ast: type_of(Expr_Ast.expr_binary)) -> Val_Tacky {
+gen_logical_or :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: Ast.Expr_Binary) -> *Val {
     label_false := make_label(tc, "cond_true");
 
     src1 := gen_expr(tc, instructions, bin_ast.left);
-    array_add(instructions, jump_if_not_zero(src1, label_false.as.label));
+    array_add(instructions, jump_if_not_zero(src1, label_false));
 
     src2 := gen_expr(tc, instructions, bin_ast.right);
-    array_add(instructions, jump_if_not_zero(src2, label_false.as.label));
+    array_add(instructions, jump_if_not_zero(src2, label_false));
 
     result_var := make_var(tc);
     zero       := constant(0);
+
     array_add(instructions, copy(zero, result_var));
 
     label_end := make_label(tc, "logical_cmp_end");
 
-    array_add(instructions, jump(label_end.as.label));
-    array_add(instructions, label_false);
-    
+    array_add(instructions, jump(label_end));
+    array_add(instructions, label(label_false));
+
     one := constant(1);
     array_add(instructions, copy(one, result_var));
-    array_add(instructions, label_end);
 
+    array_add(instructions, label(label_end));
     return result_var;
 }
 
-to_tacky :: (ast_op: type_of(Expr_Ast.expr_binary.op)) -> type_of(Instruction_Tacky.as.binary.op) {
+to_tacky :: (ast_op: Ast.Binary_Operator) -> Bin_Op {
     if #complete ast_op == {
         case .ADD;           return .ADD;
         case .BITWISE_AND;   return .BITWISE_AND;
@@ -449,65 +465,63 @@ to_tacky :: (ast_op: type_of(Expr_Ast.expr_binary.op)) -> type_of(Instruction_Ta
         case .MUL;           return .MUL;
         case .NOT_EQUAL;     return .NOT_EQUAL;
         case .RIGHT_SHIFT;   return .RIGHT_SHIFT;
-        case .SUB;           return .SUB; 
-        
+        case .SUB;           return .SUB;
         case .AND;           #through;
-        case .OR;            assert(false, "And and OR are not handled this way");
+        case .OR;            assert(false, "logical and/or operators are handled separately"); return .ADD;
     }
-    assert(false, "There are not other binary operator. What is this %", ast_op);
-    return .MOD; // unreachable
 }
 
-ret :: (val: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{.RETURN, .{ ret = val }};
+ret :: (val: *Val) -> *Instruction #expand {
+    return Instruction_Return.new(val);
 }
 
-constant :: (value: int) -> Val_Tacky #expand {
-    return .{.CONSTANT, .{constant = value }};
+constant :: (value: int) -> *Val #expand {
+    return Val_Constant.new(value);
 }
 
-variable :: (ident: string) -> Val_Tacky #expand {
-    return .{.VARIABLE, .{variable = copy_string(ident) }};
+variable :: (ident: string) -> *Val #expand {
+    return Val_Variable.new(ident);
 }
 
-copy :: (src: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{.COPY, .{ copy = .{ src, dst }}};
+copy :: (src: *Val, dst: *Val) -> *Instruction #expand {
+    return Instruction_Copy.new(src, dst);
 }
 
-label :: (ident: string) -> Instruction_Tacky #expand {
-    return .{.LABEL, .{label = copy_string(ident) }};
+label :: (ident: string) -> *Instruction #expand {
+    return Instruction_Label.new(ident);
 }
 
-jump :: (ident: string) -> Instruction_Tacky #expand {
-    return .{.JUMP, .{ jump = copy_string(ident) }};
+jump :: (ident: string) -> *Instruction #expand {
+    return Instruction_Jump.new(ident);
 }
 
-jump_if_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
-    return .{ .JUMP_IF_ZERO, .{ jump_if_zero = .{ condition, copy_string(ident) } }};
+jump_if_zero :: (condition: *Val, ident: string) -> *Instruction #expand {
+    return Instruction_Jump_If_Zero.new(condition, ident);
 }
 
-jump_if_not_zero :: (condition: Val_Tacky, ident: string) -> Instruction_Tacky #expand {
-    return .{ .JUMP_IF_NOT_ZERO, .{ jump_if_not_zero = .{condition, copy_string(ident) } }};
+jump_if_not_zero :: (condition: *Val, ident: string) -> *Instruction #expand {
+    return Instruction_Jump_If_Not_Zero.new(condition, ident);
 }
 
-fn_call :: (ident: string, args: [..]Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{ .FN_CALL, .{ fn_call = .{ copy_string(ident), args, dst } }};
+fn_call :: (ident: string, args: [..]*Val, dst: *Val) -> *Instruction #expand {
+    return Instruction_Fn_Call.new(ident, args, dst);
 }
 
-unary :: (op: Unary_Op_Type_Tacky, src: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{.UNARY, .{unary = .{op, src, dst}}};
+unary :: (op: Unary_Op, src: *Val, dst: *Val) -> *Instruction #expand {
+    return Instruction_Unary.new(op, src, dst);
 }
 
-binary :: (op: Bin_Op_Type_Tacky, src1: Val_Tacky, src2: Val_Tacky, dst: Val_Tacky) -> Instruction_Tacky #expand {
-    return .{.BINARY, .{binary= .{ op, src1, src2, dst}}};
+binary :: (op: Bin_Op, src1: *Val, src2: *Val, dst: *Val) -> *Instruction #expand {
+    return Instruction_Binary.new(op, src1, src2, dst);
 }
 
-make_var :: (tc : *Tacky_Ctx) -> Val_Tacky {
+make_var :: (tc : *Tacky_Ctx) -> *Val {
     defer tc.temp_var_index += 1;
-    return .{.VARIABLE, .{variable = sprint("tmp.%",tc.temp_var_index) }};
+    return Val_Variable.new(sprint("tmp.%",tc.temp_var_index));
 }
 
-make_label :: (tc : *Tacky_Ctx, label: string) -> Instruction_Tacky {
+make_label :: (tc : *Tacky_Ctx, label_prefix: string) -> string {
     defer tc.label_index += 1;
-    return .{.LABEL, .{label = sprint("L_%.%", copy_string(label), tc.label_index) }};
+    return sprint("%.%", label_prefix, tc.label_index);
 }
+

@@ -1,60 +1,130 @@
-Program_Ast :: struct {
-    decls: [..]*Decl_Ast;
-}
+Ast :: struct {
+    Program :: struct {
+        decls: [..]*Decl;
 
-Storage_Class_Ast :: enum { EXTERN; STATIC; NONE; };
-
-Block_Ast :: struct {
-    items:     [..]*Block_Item_Ast;
-    using loc: Source_Location;
-}
-
-Block_Item_Ast :: struct {
-    type: enum { STMT; DECL; };
-    using as: union {
-        block_item_stmt: *Stmt_Ast;
-        block_item_decl: *Decl_Ast;
-    };
-}
-
-Decl_Ast :: struct {
-    type:     enum { FN; VAR; };
-    using as: union {
-        decl_fn:  *Fn_Decl_Ast;
-        decl_var: *Var_Decl_Ast;
+        new :: (decls: [..]*Decl) -> *Program #expand {
+            p := New(Program);
+            p.decls = decls;
+            return p;
+        }
     }
-}
 
-Fn_Decl_Ast :: struct {
-    ident:         string;
-    params:        [..]*Fn_Param;
-    block:         *Block_Ast;
-    storage_class: Storage_Class_Ast;
-    using loc:     Source_Location;
-}
+    Storage_Class :: enum { EXTERN; STATIC; NONE; };
 
-Fn_Param :: struct {
-    ident:     string;
-    using loc: Source_Location;
-}
-
-Var_Decl_Ast :: struct {
-    ident:         string;
-    init:          *Expr_Ast; @Optional
-    storage_class: Storage_Class_Ast;
-    using loc:     Source_Location;
-}
-
-For_Init_Ast :: struct {
-    type:     enum { DECL; EXPR; };
-    using as: union {
-        for_init_decl: *Decl_Ast;
-        for_init_expr: *Expr_Ast; @Optional 
+    Decl_Kind :: enum { FN; VAR; };
+    Decl :: struct {
+        kind: Decl_Kind;
+        ident: string;
+        storage_class: Storage_Class;
+        using loc: Source_Location;
     };
-}
 
-Stmt_Ast :: struct {
-    type: enum { 
+    Fn_Decl :: struct {
+        #as using decl: Decl;
+        kind = Decl_Kind.FN;
+        params: [..]*Fn_Param;
+        body: *Block; @Optional
+
+        Fn_Param :: struct {
+            ident:     string;
+            using loc: Source_Location;
+        }
+
+        new :: (ident: string, params: [..]*Fn_Param, block: *Block, storage_class: Storage_Class, line: int, start: int) -> *Fn_Decl #expand {
+            assert(ident != "", "ident can't be null");
+            fn := New(Fn_Decl);
+            fn.ident = ident;
+            fn.storage_class = storage_class;
+            fn.loc = .{line, start};
+            fn.params = params;
+            fn.body = block;
+            return fn;
+        }
+
+        as_decl :: (fn: *Fn_Decl) -> *Decl #expand {
+            assert(fn != null, "fn cannot be null");
+            return fn;
+        }
+    };
+
+    Var_Decl :: struct {
+        #as using decl: Decl;
+        kind = Decl_Kind.VAR;
+        init: *Expr; @Optional
+
+        new :: (ident: string, init: *Expr, storage_class: Storage_Class, line: int, start: int) -> *Decl #expand {
+            assert(ident != "", "ident can't be null");
+            var := New(Var_Decl);
+            var.ident = ident;
+            var.storage_class = storage_class;
+            var.loc = .{line, start};
+            var.init = init;
+            return var;
+        }
+    }
+
+    Block_Item_Kind :: enum { STMT; DECL; };
+    Block_Item :: struct {
+        kind: Block_Item_Kind;
+    }
+
+    Block_Item_Stmt :: struct {
+        #as using base: Block_Item;
+        kind = Block_Item_Kind.STMT;
+        stmt: *Stmt;
+
+        new :: (stmt: *Stmt) -> *Block_Item #expand {
+            assert(stmt != null, "stmt cannot be null");
+            item := New(Block_Item_Stmt);
+            item.stmt = stmt;
+            return item;
+        }
+    }
+
+    Block_Item_Decl :: struct {
+        #as using base: Block_Item;
+        kind = Block_Item_Kind.DECL;
+        decl: *Decl;
+
+        new :: (decl: *Decl) -> *Block_Item #expand {
+            assert(decl != null, "decl cannot be null");
+            item := New(Block_Item_Decl);
+            item.decl = decl;
+            return item;
+        }
+    }
+
+    For_Init_Kind :: enum { DECL; EXPR; };
+    For_Init :: struct {
+        kind: For_Init_Kind;
+    }
+
+    For_Init_Decl :: struct {
+        #as using base: For_Init;
+        kind = For_Init_Kind.DECL;
+        decl: *Decl;
+
+        new :: (decl: *Decl) -> *For_Init #expand {
+            assert(decl != null, "decl cannot be null");
+            init := New(For_Init_Decl);
+            init.decl = decl;
+            return init;
+        }
+    }
+
+    For_Init_Expr :: struct {
+        #as using base: For_Init;
+        kind = For_Init_Kind.EXPR;
+        expr: *Expr; @Optional
+
+        new :: (expr: *Expr) -> *For_Init #expand {
+            init := New(For_Init_Expr);
+            init.expr = expr;
+            return init;
+        }
+    }
+
+    Stmt_Kind :: enum {
         BREAK;
         CASE;
         COMPOUND;
@@ -71,41 +141,256 @@ Stmt_Ast :: struct {
         SWITCH;
         WHILE;
     };
-    using as: union {
-        stmt_break:       string;
-        stmt_case:        struct { value: string; label: string; };
-        stmt_compound:    *Block_Ast;
-        stmt_continue:    string;
-        stmt_default:     string;
-        stmt_do_while:    struct { body: *Stmt_Ast; condition: *Expr_Ast; label: string; };
-        stmt_expr:        *Expr_Ast;
-        stmt_for:         struct { init: *For_Init_Ast; condition: *Expr_Ast; @Optional post: *Expr_Ast; @Optional body: *Stmt_Ast; label: string; };
-        stmt_goto:        string;
-        stmt_if:          struct { condition: *Expr_Ast; if_block: *Stmt_Ast; else_block: *Stmt_Ast; @Optional  };
-        stmt_label:       struct {label: string; stmt: *Stmt_Ast;};
-        stmt_return:      struct { expr: *Expr_Ast; };
-        stmt_switch:      Switch_Stmt_Ast;
-        stmt_while:       struct { condition: *Expr_Ast; body: *Stmt_Ast; label: string; };
-        // null : doesn't need value
-    };
-    using loc: Source_Location;
-}
 
-Switch_Stmt_Ast :: struct {
-    condition:   *Expr_Ast;
-    body:        [..]*Block_Item_Ast;
-    label:       string;
-    cases_label: [..]Case_Label_Info;
-};
+    Stmt :: struct {
+        kind: Stmt_Kind;
+        using loc: Source_Location;
+    }
 
-Case_Label_Info :: struct {
-    label:      string;
-    value:      string;
-    is_default: bool = true;
-}
+    Stmt_Break :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.BREAK;
+        label: string;
 
-Expr_Ast :: struct {
-    type: enum {
+        new :: (line: int, start: int) -> *Stmt #expand {
+            stmt := New(Stmt_Break);
+            stmt.loc = .{line, start};
+            stmt.label = "$$$UNPROCESSED$$$";
+            return stmt;
+        }
+    }
+
+    Stmt_Case :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.CASE;
+        value: string;
+        label: string;
+
+        new :: (value: string, line: int, start: int) -> *Stmt #expand {
+            assert(value != "", "value cannot be null");
+            stmt := New(Stmt_Case);
+            stmt.loc = .{line, start};
+            stmt.value = value;
+            stmt.label = "$$UNPROCESSED$$";
+            return stmt;
+        }
+    }
+
+    Stmt_Compound :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.COMPOUND;
+        block: *Block;
+
+        new :: (block: *Block) -> *Stmt #expand {
+            assert(block != null, "block cannot be null");
+            stmt := New(Stmt_Compound);
+            stmt.loc = .{block.line, block.start};
+            stmt.block = block;
+            return stmt;
+        }
+    }
+
+    Stmt_Continue :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.CONTINUE;
+        label: string;
+
+        new :: (line: int, start: int) -> *Stmt #expand {
+            stmt := New(Stmt_Continue);
+            stmt.loc = .{line, start};
+            stmt.label = "$$$UNPROCESSED$$$";
+            return stmt;
+        }
+    }
+
+    Stmt_Default :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.DEFAULT;
+        label: string;
+
+        new :: (line: int, start: int) -> *Stmt #expand {
+            stmt := New(Stmt_Default);
+            stmt.loc = .{line, start};
+            stmt.label = "$$UNPROCESSED$$";
+            return stmt;
+        }
+    }
+
+    Stmt_Do_While :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.DO_WHILE;
+        body: *Stmt;
+        condition: *Expr;
+        label: string;
+
+        new :: (body: *Stmt, condition: *Expr, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt #expand {
+            assert(body != null, "body cannot be null");
+            assert(condition != null, "condition cannot be null");
+            stmt := New(Stmt_Do_While);
+            stmt.loc = .{line, start};
+            stmt.body = body;
+            stmt.condition = condition;
+            stmt.label = label;
+            return stmt;
+        }
+    }
+
+    Stmt_Expr :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.EXPR;
+        expr: *Expr;
+
+        new :: (expr: *Expr, line: int, start: int) -> *Stmt #expand {
+            assert(expr != null, "expr cannot be null");
+            stmt := New(Stmt_Expr);
+            stmt.loc = .{line, start};
+            stmt.expr = expr;
+            return stmt;
+        }
+    }
+
+    Stmt_For :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.FOR;
+        init: *For_Init;
+        condition: *Expr; @Optional
+        post: *Expr; @Optional
+        body: *Stmt;
+        label: string;
+
+        new :: (init: *For_Init, condition: *Expr, post: *Expr, body: *Stmt, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt #expand {
+            assert(init != null, "init cannot be null");
+            assert(body != null, "body cannot be null");
+            stmt := New(Stmt_For);
+            stmt.loc = .{line, start};
+            stmt.init = init;
+            stmt.condition = condition;
+            stmt.post = post;
+            stmt.body = body;
+            stmt.label = label;
+            return stmt;
+        }
+    }
+
+    Stmt_Goto :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.GOTO;
+        label: string;
+
+        new :: (label: string, line: int, start: int) -> *Stmt #expand {
+            assert(label != "", "label cannot be null");
+            stmt := New(Stmt_Goto);
+            stmt.loc = .{line, start};
+            stmt.label = label;
+            return stmt;
+        }
+    }
+
+    Stmt_If :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.IF;
+        condition: *Expr;
+        if_block: *Stmt;
+        else_block: *Stmt; @Optional
+
+        new :: (condition: *Expr, if_block: *Stmt, else_block: *Stmt, line: int, start: int) -> *Stmt #expand {
+            assert(condition != null, "condition cannot be null");
+            assert(if_block != null, "if_block cannot be null");
+            stmt := New(Stmt_If);
+            stmt.loc = .{line, start};
+            stmt.condition = condition;
+            stmt.if_block = if_block;
+            stmt.else_block = else_block;
+            return stmt;
+        }
+    }
+
+    Stmt_Label :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.LABEL;
+        label: string;
+        stmt: *Stmt;
+
+        new :: (label: string, l_stmt: *Stmt, line: int, start: int) -> *Stmt #expand {
+            assert(label != "", "label cannot be null");
+            stmt := New(Stmt_Label);
+            stmt.loc = .{line, start};
+            stmt.label = label;
+            stmt.stmt = l_stmt;
+            return stmt;
+        }
+    }
+
+    Stmt_Null :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.NULL;
+
+        new :: (line: int, start: int) -> *Stmt #expand {
+            stmt := New(Stmt_Null);
+            stmt.loc = .{line, start};
+            return stmt;
+        }
+    }
+
+    Stmt_Return :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.RETURN;
+        expr: *Expr;
+
+        new :: (expr: *Expr, line: int, start: int) -> *Stmt #expand {
+            assert(expr != null, "expr cannot be null");
+            stmt := New(Stmt_Return);
+            stmt.loc = .{line, start};
+            stmt.expr = expr;
+            return stmt;
+        }
+    }
+
+    Stmt_Switch :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.SWITCH;
+        condition: *Expr;
+        body: [..]*Block_Item;
+        label: string;
+        cases_label: [..]Case_Label_Info;
+
+        new :: (condition: *Expr, body: [..]*Block_Item, line: int, start: int, label: string = "$$$$$$$$$") -> *Stmt #expand {
+            assert(condition != null, "condition cannot be null");
+            stmt := New(Stmt_Switch);
+            stmt.loc = .{line, start};
+            stmt.condition = condition;
+            stmt.body = body;
+            stmt.label = label;
+            return stmt;
+        }
+    }
+
+    Stmt_While :: struct {
+        #as using base: Stmt;
+        kind = Stmt_Kind.WHILE;
+        condition: *Expr;
+        body: *Stmt;
+        label: string;
+
+        new :: (condition: *Expr, body: *Stmt, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt #expand {
+            assert(condition != null, "condition cannot be null");
+            assert(body != null, "body cannot be null");
+            stmt := New(Stmt_While);
+            stmt.loc = .{line, start};
+            stmt.condition = condition;
+            stmt.body = body;
+            stmt.label = label;
+            return stmt;
+        }
+    }
+
+    Case_Label_Info :: struct {
+        label:      string;
+        value:      string;
+        is_default: bool = true;
+    }
+
+    Expr_Kind :: enum {
         ASSIGNMENT;
         BINARY;
         CONSTANT;
@@ -117,242 +402,210 @@ Expr_Ast :: struct {
         PREFIX;
         POSTFIX;
     };
-    using as: union {
-        expr_assignment: struct { dst: *Expr_Ast; src: *Expr_Ast; };
-        expr_binary:     struct { op: Binary_Operator; left: *Expr_Ast; right: *Expr_Ast; };
-        expr_constant:   int;
-        expr_fn_call:    struct { ident: string; args: [..]*Expr_Ast; }
-        expr_group:      *Expr_Ast;
-        expr_ternary:    struct { condition: *Expr_Ast; true_expr: *Expr_Ast; false_expr: *Expr_Ast; };
-        expr_unary:      struct { op: Unary_Operator; expr: *Expr_Ast; };
-        expr_var:        string; 
-        expr_postfix:    struct { op: Postfix_Operator; expr: *Expr_Ast; };
-        expr_prefix:     struct { op: Prefix_Operator; expr: *Expr_Ast; };
-    };
-    using loc: Source_Location;
-}
 
-Postfix_Operator :: enum { ADD; SUBTRACT; }
+    Expr :: struct {
+        kind: Expr_Kind;
+        using loc: Source_Location;
+    }
 
-Prefix_Operator :: Postfix_Operator; 
+    Expr_Assignment :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.ASSIGNMENT;
+        dst: *Expr;
+        src: *Expr;
 
-Unary_Operator :: enum { BITWISE_NOT; NEGATE; NOT; }
+        new :: (dst: *Expr, src: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(dst != null, "dst cannot be null");
+            assert(src != null, "src cannot be null");
+            expr := New(Expr_Assignment);
+            expr.loc = .{line, start};
+            expr.dst = dst;
+            expr.src = src;
+            return expr;
+        }
+    }
 
-Binary_Operator :: enum {
-    ADD;
-    AND;
-    BITWISE_AND;
-    BITWISE_OR;
-    BITWISE_XOR;
-    DIV;
-    EQUAL_EQUAL;
-    GREATER;
-    GREATER_EQUAL;
-    LEFT_SHIFT;
-    LESS;
-    LESS_EQUAL;
-    MOD;
-    MUL;
-    NOT_EQUAL;
-    OR;
-    RIGHT_SHIFT;
-    SUB;
-};
+    Expr_Binary :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.BINARY;
+        op: Binary_Operator;
+        left: *Expr;
+        right: *Expr;
 
-Source_Location :: struct {
-    line, start: int;
-}
+        new :: (op: Binary_Operator, left: *Expr, right: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(left != null, "left cannot be null");
+            assert(right != null, "right cannot be null");
+            expr := New(Expr_Binary);
+            expr.loc = .{line, start};
+            expr.op = op;
+            expr.left = left;
+            expr.right = right;
+            return expr;
+        }
+    }
 
-#scope_module
+    Expr_Constant :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.CONSTANT;
+        value: int;
 
-program_new :: (decls: [..]*Decl_Ast) -> *Program_Ast #expand {
-    return New(Program_Ast, .{ decls });
-}
+        new :: (constant: int, line: int, start: int) -> *Expr #expand {
+            expr := New(Expr_Constant);
+            expr.loc = .{line, start};
+            expr.value = constant;
+            return expr;
+        }
+    }
 
-decl_fn_new :: (fn: *Fn_Decl_Ast) -> *Decl_Ast #expand {
-    assert(fn != null, "fn cannot be null");
-    return New(Decl_Ast, .{ type = .FN, as = .{ decl_fn = fn } });
-}
+    Expr_Fn_Call :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.FN_CALL;
+        ident: string;
+        args: [..]*Expr;
 
-fn_decl_new :: (ident: string, params: [..]*Fn_Param, block: *Block_Ast, storage_class: Storage_Class_Ast, line: int, start: int) -> *Fn_Decl_Ast #expand {
-    assert(ident != "", "ident can't be null");
-    return New(Fn_Decl_Ast, .{
-        ident, params, block, storage_class, .{line, start}
-    });
-}
+        new :: (ident: string, args_list: [..]*Expr, line: int, start: int) -> *Expr #expand {
+            assert(ident != "", "ident cannot be null");
+            expr := New(Expr_Fn_Call);
+            expr.loc = .{line, start};
+            expr.ident = ident;
+            expr.args = args_list;
+            return expr;
+        }
+    }
 
-block_new :: (items: [..]*Block_Item_Ast, line: int, start: int) -> *Block_Ast #expand {
-    return New(Block_Ast, .{items, .{line, start}});
-}
+    Expr_Group :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.GROUP;
+        expr: *Expr;
 
-block_item_stmt_new :: (stmt: *Stmt_Ast) -> *Block_Item_Ast #expand {
-    assert(stmt != null, "stmt cannot be null");
-    return New(Block_Item_Ast, .{ type = .STMT, as = .{ block_item_stmt = stmt } });
-}
+        new :: (expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(expr != null, "expr cannot be null");
+            e := New(Expr_Group);
+            e.loc = .{line, start};
+            e.expr = expr;
+            return e;
+        }
+    }
 
-block_item_decl_new :: (decl: *Decl_Ast) -> *Block_Item_Ast #expand {
-    assert(decl != null, "decl cannot be null");
-    return New(Block_Item_Ast, .{ type = .DECL, as = .{ block_item_decl = decl } });
-}
+    Expr_Ternary :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.TERNARY;
+        condition: *Expr;
+        true_expr: *Expr;
+        false_expr: *Expr;
 
-decl_var_new :: (ident: string, init: *Expr_Ast, storage_class: Storage_Class_Ast, line: int, start: int) -> *Decl_Ast #expand {
-    assert(ident != "", "ident can't be null");
-    var := New(Var_Decl_Ast, .{ident, init, storage_class, .{line, start}});
-    return New(Decl_Ast, .{ type = .VAR, as = .{ decl_var = var } });
-}
+        new :: (condition: *Expr, true_expr: *Expr, false_expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(condition != null, "condition cannot be null");
+            assert(true_expr != null, "true_expr cannot be null");
+            assert(false_expr != null, "false_expr cannot be null");
+            expr := New(Expr_Ternary);
+            expr.loc = .{line, start};
+            expr.condition = condition;
+            expr.true_expr = true_expr;
+            expr.false_expr = false_expr;
+            return expr;
+        }
+    }
 
-stmt_null_new :: (line: int, start: int) -> *Stmt_Ast #expand {
-    return New(Stmt_Ast, .{ .NULL, .{}, .{line, start}});
-}
+    Expr_Unary :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.UNARY;
+        op: Unary_Operator;
+        expr: *Expr;
 
-stmt_compound_new :: (block: *Block_Ast) -> *Stmt_Ast #expand {
-    assert(block != null, "block cannot be null");
-    return New(Stmt_Ast, .{ type = .COMPOUND,  stmt_compound = block, line = block.line, start = block.start });
-}
+        new :: (op: Unary_Operator, expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(expr != null, "expr cannot be null");
+            e := New(Expr_Unary);
+            e.loc = .{line, start};
+            e.op = op;
+            e.expr = expr;
+            return e;
+        }
+    }
 
-stmt_break_new :: (line: int, start: int) -> *Stmt_Ast #expand {
-    return New(Stmt_Ast, .{ type = .BREAK, line = line, start = start });
-}
+    Expr_Var :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.VAR;
+        ident: string;
 
-stmt_continue_new :: (line: int, start: int) -> *Stmt_Ast #expand {
-    stmt := New(Stmt_Ast);
-    stmt.* = .{.CONTINUE, .{ stmt_continue = "$$$UNPROCESSED$$$" }, .{line, start}};
-    return stmt;
-}
+        new :: (ident: string, line: int, start: int) -> *Expr #expand {
+            assert(ident != "", "ident cannot be null");
+            expr := New(Expr_Var);
+            expr.loc = .{line, start};
+            expr.ident = ident;
+            return expr;
+        }
+    }
 
-stmt_goto_new :: (label: string, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(label != "", "label cannot be null");
-    return New(Stmt_Ast, .{.GOTO, .{ stmt_goto = label }, .{line, start}});
-}
+    Expr_Postfix :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.POSTFIX;
+        op: Postfix_Operator;
+        expr: *Expr;
 
-stmt_label_new :: (label: string, l_stmt: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(label != "", "label cannot be null");
-    return New(Stmt_Ast, .{.LABEL, .{ stmt_label = .{label, l_stmt } }, .{line, start}});
-}
+        new :: (op: Postfix_Operator, expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(expr != null, "expr cannot be null");
+            e := New(Expr_Postfix);
+            e.loc = .{line, start};
+            e.op = op;
+            e.expr = expr;
+            return e;
+        }
+    }
 
-stmt_expr_new :: (expr: *Expr_Ast, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Stmt_Ast, .{.EXPR, .{ stmt_expr = expr }, .{line, start}});
-}
+    Expr_Prefix :: struct {
+        #as using base: Expr;
+        kind = Expr_Kind.PREFIX;
+        op: Prefix_Operator;
+        expr: *Expr;
 
-stmt_while_new :: (condition: *Expr_Ast, body: *Stmt_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast #expand {
-    assert(condition != null, "condition cannot be null");
-    assert(body != null, "body cannot be null");
-    return New(Stmt_Ast, .{.WHILE, .{ stmt_while = .{ condition, body, label }}, .{line, start}});
-}
+        new :: (op: Prefix_Operator, expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(expr != null, "expr cannot be null");
+            e := New(Expr_Prefix);
+            e.loc = .{line, start};
+            e.op = op;
+            e.expr = expr;
+            return e;
+        }
+    }
 
-stmt_do_while_new :: (body: *Stmt_Ast, condition: *Expr_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast #expand {
-    assert(body != null, "body cannot be null");
-    assert(condition != null, "condition cannot be null");
-    return New(Stmt_Ast, .{.DO_WHILE, .{ stmt_do_while = .{ body, condition, label }}, .{line, start}});
-}
+    Block :: struct {
+        items:     [..]*Block_Item;
+        using loc: Source_Location;
 
-for_init_decl_new :: (decl: *Decl_Ast) -> *For_Init_Ast #expand {
-    assert(decl != null, "decl cannot be null");
-    return New(For_Init_Ast, .{ type = .DECL, as = .{ for_init_decl = decl }});
-}
+        new :: (items: [..]*Block_Item, line: int, start: int) -> *Block #expand {
+            return New(Block, .{items, .{line, start}});
+        }
+    }
 
-for_init_expr_new :: (expr: *Expr_Ast) -> *For_Init_Ast #expand {
-    return New(For_Init_Ast, .{ type = .EXPR , as = .{ for_init_expr = expr }});
-}
+    Source_Location :: struct {
+        line, start: int;
+    }
 
-stmt_for_new :: (init: *For_Init_Ast, condition: *Expr_Ast, post: *Expr_Ast, body: *Stmt_Ast, line: int, start: int, label: string = "$$UNPROCESSED$$") -> *Stmt_Ast #expand {
-    assert(init != null, "init cannot be null");
-    assert(body != null, "body cannot be null");
-    return New(Stmt_Ast, .{
-        .FOR, 
-        .{ stmt_for = .{ init, condition, post, body, label }},
-        .{line, start}
-    });
-}
+    Postfix_Operator :: enum { ADD; SUBTRACT; }
 
-stmt_switch_new :: (condition: *Expr_Ast, body: [..]*Block_Item_Ast, line: int, start: int, label: string = "$$$$$$$$$") -> *Stmt_Ast #expand {
-    assert(condition != null, "condition cannot be null");
-    return New(Stmt_Ast, .{
-        .SWITCH,
-        .{ stmt_switch = .{ condition = condition, body = body, label = label }}, 
-        .{line, start}
-    });
-}
+    Prefix_Operator :: Postfix_Operator;
 
-stmt_case_new :: (value: string, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(value != "", "value cannot be null");
-    return New(Stmt_Ast, .{
-        .CASE,
-        .{ stmt_case = .{ value, "$$UNPROCESSED$$" }},
-        .{line, start}
-    });
-}
+    Unary_Operator :: enum { BITWISE_NOT; NEGATE; NOT; }
 
-stmt_if_new :: (condition: *Expr_Ast, if_block: *Stmt_Ast, else_block: *Stmt_Ast, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(condition != null, "condition cannot be null");
-    assert(if_block != null, "if_block cannot be null");
-    stmt := New(Stmt_Ast);
-    return New(Stmt_Ast, .{
-        .IF,
-        .{ stmt_if = .{ condition, if_block, else_block }},
-        .{line, start}
-    });
-}
-
-stmt_return_new :: (expr: *Expr_Ast, line: int, start: int) -> *Stmt_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Stmt_Ast, .{.RETURN, .{ stmt_return = .{ expr }}, .{line, start}});
-}
-
-expr_prefix_new :: (op: Prefix_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.PREFIX, .{ expr_prefix = .{ op, expr }}, .{line, start}});
-}
-
-expr_postfix_new :: (op: Postfix_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.POSTFIX, .{ expr_postfix = .{ op, expr }}, .{line, start}});
-}
-
-expr_assignment_new :: (dst: *Expr_Ast, src: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(dst != null, "dst cannot be null");
-    assert(src != null, "src cannot be null");
-    return New(Expr_Ast, .{.ASSIGNMENT, .{ expr_assignment = .{ dst, src }}, .{line, start}});
-}
-
-expr_ternary_new :: (condition: *Expr_Ast, true_expr: *Expr_Ast, false_expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(condition != null, "condition cannot be null");
-    assert(true_expr != null, "true_expr cannot be null");
-    assert(false_expr != null, "false_expr cannot be null");
-    return New(Expr_Ast, .{.TERNARY, .{ expr_ternary = .{ condition, true_expr, false_expr }}, .{line, start}});
-}
-
-expr_unary_new :: (op: Unary_Operator, expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.UNARY, .{ expr_unary = .{ op, expr }}, .{line, start}});
-}
-
-expr_var_new :: (ident: string, line: int, start: int) -> *Expr_Ast #expand {
-    assert(ident != "", "ident cannot be null");
-    return New(Expr_Ast, .{.VAR, .{ expr_var = ident }, .{line, start}});
-}
-
-expr_fn_call_new :: (ident: string, args_list: [..]*Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(ident != "", "ident cannot be null");
-    return New(Expr_Ast, .{.FN_CALL, .{ expr_fn_call = .{ ident, args_list } }, .{line, start}});
-}
-
-expr_group_new :: (expr: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(expr != null, "expr cannot be null");
-    return New(Expr_Ast, .{.GROUP, .{ expr_group = expr }, .{line, start}});
-}
-
-stmt_default_new :: (line: int, start: int) -> *Stmt_Ast #expand {
-    return New(Stmt_Ast, .{.DEFAULT, .{ stmt_default = "$$UNPROCESSED$$" }, .{line, start}});
-}
-
-expr_binary_new :: (op: Binary_Operator, left: *Expr_Ast, right: *Expr_Ast, line: int, start: int) -> *Expr_Ast #expand {
-    assert(left != null, "left cannot be null");
-    assert(right != null, "right cannot be null");
-    return New(Expr_Ast, .{.BINARY, .{ expr_binary = .{ op, left, right }}, .{line, start}});
-}
-
-expr_constant_new :: (constant: int, line: int, start: int) -> *Expr_Ast #expand {
-    return New(Expr_Ast, .{.CONSTANT, .{ expr_constant = constant }, .{line, start}});
+    Binary_Operator :: enum {
+        ADD;
+        AND;
+        BITWISE_AND;
+        BITWISE_OR;
+        BITWISE_XOR;
+        DIV;
+        EQUAL_EQUAL;
+        GREATER;
+        GREATER_EQUAL;
+        LEFT_SHIFT;
+        LESS;
+        LESS_EQUAL;
+        MOD;
+        MUL;
+        NOT_EQUAL;
+        OR;
+        RIGHT_SHIFT;
+        SUB;
+    }
 }

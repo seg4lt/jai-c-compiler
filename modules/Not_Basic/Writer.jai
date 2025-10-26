@@ -1,4 +1,5 @@
 
+// TODO(seg4lt): use interface pattern
 Writer :: struct {
     ctx   : *void;
     write : (ctx: *void, format_string: string, args: .. Any) -> success: bool;

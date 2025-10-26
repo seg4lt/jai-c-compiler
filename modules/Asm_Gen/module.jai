@@ -1,6 +1,7 @@
 #load "Asm_Nodes.jai";
 
 #scope_module
+using Asm;
 
 #load "Asm_Gen.jai";
 #load "Asm_Gen_Printer.jai";

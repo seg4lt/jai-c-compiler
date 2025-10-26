@@ -1,124 +1,240 @@
-Program_Asm :: struct {
-    top_level: [..]Top_Level_Asm;
-}
-
-Top_Level_Asm :: struct {
-    kind: enum { STATIC; FN; };
-    using as: union {
-        top_level_static_var: Static_Var_Asm;
-        top_level_fn: Fn_Asm;
+Asm :: struct {
+    Instruction_Kind :: enum {
+        ALLOCATE_STACK;
+        BINARY;
+        CALL;
+        CDQ;
+        CMP;
+        DEALLOCATE_STACK;
+        IDIV;
+        JMP;
+        JMP_CC;
+        LABEL;
+        MOV;
+        PUSH;
+        RET;
+        SET_CC;
+        UNARY;
     }
-};
 
-Static_Var_Asm :: struct {
-    ident: string;
-    global: bool;
-    init: int;
-}
+    Top_Level_Kind :: enum {
+        STATIC;
+        FN;
+    }
 
-Fn_Asm :: struct {
-    ident:        string;
-    instructions: [..]Instruction_Asm;
-    stack_size:   int = 0;
-    global:       bool;
-}
+    Operand_Kind :: enum {
+        IMM;
+        REG;
+        PSEUDO;
+        STACK;
+        DATA;
+    }
 
-Instruction_Asm :: struct {
-    type : Instruction_Asm_Type;
-    as   : union {
-        allocate_stack    : int;
-        binary            : struct { op: Bin_Op_Asm; src1: Operand_Asm; src2: Operand_Asm; } 
-        call              : string;
-        cmp               : struct { op1: Operand_Asm; op2: Operand_Asm; };
-        deallocate_stack  : int;
-        idiv              : Operand_Asm;
-        jmp               : string;
-        jmp_cc            : struct { cond_code: Cond_Code_Asm; ident: string; };
-        label             : string;
-        mov               : struct { src: Operand_Asm; dst: Operand_Asm; };
-        push              : Operand_Asm;
-        set_cc            : struct { cond_code: Cond_Code_Asm; operand: Operand_Asm; };
-        unary             : struct { op: Unary_Op_Asm; operand: Operand_Asm; }
-        // cdq            : no value needed
-        // ret            : no value needed
-    };
-}
+    Cond_Code :: enum { EE; NE; G; GE; L; LE; }
 
-Instruction_Asm_Type :: enum {
-    ALLOCATE_STACK;
-    BINARY;
-    CALL;
-    CDQ;
-    CMP;
-    DEALLOCATE_STACK;
-    IDIV;
-    JMP;
-    JMP_CC;
-    LABEL;
-    MOV;
-    PUSH;
-    RET;
-    SET_CC;
-    UNARY;
-};
+    Unary_Op :: enum { NEG; BITWISE_NOT; NNOT; }
 
-Cond_Code_Asm :: enum { EE; NE; G; GE; L; LE; }; 
+    Bin_Op :: enum {
+        ADD;
+        BITWISE_AND;
+        BITWISE_OR;
+        BITWISE_XOR;
+        EQUAL_EQUAL;
+        GREATER;
+        GREATER_EQUAL;
+        LEFT_SHIFT;
+        LESS;
+        LESS_EQUAL;
+        MUL;
+        NOT_EQUAL;
+        RIGHT_SHIFT;
+        SUB;
+    }
 
-Operand_Asm :: struct {
-    type:     enum { IMM; REG; PSEUDO; STACK; DATA; };
-    using as: union { 
-        imm:    int;
-        pseudo: string;
-        reg:    Register_Asm;
-        stack:  int; 
-        data:   string;
-    }; 
-};
+    Register_Size :: enum #specified {
+        BYTE  :: 1;
+        WORD  :: 2;
+        DWORD :: 4;
+        QWORD :: 8;
+    }
 
-Unary_Op_Asm :: enum { NEG; BITWISE_NOT; NNOT; }
+    Register :: enum {
+        AX;
+        CX;
+        DI;
+        DX;
+        R10;
+        R11;
+        R8;
+        R9;
+        RBP;
+        RSP;
+        SI;
+        RIP;
+    }
 
-Bin_Op_Asm :: enum {
-    ADD;
-    BITWISE_AND;
-    BITWISE_OR;
-    BITWISE_XOR;
-    EQUAL_EQUAL;
-    GREATER;
-    GREATER_EQUAL;
-    LEFT_SHIFT;
-    LESS;
-    LESS_EQUAL;
-    MUL;
-    NOT_EQUAL;
-    RIGHT_SHIFT;
-    SUB;
-}; 
+    Register_Asm :: struct {
+        register: Register;
+        size: Register_Size;
+    }
 
-Register_Asm :: struct {
-    register : Register;
-    size     : Register_Size;
-};
+    Operand :: struct {
+        kind: Operand_Kind;
+    }
 
-Register_Size :: enum #specified { 
-    BYTE  :: 1;
-    WORD  :: 2;
-    DWORD :: 4;
-    QWORD :: 8;
-}
+    Operand_Imm :: struct {
+        #as using base: Operand;
+        kind = Operand_Kind.IMM;
+        value: int;
+    }
 
-Register :: enum { 
-    AX;
-    CX;
-    DI;
-    DX;
-    R10;
-    R11;
-    R8;
-    R9;
-    RBP;
-    RSP;
-    SI;
-    RIP;
+    Operand_Reg :: struct {
+        #as using base: Operand;
+        kind = Operand_Kind.REG;
+        reg: Register_Asm;
+    }
+
+    Operand_Pseudo :: struct {
+        #as using base: Operand;
+        kind = Operand_Kind.PSEUDO;
+        ident: string;
+    }
+
+    Operand_Stack :: struct {
+        #as using base: Operand;
+        kind = Operand_Kind.STACK;
+        position: int;
+    }
+
+    Operand_Data :: struct {
+        #as using base: Operand;
+        kind = Operand_Kind.DATA;
+        ident: string;
+    }
+
+    Instruction :: struct {
+        kind: Instruction_Kind;
+    }
+
+    Instruction_Allocate_Stack :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.ALLOCATE_STACK;
+        size: int;
+    }
+
+    Instruction_Binary :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.BINARY;
+        op: Bin_Op;
+        src1: *Operand;
+        src2: *Operand;
+    }
+
+    Instruction_Call :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.CALL;
+        ident: string;
+    }
+
+    Instruction_Cdq :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.CDQ;
+    }
+
+    Instruction_Cmp :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.CMP;
+        op1: *Operand;
+        op2: *Operand;
+    }
+
+    Instruction_Deallocate_Stack :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.DEALLOCATE_STACK;
+        size: int;
+    }
+
+    Instruction_Idiv :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.IDIV;
+        operand: *Operand;
+    }
+
+    Instruction_Jmp :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.JMP;
+        target: string;
+    }
+
+    Instruction_Jmp_Cc :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.JMP_CC;
+        cond_code: Cond_Code;
+        target: string;
+    }
+
+    Instruction_Label :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.LABEL;
+        ident: string;
+    }
+
+    Instruction_Mov :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.MOV;
+        src: *Operand;
+        dst: *Operand;
+    }
+
+    Instruction_Push :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.PUSH;
+        operand: *Operand;
+    }
+
+    Instruction_Ret :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.RET;
+    }
+
+    Instruction_Set_Cc :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.SET_CC;
+        cond_code: Cond_Code;
+        operand: *Operand;
+    }
+
+    Instruction_Unary :: struct {
+        #as using base: Instruction;
+        kind = Instruction_Kind.UNARY;
+        op: Unary_Op;
+        operand: *Operand;
+    }
+
+    Top_Level :: struct {
+        kind: Top_Level_Kind;
+    }
+
+    Top_Level_Static :: struct {
+        #as using base: Top_Level;
+        kind = Top_Level_Kind.STATIC;
+        ident: string;
+        global: bool;
+        init: int;
+    }
+
+    Top_Level_Fn :: struct {
+        #as using base: Top_Level;
+        kind = Top_Level_Kind.FN;
+        ident: string;
+        instructions: [..]*Instruction;
+        stack_size: int;
+        global: bool;
+    }
+
+    Program :: struct {
+        top_level: [..]*Top_Level;
+    }
 }
 
 #scope_module
@@ -128,83 +244,142 @@ STACK_ALIGNMENT         :: 16;
 PUSH_SIZE               :: 8; // we use push and it only works with 8 bytes
 ARGS_REGISTERS          : [COUNT_REGISTER_FOR_ARGS]Register : .[.DI, .SI, .DX, .CX, .R8, .R9];
 
-
-reg :: (register: Register, size: Register_Size) -> Operand_Asm #expand {
-    return .{.REG, .{reg = .{register, size }}};
+reg :: (register: Register, size: Register_Size) -> *Operand #expand {
+    r := New(Operand_Reg);
+    r.reg = .{ register, size };
+    return r;
 }
 
-pseudo :: (ident: string) -> Operand_Asm #expand {
-    return .{ .PSEUDO, .{ pseudo = copy_string(ident) } };
+pseudo :: (ident: string) -> *Operand #expand {
+    p := New(Operand_Pseudo);
+    p.ident = copy_string(ident);
+    return p;
 }
 
-stack :: (position: int) -> Operand_Asm #expand {
-    return .{ .STACK, .{ stack = position } }; 
+stack :: (position: int) -> *Operand #expand {
+    s := New(Operand_Stack);
+    s.position = position;
+    return s;
 }
 
-data :: (ident: string) -> Operand_Asm #expand {
-    return .{ .DATA , .{ data = ident } }; 
+data :: (ident: string) -> *Operand #expand {
+    d := New(Operand_Data);
+    d.ident = ident;
+    return d;
 }
 
-imm :: (value: int) -> Operand_Asm #expand {
-    return .{ .IMM, .{ imm = value } };
-} 
-
-ret :: () -> Instruction_Asm #expand {
-    return .{.RET, .{}};
+imm :: (value: int) -> *Operand #expand {
+    i := New(Operand_Imm);
+    i.value = value;
+    return i;
 }
 
-mov :: (src: Operand_Asm, dst: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .MOV, .{ mov = .{ src, dst } } };
+ret :: () -> *Instruction #expand {
+    return New(Instruction_Ret);
 }
 
-cmp :: (op1: Operand_Asm, op2: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .CMP, .{ cmp = .{ op1, op2 } } };
+mov :: (src: *Operand, dst: *Operand) -> *Instruction #expand {
+    m := New(Instruction_Mov);
+    m.src = src;
+    m.dst = dst;
+    return m;
 }
 
-set_cc :: (cond_code: Cond_Code_Asm, operand: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .SET_CC, .{ set_cc = .{ cond_code, operand } } }; 
+cmp :: (op1: *Operand, op2: *Operand) -> *Instruction #expand {
+    c := New(Instruction_Cmp);
+    c.op1 = op1;
+    c.op2 = op2;
+    return c;
 }
 
-unary :: (op: Unary_Op_Asm, operand: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .UNARY, .{ unary = .{ op, operand } } };
+set_cc :: (cond_code: Cond_Code, operand: *Operand) -> *Instruction #expand {
+    s := New(Instruction_Set_Cc);
+    s.cond_code = cond_code;
+    s.operand = operand;
+    return s;
 }
 
-binary :: (op: Bin_Op_Asm, src1: Operand_Asm, src2: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .BINARY, .{ binary = .{ op, src1, src2 } } };
+unary :: (op: Unary_Op, operand: *Operand) -> *Instruction #expand {
+    u := New(Instruction_Unary);
+    u.op = op;
+    u.operand = operand;
+    return u;
 }
 
-cdq :: () -> Instruction_Asm #expand {
-    return .{ .CDQ, .{} };
+binary :: (op: Bin_Op, src1: *Operand, src2: *Operand) -> *Instruction #expand {
+    b := New(Instruction_Binary);
+    b.op = op;
+    b.src1 = src1;
+    b.src2 = src2;
+    return b;
 }
 
-idiv :: (operand: Operand_Asm) -> Instruction_Asm #expand {
-    return .{ .IDIV, .{ idiv = operand } };
+cdq :: () -> *Instruction #expand {
+    return New(Instruction_Cdq);
 }
 
-label :: (ident: string) -> Instruction_Asm #expand {
-    return .{ .LABEL, .{ label = copy_string(ident) } };
+idiv :: (operand: *Operand) -> *Instruction #expand {
+    i := New(Instruction_Idiv);
+    i.operand = operand;
+    return i;
 }
 
-jmp_cc :: (cond_code: Cond_Code_Asm, ident: string) -> Instruction_Asm #expand {
-    return .{ .JMP_CC, .{ jmp_cc = .{ cond_code, copy_string(ident) } } };
+label :: (ident: string) -> *Instruction #expand {
+    l := New(Instruction_Label);
+    l.ident = copy_string(ident);
+    return l;
 }
 
-jmp :: (ident: string) -> Instruction_Asm #expand {
-    return .{ .JMP, .{ jmp = copy_string(ident) } };
+jmp_cc :: (cond_code: Cond_Code, target: string) -> *Instruction #expand {
+    j := New(Instruction_Jmp_Cc);
+    j.cond_code = cond_code;
+    j.target = copy_string(target);
+    return j;
 }
 
-allocate_stack :: (size: int) -> Instruction_Asm #expand {
-    return .{.ALLOCATE_STACK, .{allocate_stack = size}};
+jmp :: (target: string) -> *Instruction #expand {
+    j := New(Instruction_Jmp);
+    j.target = copy_string(target);
+    return j;
 }
 
-push :: (operand: Operand_Asm) -> Instruction_Asm #expand {
-    return .{.PUSH, .{push = operand}};
+allocate_stack :: (size: int) -> *Instruction #expand {
+    a := New(Instruction_Allocate_Stack);
+    a.size = size;
+    return a;
 }
 
-call :: (ident: string) -> Instruction_Asm #expand {
-    return .{.CALL, .{ call = copy_string(ident) }};
+push :: (operand: *Operand) -> *Instruction #expand {
+    p := New(Instruction_Push);
+    p.operand = operand;
+    return p;
 }
 
-deallocate_stack :: (size: int) -> Instruction_Asm #expand {
-    return .{.DEALLOCATE_STACK, .{ deallocate_stack = size }};
+call :: (ident: string) -> *Instruction #expand {
+    c := New(Instruction_Call);
+    c.ident = copy_string(ident);
+    return c;
+}
+
+deallocate_stack :: (size: int) -> *Instruction #expand {
+    d := New(Instruction_Deallocate_Stack);
+    d.size = size;
+    return d;
+}
+
+top_level_static_var :: (ident: string, global: bool, init: int) -> *Top_Level #expand {
+    s := New(Top_Level_Static);
+    s.ident = ident;
+    s.global = global;
+    s.init = init;
+    return s;
+}
+
+top_level_fn :: (ident: string, instructions: [..]*Instruction, stack_size: int, global: bool) -> *Top_Level #expand {
+    f := New(Top_Level_Fn);
+    f.ident = ident;
+    f.instructions = instructions;
+    f.stack_size = stack_size;
+    f.global = global;
+    return f;
 }

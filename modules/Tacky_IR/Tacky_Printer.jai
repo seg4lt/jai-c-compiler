@@ -1,84 +1,101 @@
-print_tacky :: (program: *Program_Tacky, writer: *Writer) {
+print_tacky :: (program: *Program, writer: *Writer) {
     write(writer, "\n\n-- Tacky --\n");
     write(writer, "    .program\n");
     
     
-    for *item: program.items {
-        using item.*;
-        if #complete kind == {
-            case .FN; print_tacky_fn(*top_level_fn, writer);
-            case .STATIC_VAR; print_static_var(*top_level_static_var, writer);
+    for item: program.items {
+        if #complete item.kind == {
+            case .FN; 
+                fn := cast(*Top_Level_Fn) item;
+                print_tacky_fn(fn, writer);
+            case .STATIC_VAR; 
+                sv := cast(*Top_Level_Static_Var) item;
+                print_static_var(sv, writer);
         }
         write(writer, "\n");
     }
 }
-print_static_var:: (var: Static_Var_Tacky, writer: *Writer) {
+
+print_static_var:: (var: *Top_Level_Static_Var, writer: *Writer) {
     write(writer, "    StaticVar(ident: %, global: %, init: %)", var.ident, var.global, var.init);
 }
 
-print_tacky_fn :: (fn: *Fn_Tacky, writer: *Writer) {
+print_tacky_fn :: (fn: *Top_Level_Fn, writer: *Writer) {
     write(writer, ".%:", fn.ident);
-    for fn.instructions print_tacky_inst(*it, writer);
+    for fn.instructions print_tacky_inst(it, writer);
 }
 
-print_tacky_inst :: (inst: *Instruction_Tacky, writer: *Writer) {
+print_tacky_inst :: (inst: *Instruction, writer: *Writer) {
     write(writer, "\n    ");
-    if #complete inst.type == {
+    if #complete inst.kind == {
         case .FN_CALL;
-            write(writer, "FnCall(ident: %, args: [", inst.as.fn_call.ident);
-            for arg: inst.as.fn_call.args {
-                print_tacky_val(*arg, writer);
-                if it_index != inst.as.fn_call.args.count - 1 write(writer, ", ");
+            fn_call := cast(*Instruction_Fn_Call) inst;
+            write(writer, "FnCall(ident: %, args: [", fn_call.ident);
+            for arg: fn_call.args {
+                print_tacky_val(arg, writer);
+                if it_index != fn_call.args.count - 1 write(writer, ", ");
             }
             write(writer, "], dst: ");
-            print_tacky_val(*inst.as.fn_call.dst, writer);
+            print_tacky_val(fn_call.dst, writer);
             write(writer, ")");
         case .RETURN;
+            ret := cast(*Instruction_Return) inst;
             write(writer, "Return(");
-            print_tacky_val(*inst.as.ret, writer);
+            print_tacky_val(ret.val, writer);
             write(writer, ")");
         case .UNARY;
-            write(writer, "Unary(op: %", inst.as.unary.op);
+            unary := cast(*Instruction_Unary) inst;
+            write(writer, "Unary(op: %", unary.op);
             write(writer, ", src: ");
-            print_tacky_val(*inst.as.unary.src, writer);
+            print_tacky_val(unary.src, writer);
             write(writer, ", dst: ");
-            print_tacky_val(*inst.as.unary.dst, writer);
+            print_tacky_val(unary.dst, writer);
             write(writer, ")");
         case .BINARY;
-            write(writer, "Binary(op: %", inst.as.binary.op);
+            binary := cast(*Instruction_Binary) inst;
+            write(writer, "Binary(op: %", binary.op);
             write(writer, ", src1: ");
-            print_tacky_val(*inst.as.binary.src1, writer);
+            print_tacky_val(binary.src1, writer);
             write(writer, ", src2: ");
-            print_tacky_val(*inst.as.binary.src2, writer);
+            print_tacky_val(binary.src2, writer);
             write(writer, ", dst: ");
-            print_tacky_val(*inst.as.binary.dst, writer);
+            print_tacky_val(binary.dst, writer);
             write(writer, ")");
         case .LABEL;
-            write(writer, "Label(%)", inst.as.label);
+            lbl := cast(*Instruction_Label) inst;
+            write(writer, "Label(%)", lbl.name);
         case .JUMP_IF_NOT_ZERO; 
+            jnz := cast(*Instruction_Jump_If_Not_Zero) inst;
             write(writer, "JumpIfNotZero(condition: ");
-            print_tacky_val(*inst.as.jump_if_not_zero.condition, writer);
-            write(writer, ", label: %", inst.as.jump_if_not_zero.ident);
+            print_tacky_val(jnz.condition, writer);
+            write(writer, ", label: %", jnz.target);
             write(writer, ")");
         case .JUMP_IF_ZERO; 
+            jz := cast(*Instruction_Jump_If_Zero) inst;
             write(writer, "JumpIfZero(condition: ");
-            print_tacky_val(*inst.as.jump_if_zero.condition, writer);
-            write(writer, ", label: %", inst.as.jump_if_zero.ident);
+            print_tacky_val(jz.condition, writer);
+            write(writer, ", label: %", jz.target);
             write(writer, ")");
         case .COPY; 
+            copy := cast(*Instruction_Copy) inst;
             write(writer, "Copy(src: ");
-            print_tacky_val(*inst.as.copy.src, writer);
+            print_tacky_val(copy.src, writer);
             write(writer, ", dst: ");
-            print_tacky_val(*inst.as.copy.dst, writer);
+            print_tacky_val(copy.dst, writer);
             write(writer, ")");
         case .JUMP;
-            write(writer, "Jump(%)", inst.as.jump);
+            jmp := cast(*Instruction_Jump) inst;
+            write(writer, "Jump(%)", jmp.target);
     }
 }
 
-print_tacky_val :: (val: *Val_Tacky, writer: *Writer) {
-    if #complete val.type == {
-        case .CONSTANT; write(writer, "Constant(%)", val.as.constant);
-        case .VARIABLE; write(writer, "Var(%)", val.as.variable);
+print_tacky_val :: (val: *Val, writer: *Writer) {
+    if #complete val.kind == {
+        case .CONSTANT; 
+            constant := cast(*Val_Constant) val;
+            write(writer, "Constant(%)", constant.constant);
+        case .VARIABLE; 
+            variable := cast(*Val_Variable) val;
+            write(writer, "Var(%)", variable.variable);
     }
 }

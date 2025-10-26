@@ -15,6 +15,7 @@ build:: () {
 
     options.output_path =  "out" ;
     options.output_executable_name = "jcc";
+    options.backend = .X64;
 
     set_optimization(*options, .VERY_DEBUG);
     set_build_options(options, w);
