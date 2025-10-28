@@ -59,7 +59,7 @@ unreachable :: ($message := "", args: .. Any, log: bool = true, exit_status_code
     print_stack_trace(context.stack_trace);
     print("\n===================================\n");
     my_panic();
-    // TODO(Aman): make this macro return anything here, so on call site we don't have to return dumb value
+    // TODO(seg4lt): make this macro return anything here, so on call site we don't have to return dumb value
 }
 
 New :: ($T: Type, value: T) -> *T #expand {

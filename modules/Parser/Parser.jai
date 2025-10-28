@@ -603,11 +603,14 @@ precedence :: (parser: *Parser, token_type: Token_Type) -> int {
     return 0;
 }
 
+// This is more or less trying to deep clone the expr
+// Maybe I need to find a way to not do this and make it work
 expr_clone :: (expr: *Expr) -> *Expr {
     if expr.kind == {
         case .VAR;
-            expr_var := cast(*Expr_Var) expr;
-            return Expr_Var.new(expr_var.ident, expr_var.line, expr_var.start);
+            using expr_var := cast(*Expr_Var) expr;
+            // we can just use new if we use using, but is this confusing ???
+            return new(expr_var.ident, expr_var.line, expr_var.start);
         case .CONSTANT;
             expr_constant := cast(*Expr_Constant) expr;
             return Expr_Constant.new(expr_constant.value, expr_constant.line, expr_constant.start);

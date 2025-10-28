@@ -159,7 +159,7 @@ print_arena :: (using arena: *Arena) {
 
 #scope_file
 
-// TODO(Aman): Make this a module parameter
+// TODO(seg4lt): Make this a module parameter
 DEFAULT_BLOCK_SIZE :: 4 *  1024;
 
 Block :: struct {
