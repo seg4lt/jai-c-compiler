@@ -1,20 +1,11 @@
-// an external variable is in scope inside a switch statement
-// even if we jump over the point where it's declared
+#ifdef SUPPRESS_WARNINGS
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+#else
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+#endif
 
 int main(void) {
-    int a = 10;
-    switch(a) {
-        case 1: return 1; // fail
-        extern int x; // bring x into scope
-        case 2: return 2; // fail
-        case 10:
-        if (x * 2 == 30) {
-            return 0; // success
-        }
-        default: return 5; // fail
-    }
-    return 6; // also fail; shouldn't have made it to this point
+    return 80 >> 2 | 1 ^ 5 & 7 << 1;
 }
-
-
-int x = 15;

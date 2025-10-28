@@ -59,9 +59,13 @@ fix_instructions :: (old_instructions: []*Instruction, stack_size: int) -> [..]*
                 if #complete bins.op == {
                     case .LEFT_SHIFT; #through;
                     case .RIGHT_SHIFT;
-                        ireg := reg(.CX, .DWORD);
-                        array_add(*insts, mov(bins.src1, ireg));
-                        array_add(*insts, binary(bins.op, ireg, bins.src2));
+                        count_reg_dword := reg(.CX, .DWORD);
+                        array_add(*insts, mov(bins.src1, count_reg_dword));
+                        dest_reg := reg(.R10, .DWORD);
+                        array_add(*insts, mov(bins.src2, dest_reg));
+                        count_reg_byte := reg(.CX, .BYTE);
+                        array_add(*insts, binary(bins.op, count_reg_byte, dest_reg));
+                        array_add(*insts, mov(dest_reg, bins.src2));
                     case .ADD;         #through;
                     case .BITWISE_AND; #through;
                     case .BITWISE_OR;  #through;
