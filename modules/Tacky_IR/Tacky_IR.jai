@@ -15,19 +15,21 @@ gen_tacky :: (pg: *Ast.Program, st: *Symbol_Table, debug_log: bool = false) -> *
     }
 
     for value, key: st {
-        if #complete value.attr.kind == {
-            case .STATIC;
-                sv := cast(*Symbol_Table.Ident_Attr_Static) value.attr;
-                if #complete sv.initial_value.kind == {
-                    case .INITIAL;
-                        init_val := cast(*Symbol_Table.Ident_Initial_Value_Initial) sv.initial_value;
-                        array_add(*top_level_tac, Top_Level_Static_Var.new(key, sv.global, init_val.value));
-                    case .TENTATIVE;
-                        array_add(*top_level_tac, Top_Level_Static_Var.new(key, sv.global, 0));
-                    case .NO_INITIALIZER; // noop
+        if #complete value.kind == {
+            case .VAR;
+                var_symbol := cast(*Symbol_Var) value;
+                if #complete var_symbol.attr.kind == {
+                    case .STATIC;
+                        if #complete var_symbol.attr.initial_value.kind == {
+                            case .INITIAL;
+                                array_add(*top_level_tac, Top_Level_Static_Var.new(key, var_symbol.attr.global, var_symbol.attr.initial_value.value));
+                            case .TENTATIVE;
+                                array_add(*top_level_tac, Top_Level_Static_Var.new(key, var_symbol.attr.global, 0));
+                            case .NO_INITIALIZER;
+                        }
+                    case .LOCAL;
                 }
-            case .FN;    #through;
-            case .LOCAL; // noop
+            case .FN;
         }
     }
 
@@ -43,15 +45,13 @@ gen_fn_tacky :: (tc: *Tacky_Ctx, fn_ast: *Ast.Fn_Decl, st: *Symbol_Table) -> *To
     instructions: [..]*Instruction;
     if fn_ast.body  {
         gen_instructions(tc, *instructions, fn_ast.body, st);
-        // Always add return 0 as there might be case where we don't have one
-        // Potentially we can optimize this away later.
         array_add(*instructions, ret(constant(0)));
     }
     found_symbol, symbol := table_find(st, fn_ast.ident);
-    assert(found_symbol, "Something went wrong.. fn symbol not found on table");
-    assert(symbol.attr.kind == .FN, "Symbol should be fn kind");
-    attr_fn := cast(*Symbol_Table.Ident_Attr_Fn) symbol.attr;
-    return Top_Level_Fn.new(fn_ast.ident, attr_fn.global, instructions);
+    assert(found_symbol);
+    assert(symbol.kind == .FN);
+    fn_symbol := cast(*Symbol_Fn) symbol;
+    return Top_Level_Fn.new(fn_ast.ident, fn_symbol.global, instructions);
 }
 
 gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, block_ast: *Ast.Block, st: *Symbol_Table) {
@@ -111,8 +111,11 @@ gen_instructions :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, stmt_ast: 
                 expr_var := cast(*Ast.Expr_Var) stmt_expr.expr;
                 success, ident := table_find(st, expr_var.ident);
                 if success {
-                    if ident.attr.kind == .STATIC {
-                        return;
+                    if ident.kind == .VAR {
+                        var_symbol := cast(*Symbol_Var) ident;
+                        if var_symbol.attr.kind == .STATIC {
+                            return;
+                        }
                     }
                 }
             }

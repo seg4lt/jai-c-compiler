@@ -29,7 +29,7 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
 
     // fn args already has a name - but they don't have values
     // we need to move value as per System V calling convention to respective pseudo registers
-    fn_sym := cast(*Symbol_Table.Symbol_Fn) sym;
+    fn_sym := cast(*Symbol_Fn) sym;
     fn_params := fn_sym.params;
 
     register_args  := array_view(fn_params, 0, min(fn_params.count, COUNT_REGISTER_FOR_ARGS));

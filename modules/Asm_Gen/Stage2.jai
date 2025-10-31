@@ -67,7 +67,10 @@ pseudo_to_stack :: (table: *Table, st: *Symbol_Table, op: *Operand) -> *Operand 
     pseudo := pseudo_op.ident;
 
     found_symbol, symbol := table_find(st, pseudo);
-    if found_symbol && symbol.attr.kind == .STATIC return data(pseudo);
+    if found_symbol && symbol.kind == .VAR {
+        var_symbol := cast(*Symbol_Var) symbol;
+        if var_symbol.attr.kind == .STATIC return data(pseudo);
+    }
 
     success, saved_offset := table_find(table, pseudo);
     if success return stack(saved_offset);

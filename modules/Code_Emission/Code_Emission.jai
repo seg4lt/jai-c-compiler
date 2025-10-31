@@ -79,8 +79,8 @@ emm_instructions :: (writer: *Writer, inst: *Instruction, symbols: Symbol_Table)
                 success, entry := table_find(*symbols, fn_name);
                 add_plt := false;
                 if success && entry.kind == .FN {
-                    attr_fn := cast(*Symbol_Table.Ident_Attr_Fn) entry.attr;
-                    if !attr_fn.defined {
+                    fn_symbol := cast(*Symbol_Fn) entry;
+                    if !fn_symbol.defined {
                         add_plt = true;
                     }
                 }
