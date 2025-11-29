@@ -1,5 +1,6 @@
 main :: () {
     success := run_compiler();
+
     log("\n================= COMPILER EXITED ===================\n");
     if !success { log("Compiler failed with errors. Exiting."); exit(1); }
 }
@@ -52,13 +53,6 @@ run_compiler :: () -> success: bool = true {
 
 has_error :: (erp: *Error_Reporter) -> bool {
     return erp.error_items.count > 0;
-}
-
-fail_fast :: () #expand {
-    if `erp.error_items.count <= 0 return;
-
-    print_errors(*`erp, panic = true);
-    `return success = false;
 }
 
 DEBUG_LOG :: true;

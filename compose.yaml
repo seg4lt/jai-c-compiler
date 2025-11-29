@@ -14,4 +14,4 @@ services:
     volumes:
       - "./:/app"
       # Hardcoding the value, but oh well!!! Jai is in closed beta
-      - "${HOME}/Code/libs/jai:/libs/jai"
+      - "${HOME}/seg4ltcode/seg4lt-libs/jai:/libs/jai"

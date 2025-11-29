@@ -5,7 +5,7 @@ Symbol_Table :: struct {
 
 init :: (using symbols: *Symbol_Table) {
     symbol_allocator = context.allocator;
-    init(*map);
+    init(*map,, symbol_allocator);
 }
 
 

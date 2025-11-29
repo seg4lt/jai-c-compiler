@@ -124,7 +124,7 @@ typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, st: *Symbol_Table, erp: *Erro
     }
     fn_symbol := Symbol_Fn.new(ident, fn_params, "int", defined = has_body || already_defined, global = global);
 
-    if !symbol_exists || has_body table_set(st, copy_string(ident), fn_symbol);
+    if !symbol_exists || has_body table_set(st, copy_string(ident,, st.allocator), fn_symbol);
 
     if has_body {
         for params table_set(st, copy_string(it.ident), Symbol_Var.new(it.ident, local_var()));
