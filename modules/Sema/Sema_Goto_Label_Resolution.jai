@@ -171,6 +171,7 @@ resolve_stmt :: (stmt: *Ast.Stmt, goto_labels: *Label_Store, label_store: *Label
 
 resolve_expr :: (expr: *Ast.Expr, goto_labels: *Label_Store, label_store: Label_Store, erp: *Error_Reporter) {
     if #complete expr.kind == {
+        case .CAST; assert(false, "not implemented");
         case .POSTFIX;
             expr_postfix := cast(*Ast.Expr_Postfix) expr;
             resolve_expr(expr_postfix.expr, goto_labels, label_store, erp);
@@ -198,6 +199,7 @@ resolve_expr :: (expr: *Ast.Expr, goto_labels: *Label_Store, label_store: Label_
 
 label_expr :: (expr: *Ast.Expr, label_store: *Label_Store, erp: *Error_Reporter) {
     if #complete expr.kind == {
+        case .CAST; assert(false, "not implemented");
         case .POSTFIX;
             expr_postfix := cast(*Ast.Expr_Postfix) expr;
             label_expr(expr_postfix.expr, label_store, erp);

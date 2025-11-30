@@ -26,9 +26,18 @@ print_storage_class :: (writer: *Writer, class: Ast.Storage_Class) {
 print_fn_decl_ast :: (writer: *Writer, fn_decl: *Ast.Fn_Decl, depth: int, indent: bool = false) {
     if indent print_space(writer, depth);
     print_storage_class(writer, fn_decl.storage_class);
-    write(writer, "int %( ", fn_decl.ident);
+    if #complete fn_decl.type.(*Ast.Decl_Type_Fn).return_type.kind == {
+        case .INT; write(writer, "int ");
+        case .LONG; write(writer, "long ");
+        case .FN; unreachable("** compiler bug ** this is fn return type, and fn type is not supported");
+    }
+    write(writer, "%( ", fn_decl.ident);
     for param: fn_decl.params {
-        if fn_decl.body != null write(writer, "int ");
+        if #complete fn_decl.type.(*Ast.Decl_Type_Fn).params[it_index].kind == {
+            case .INT; write(writer, "int ");
+            case .LONG; write(writer, "long ");
+            case .FN; unreachable("** compiler bug ** this is fn param type, and fn type is not supported");
+        }
         write(writer, "%", param.ident);
         if it_index < fn_decl.params.count - 1 write(writer, ", ");
     }
@@ -78,7 +87,11 @@ print_var_decl_ast :: (writer: *Writer, using var_decl: *Ast.Var_Decl, depth: in
         case .EXTERN; write(writer, "extern ");
         case .NONE; // noop
     }
-    write(writer, "int ");
+    if #complete var_decl.type.kind == {
+        case .INT; write(writer, "int ");
+        case .LONG; write(writer, "long ");
+        case .FN; unreachable("** compiler bug ** this is var decl ast");
+    }
     write(writer, "%", ident);
     if init != null {
         initializer := init;
@@ -247,8 +260,23 @@ print_stmt_ast :: (writer: *Writer, stmt: *Ast.Stmt, depth: int) {
             write(writer, ";\n");
     }
 }
+
+print_decl_type :: (writer: *Writer, decl_type: *Ast.Decl_Type) {
+    if #complete decl_type.kind == {
+        case .INT; write(writer, "int");
+        case .LONG; write(writer, "long");
+        case .FN; unreachable("** compiler bug ** this is decl type ast");
+    }
+}
+
 print_expr_ast :: (writer: *Writer, expr: *Ast.Expr) {
     if #complete expr.kind == {
+        case .CAST; 
+            expr_cast := expr.(*Ast.Expr_Cast);
+            write(writer, "(");
+            print_decl_type(writer, expr_cast.target_type);
+            write(writer, ") ");
+            print_expr_ast(writer, expr_cast.expr);
         case .PREFIX;
             expr_prefix := cast(*Ast.Expr_Prefix) expr;
             write(writer, "%", ifx expr_prefix.op == .ADD "++" else "--");
@@ -290,7 +318,12 @@ print_expr_ast :: (writer: *Writer, expr: *Ast.Expr) {
             print_expr_ast(writer, expr_assignment.src);
         case .CONSTANT;
             expr_constant := cast(*Ast.Expr_Constant) expr;
-            write(writer, "%", expr_constant.value);
+            if #complete expr_constant.value.kind == {
+                case .INT;
+                    write(writer, "%", expr_constant.value.(*Ast.Constant_Int).value);
+                case .LONG;
+                    write(writer, "%L", expr_constant.value.(*Ast.Constant_Long).value);
+            }
         case .UNARY;
             expr_unary := cast(*Ast.Expr_Unary) expr;
             write(writer, "(");

@@ -279,6 +279,7 @@ gen_stmt_switch:: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, switch_ast: 
 
 gen_expr :: (tc: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *Ast.Expr) -> dst: *Val {
     if #complete expr_ast.kind == {
+        case .CAST; assert(false, "not implemented"); return null;
         case .PREFIX;
             expr_prefix := cast(*Ast.Expr_Prefix) expr_ast;
             inner_expr_result := gen_expr(tc, instructions, expr_prefix.expr);

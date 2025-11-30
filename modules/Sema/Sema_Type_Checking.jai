@@ -15,7 +15,14 @@ get_var_init_value :: (using var_decl: *Ast.Var_Decl, st: *Symbol_Table, erp: *E
     if init == null && storage_class != .EXTERN return tentative();
     if init != null && init.kind == .CONSTANT {
         expr_constant := cast(*Ast.Expr_Constant) init;
-        return initial(expr_constant.value);
+        owned_constant : *Ast.Constant = ---;
+        if #complete expr_constant.value.kind == {
+            case .INT; 
+                owned_constant = Ast.Constant_Int.new(expr_constant.value.(*Ast.Constant_Int).value);
+            case .LONG;
+                owned_constant = Ast.Constant_Long.new(expr_constant.value.(*Ast.Constant_Long).value);
+        }
+        return initial(owned_constant);
     }
 
     error_report(erp, line, start, "non constant initializer");
@@ -26,12 +33,16 @@ typecheck_file_scope_var_decl :: (using var_decl: *Ast.Var_Decl, st: *Symbol_Tab
     initial_value := get_var_init_value(var_decl, st, erp);
 
     global := storage_class != .STATIC;
+
     symbol_exists, existing_symbol := table_find(st, ident);
+
     if symbol_exists {
-        if existing_symbol.kind != .VAR error_report(erp, line, start, "this is not type int");
+        if existing_symbol.kind != .VAR
+            error_report(erp, line, start, "this is not type variable");
         
         existing_var := cast(*Symbol_Var) existing_symbol;
-        if existing_var.attr.kind != .STATIC error_report(erp, line, start, "file scope variable should have static storage attribute");
+        if existing_var.attr.kind != .STATIC
+            error_report(erp, line, start, "file scope variable should have static storage attribute");
 
         if storage_class == .EXTERN {
             global = existing_var.attr.global;
@@ -48,47 +59,99 @@ typecheck_file_scope_var_decl :: (using var_decl: *Ast.Var_Decl, st: *Symbol_Tab
         } else if initial_value.kind != .INITIAL && existing_var.attr.initial_value.kind == .TENTATIVE {
             initial_value = tentative();
         }
+
+        if var_decl.type.kind != existing_var.type.kind 
+            error_report(erp, line, start, "conflicting variable types");
     }
+
     new_attr := static_var(initial_value, global);
-    table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, new_attr));
+    owned_type : *Ast.Decl_Type = get_owned_type(var_decl.type);
+    table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, owned_type, new_attr));
+}
+
+get_owned_type :: (type: *Ast.Decl_Type) -> *Ast.Decl_Type {
+    if #complete type.kind == {
+        case .INT; return Ast.Decl_Type_Int.new();
+        case .LONG; return Ast.Decl_Type_Long.new();
+        case .FN;
+            fn_type := type.(*Ast.Decl_Type_Fn);
+            owned_params: [..]*Ast.Decl_Type;
+            for param: fn_type.params {
+                array_add(*owned_params, get_owned_type(param));
+            }
+            return Ast.Decl_Type_Fn.new(owned_params, get_owned_type(fn_type.return_type));
+    }
 }
 
 typecheck_local_var_decl :: (using var_decl: *Ast.Var_Decl, st: *Symbol_Table, erp: *Error_Reporter, can_be_static: bool = true) {
     symbol_exists, existing_symbol := table_find(st, var_decl.ident);
+    if symbol_exists {
+        if existing_symbol.kind != .VAR
+            error_report(erp, line, start, "this is not type variable");
+        
+        existing_var := existing_symbol.(*Symbol_Var);
+
+        if existing_var.type.kind != var_decl.type.kind
+            error_report(erp, line, start, "conflicting variable types");
+    
+        var_symbol := existing_symbol.(*Symbol_Var);
+
+        if var_symbol.type.kind != var_decl.type.kind
+            error_report(erp, line, start, "conflicting variable types");
+    }
+
 
     if #complete storage_class == {
         case .EXTERN;
             if init != null error_report(erp, line, start, "initializer on local extern is not allowed");
-            if symbol_exists && existing_symbol.kind != .VAR error_report(erp, line, start, "not a int value");
-
             if !symbol_exists {
                 attr := static_var(no_initializer(), true);
-                table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, attr));
+                table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), attr));
             }
         case .STATIC;
-            if !can_be_static error_report(erp, line, start, "static storage class not allowed");
+            if !can_be_static 
+                error_report(erp, line, start, "static storage class not allowed");
+
             initial_value : Initial_Value = ---;
             if init == null {
-                initial_value = initial(0);
+                if #complete var_decl.type.kind == {
+                    case .INT; initial_value = initial(Ast.Constant_Int.new(0));
+                    case .LONG; initial_value = initial(Ast.Constant_Long.new(0));
+                    case .FN; unreachable("** compiler bug ** this is var decl ast");
+                }
             } else if init.kind == .CONSTANT {
                 expr_constant := cast(*Ast.Expr_Constant) init;
-                initial_value = initial(expr_constant.value);
+                owned_constant : *Ast.Constant = ---;
+                if #complete expr_constant.value.kind == {
+                    case .INT;
+                        owned_constant = Ast.Constant_Int.new(expr_constant.value.(*Ast.Constant_Int).value);
+                    case .LONG;
+                        owned_constant = Ast.Constant_Long.new(expr_constant.value.(*Ast.Constant_Long).value);
+                }
+                initial_value = initial(owned_constant);
             } else {
                 error_report(erp, line, start, "non-constant initializer on local static variable");
             }
             attr := static_var(initial_value, false);
-            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, attr));
+            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), attr));
         case .NONE;
-            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, local_var()));
+            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), local_var()));
             if var_decl.init typecheck_expr(var_decl.init, st, erp);
     }
 }
 
-typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, st: *Symbol_Table, erp: *Error_Reporter, file_scope: bool = false) {
-    fn_params: [..]Symbol_Fn.Symbol_Fn_Param;
-    for param: params {
-        array_add(*fn_params, Symbol_Fn.Symbol_Fn_Param.{ ident = copy_string(param.ident), type  = "int" });
+is_decl_type_same :: (type1: *Ast.Decl_Type, type2: *Ast.Decl_Type) -> bool {
+    if #complete type1.kind == {
+        case .INT; return type2.kind == .INT;
+        case .LONG; return type2.kind == .LONG;
+        case .FN; return type2.kind == .FN;
     }
+    return false;
+}
+
+typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, st: *Symbol_Table, erp: *Error_Reporter, file_scope: bool = false) {
+    fn_params: [..]string;
+    for param: params array_add(*fn_params, copy_string(param.ident));
 
     already_defined := false;
     has_body        := body != null;
@@ -99,35 +162,57 @@ typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, st: *Symbol_Table, erp: *Erro
     }
 
     symbol_exists, existing_symbol := table_find(st, ident);
+
     if symbol_exists {
-        if #complete existing_symbol.kind == {
-            case .VAR; error_report(erp, line, start, "function name conflicts with variable name: %", ident);
-            case .FN;
-                existing_fn := cast(*Symbol_Fn) existing_symbol;
-                
-                already_defined = existing_fn.defined;
+        if existing_symbol.kind != .FN
+            error_report(erp, line, start, "function name conflicts with variable name: %", ident);
 
-                if already_defined && has_body {
-                    error_report(erp, line, start, "duplicate function declaration! : %", ident);
-                }
+        existing_fn_fn_type := existing_symbol.(*Symbol_Fn).type.(*Ast.Decl_Type_Fn);
 
-                if existing_fn.global && storage_class == .STATIC {
-                    error_report(erp, line, start, "duplicate function declaration! : %", ident);
-                }
-                global &= existing_fn.global;
+        // is fn_type same
+        assert(fn_decl.type.kind == .FN, "** compiler bug ** this is fn decl ast");
+        fn_type := fn_decl.type.(*Ast.Decl_Type_Fn);
 
-                if params.count != existing_fn.params.count {
-                    error_report(erp, line, start, "function parameter count mismatch for %: expected %, got %",
-                        ident, existing_fn.params.count, params.count);
-                }
+        if !is_decl_type_same(fn_type.return_type, existing_fn_fn_type.return_type)
+            error_report(erp, line, start, "conflicting function return types");
+        
+        if params.count != existing_fn_fn_type.params.count {
+            error_report(erp, line, start, "function parameter count mismatch for %: expected %, got %",
+                ident, existing_fn_fn_type.params.count, params.count);
+        }
+        for param: fn_type.params {
+            if !is_decl_type_same(param, existing_fn_fn_type.params[it_index])
+                error_report(erp, line, start, "conflicting function parameter types");
+        }
+        // end of is fn_type same
+
+
+        existing_fn := cast(*Symbol_Fn) existing_symbol;
+        already_defined = existing_fn.defined;
+
+        if already_defined && has_body 
+            error_report(erp, line, start, "duplicate function declaration! : %", ident);
+
+        if existing_fn.global && storage_class == .STATIC {
+            error_report(erp, line, start, "duplicate function declaration! : %", ident);
+        }
+        global &= existing_fn.global;
+
+        if params.count != existing_fn.params.count {
+            error_report(erp, line, start, "function parameter count mismatch for %: expected %, got %",
+                ident, existing_fn.params.count, params.count);
         }
     }
-    fn_symbol := Symbol_Fn.new(ident, fn_params, "int", defined = has_body || already_defined, global = global);
+    fn_symbol := Symbol_Fn.new(ident, get_owned_type(fn_decl.type).(*Ast.Decl_Type_Fn), fn_params, defined = has_body || already_defined, global = global);
 
     if !symbol_exists || has_body table_set(st, copy_string(ident,, st.allocator), fn_symbol);
 
     if has_body {
-        for params table_set(st, copy_string(it.ident), Symbol_Var.new(it.ident, local_var()));
+        for params {
+            param_type := type.(*Ast.Decl_Type_Fn).params[it_index];
+            table_set(st, copy_string(it.ident), Symbol_Var.new(it.ident, get_owned_type(param_type), local_var()));
+        }
+
         typecheck_block(body, st, erp);
     }
 }
@@ -214,6 +299,9 @@ typecheck_stmt :: (stmt: *Ast.Stmt, st: *Symbol_Table, erp: *Error_Reporter) {
 
 typecheck_expr :: (expr: *Ast.Expr, st: *Symbol_Table, erp: *Error_Reporter) {
     if #complete expr.kind == {
+        case .CAST; 
+            expr_cast := expr.(*Ast.Expr_Cast);
+            typecheck_expr(expr_cast.expr, st, erp);
         case .POSTFIX;
             expr_postfix := cast(*Ast.Expr_Postfix) expr;
             typecheck_expr(expr_postfix.expr, st, erp);

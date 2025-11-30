@@ -26,6 +26,7 @@ Token_Type :: enum {
     // ident and literals
     IDENT;
     INT_LITERAL;
+    LONG_LITERAL;
     
     // Keyword
     BREAK;
@@ -39,13 +40,18 @@ Token_Type :: enum {
     FOR;
     GOTO;
     IF;
-    INT;
     QUESTION_MARK;
     RETURN;
     STATIC;
     SWITCH;
     VOID;
     WHILE;
+
+   // built-in types keywords
+    INT;
+    LONG;
+    SIGNED;
+    UNSIGNED;
     
     // Operator
     AND;
@@ -294,15 +300,22 @@ comment :: (using lexer: *Lexer) {
 }
 
 number :: (using lexer: *Lexer) {
-    found_alpha := false;
+    alpha_index: [..]int;
     while !is_at_end(lexer) && (is_digit(peek(lexer)) || is_alpha(peek(lexer))) {
-        if is_alpha(peek(lexer)) found_alpha = true;
+        if is_alpha(peek(lexer)) array_add(*alpha_index, current);
         consume(lexer);
     }
-    str := str_slice(src, start, current);
-    if found_alpha lex_err(lexer, "Invalid number found %", str);
 
-    token := Token.{ .INT_LITERAL, str, line, start};
+    if alpha_index.count > 1
+        lex_err(lexer, "Invalid number found %", str_slice(src, start, current));
+
+    literal := str_slice(src, start, current);
+
+    if alpha_index.count == 1 && !is_alpha(literal.data[literal.count-1])
+        lex_err(lexer, "Invalid number found %", literal);
+
+    token_type: Token_Type = ifx alpha_index.count == 1 then .LONG_LITERAL else .INT_LITERAL;
+    token := Token.{ token_type, literal, line, start};
     array_add(*tokens, token); 
 }
 
@@ -339,6 +352,9 @@ ident :: (str: string) -> Token_Type {
         case "default";  return .DEFAULT;
         case "static";   return .STATIC;
         case "extern";   return .EXTERN;
+        case "long";     return .LONG;
+        case "signed";   return .SIGNED;
+        case "unsigned"; return .UNSIGNED;
         case;            return .IDENT;
     }
 }

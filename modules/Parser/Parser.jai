@@ -40,32 +40,37 @@ parse_program :: (parser: *Parser) -> *Program {
 }
 
 parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl {
-    ret_type, storage_class := parse_type_and_storage_class_for_decl(parser);
+    return_type, storage_class := parse_type_and_storage_class(parser);
 
     using ident_token := consume(parser, .IDENT);
 
     consume(parser, .LPAREN);
-    params := parse_fn_params(parser);
+    params, params_type := parse_fn_params(parser);
     consume(parser, .RPAREN);
-
-    if peek(parser).type == .SEMICOLON {
+    
+    fn_type := Decl_Type_Fn.new(params_type, return_type);
+    
+    body := ifx peek(parser).type == .SEMICOLON {
         consume(parser, .SEMICOLON);
-        return Fn_Decl.new(value, params, null, storage_class, line, start);
+        null;
+    } else {
+        parse_block(parser);
     }
-
-    body := parse_block(parser);
-    return Fn_Decl.new(value, params, body, storage_class, line, start);
+    return Fn_Decl.new(value, fn_type, params, body, storage_class, line, start);
 }
 
-parse_fn_params :: (parser: *Parser) -> [..]*Fn_Decl.Fn_Param {
+parse_fn_params :: (parser: *Parser) -> ([..]*Fn_Decl.Fn_Param, [..]*Decl_Type) {
     params: [..]*Fn_Decl.Fn_Param;
+    params_type: [..]*Decl_Type;
     if peek(parser).type == .VOID {
         consume(parser, .VOID);
-        return params;
+        return params, params_type;
     }
     while peek(parser).type != .RPAREN {
-        // we only support int type for now
-        type := consume(parser, .INT);
+        param_type, storage_class := parse_type_and_storage_class(parser);  
+        if storage_class != .NONE parse_err(parser, "parameter cannot have storage class");
+        array_add(*params_type, param_type);
+
         ident := consume(parser, .IDENT);
 
         fn_param := New(Fn_Decl.Fn_Param, .{ ident = ident.value, line = ident.line, start = ident.start });
@@ -73,10 +78,11 @@ parse_fn_params :: (parser: *Parser) -> [..]*Fn_Decl.Fn_Param {
 
         if peek(parser).type == .COMMA {
             consume(parser, .COMMA);
-            if peek(parser).type == .RPAREN parse_err(parser, "trailing comma on parameter list is not allowed");
+            if peek(parser).type == .RPAREN 
+                parse_err(parser, "trailing comma on parameter list is not allowed");
         }
     }
-    return params;
+    return params, params_type;
 }
 
 parse_block :: (parser: *Parser) -> *Block {
@@ -122,6 +128,7 @@ is_fn_decl :: (parser: *Parser) -> bool {
 is_decl :: (parser: *Parser, offset: int = 0) -> bool {
     if peek(parser, offset).type == {
         case .INT;    #through;
+        case .LONG;   #through;
         case .STATIC; #through;
         case .EXTERN; return true;
         case;         return false;
@@ -129,23 +136,51 @@ is_decl :: (parser: *Parser, offset: int = 0) -> bool {
     return false;
 }
 
-parse_type_and_storage_class_for_decl :: (parser: *Parser) -> (string, Storage_Class) {
-    types: [..]string;
+
+parse_type :: (parser: *Parser) -> *Decl_Type {
+    if peek(parser).type == {
+        case .INT; consume(parser); return Decl_Type_Int.new();
+        case .LONG; consume(parser); return Decl_Type_Long.new();
+    }
+    return null;
+}
+
+// TODO - support for signed/unsigned
+// This is very crude and needs to be improved
+parse_type :: (parser: *Parser, type_hint: []string) -> *Decl_Type {
+    if type_hint.count == 0 parse_err(parser, "type hint is required");
+
+    if type_hint.count == 1 {
+        if type_hint.data.* == "int" return Decl_Type_Int.new();
+        if type_hint.data.* == "long" return Decl_Type_Long.new();
+        parse_err(parser, "invalid type hint: %", type_hint.data);
+    }
+    if type_hint.count == 2 {
+        if array_find(type_hint, "long") return Decl_Type_Long.new(); 
+        if array_find(type_hint, "int") return Decl_Type_Int.new();
+        parse_err(parser, "invalid type hint: %", type_hint.data);
+    }
+    parse_err(parser, "invalid type hint: %", type_hint.data);
+    return null;
+}
+
+parse_type_and_storage_class :: (parser: *Parser) -> (*Decl_Type, Storage_Class) {
+    type_hints: [..]string;
     storage_classes: [..]Storage_Class;
 
     while (true) {
         using token := peek(parser);
         if type == {
-            case .INT;    consume(parser); array_add(*types, value);
+            case .INT;    #through;
+            case .LONG;   consume(parser); array_add(*type_hints, value);
             case .STATIC; consume(parser); array_add(*storage_classes, .STATIC);
             case .EXTERN; consume(parser); array_add(*storage_classes, .EXTERN);
             case;         break;
         }
     }
-    if types.count != 1 parse_err(parser, "decl can only have one type. Found `%`", types);
+    decl_type := parse_type(parser, type_hints);
     if storage_classes.count > 1 parse_err(parser, "decl can only have one storage class found `%`", storage_classes);
-
-    return types[0],
+    return decl_type,
            ifx storage_classes.count == 0 then .NONE else storage_classes[0];
 }
 
@@ -154,7 +189,7 @@ parse_decl :: (parser: *Parser, only_fn_decl: bool) -> *Decl {
         fn_decl_ast := parse_fn_decl(parser, only_decl = only_fn_decl);
         return Fn_Decl.as_decl(fn_decl_ast);
     }
-    _, storage_class := parse_type_and_storage_class_for_decl(parser);
+    decl_type, storage_class := parse_type_and_storage_class(parser);
     using ident_tok := consume(parser);
     if is_digit(value.data.*) parse_err(parser, "identifier should not start with digit");
 
@@ -164,7 +199,7 @@ parse_decl :: (parser: *Parser, only_fn_decl: bool) -> *Decl {
         expr = parse_expr(parser, 0);
     }
     consume(parser, .SEMICOLON);
-    return Var_Decl.new(value, expr, storage_class, line, start);
+    return Var_Decl.new(value, decl_type, expr, storage_class, line, start);
 }
 
 parse_stmt :: (parser: *Parser) -> *Stmt {
@@ -411,11 +446,16 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr {
 
 parse_factor :: (parser: *Parser) -> *Expr {
     if peek(parser).*.type ==  {
+        case .LONG_LITERAL;
+            long_literal := consume(parser, .LONG_LITERAL);
+            long_value, success := string_to_int(slice(long_literal.value, 0, long_literal.value.count-1), T = s64);
+            if !success  parse_err(parser, "expected long found %", long_literal.value);
+            return Expr_Constant.new_long(long_value, long_literal.line, long_literal.start);
         case .INT_LITERAL;
             int_literal := consume(parser, .INT_LITERAL);
             int_value, success := string_to_int(int_literal.value);
             if !success  parse_err(parser, "expected int found %", int_literal.value);
-            return Expr_Constant.new(int_value, int_literal.line , int_literal.start);
+            return Expr_Constant.new_int(int_value, int_literal.line , int_literal.start);
         case .MINUS; #through;
         case .NOT; #through;
         case .BITWISE_NOT;
@@ -437,6 +477,14 @@ parse_factor :: (parser: *Parser) -> *Expr {
             return Expr_Prefix.new(op, inner_expr, prefix_op_token.line, prefix_op_token.start);
         case .LPAREN;
             grp_start_tok := consume(parser, .LPAREN);
+            target_type := parse_type(parser);
+            log("target_type: %", target_type.kind);
+            if target_type {
+                consume(parser, .RPAREN);
+                expr_to_cast := parse_factor(parser);
+                return Expr_Cast.new(target_type, expr_to_cast, grp_start_tok.line, grp_start_tok.start);
+            }
+
             inner_expr := parse_expr(parser, 0);
             expr := Expr_Group.new(inner_expr, grp_start_tok.line, grp_start_tok.start);
             consume(parser, .RPAREN);
@@ -613,7 +661,14 @@ expr_clone :: (expr: *Expr) -> *Expr {
             return new(expr_var.ident, expr_var.line, expr_var.start);
         case .CONSTANT;
             expr_constant := cast(*Expr_Constant) expr;
-            return Expr_Constant.new(expr_constant.value, expr_constant.line, expr_constant.start);
+            if #complete expr_constant.value.kind == {
+                case .INT;
+                    value := expr_constant.value.(*Constant_Int).value;
+                    return Expr_Constant.new_int(value, expr_constant.line, expr_constant.start);
+                case .LONG;
+                    value := expr_constant.value.(*Constant_Long).value;
+                    return Expr_Constant.new_long(value, expr_constant.line, expr_constant.start);
+            }
         case .UNARY;
             expr_unary := cast(*Expr_Unary) expr;
             return Expr_Unary.new(expr_unary.op, expr_clone(expr_unary.expr), expr_unary.line, expr_unary.start);

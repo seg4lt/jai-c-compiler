@@ -9,6 +9,48 @@ Ast :: struct {
         }
     }
 
+    // TODO: Maybe this needs to be merged with Symbol_Table types?
+    // Symbol_Table has more info, so maybe not? Need to think more
+    Decl_Type :: struct {
+        kind: Kind;
+
+        Kind :: enum { INT; LONG; FN; };
+    };
+    Decl_Type_Int :: struct {
+        #as using base: Decl_Type;
+        kind = .INT;
+
+        new :: () -> *Decl_Type_Int #expand {
+            decl_type := New(Decl_Type_Int);
+            return decl_type;
+        }
+    };
+
+    Decl_Type_Long :: struct {
+        #as using base: Decl_Type;
+        kind = .LONG;
+
+        new :: () -> *Decl_Type_Long #expand {
+            decl_type := New(Decl_Type_Long);
+            return decl_type;
+        }
+    };
+
+    Decl_Type_Fn :: struct {
+        #as using base: Decl_Type;
+        kind = .FN;
+        params: [..]*Decl_Type;
+        return_type: *Decl_Type; 
+        
+        new :: (params: [..]*Decl_Type, return_type: *Decl_Type) -> *Decl_Type_Fn #expand {
+            assert(return_type != null, "return_type cannot be null");
+            decl_type := New(Decl_Type_Fn);
+            decl_type.params = params;
+            decl_type.return_type = return_type;
+            return decl_type;
+        } 
+    };
+
     Storage_Class :: enum { EXTERN; STATIC; NONE; };
 
     Decl_Kind :: enum { FN; VAR; };
@@ -16,6 +58,7 @@ Ast :: struct {
         kind: Decl_Kind;
         ident: string;
         storage_class: Storage_Class;
+        type: *Decl_Type;
         using loc: Source_Location;
     };
 
@@ -30,7 +73,7 @@ Ast :: struct {
             using loc: Source_Location;
         }
 
-        new :: (ident: string, params: [..]*Fn_Param, block: *Block, storage_class: Storage_Class, line: int, start: int) -> *Fn_Decl #expand {
+        new :: (ident: string, fn_type: *Decl_Type, params: [..]*Fn_Param, block: *Block, storage_class: Storage_Class, line: int, start: int) -> *Fn_Decl #expand {
             assert(ident != "", "ident can't be null");
             fn := New(Fn_Decl);
             fn.ident = ident;
@@ -38,6 +81,7 @@ Ast :: struct {
             fn.loc = .{line, start};
             fn.params = params;
             fn.body = block;
+            fn.type = fn_type;
             return fn;
         }
 
@@ -52,13 +96,14 @@ Ast :: struct {
         kind = Decl_Kind.VAR;
         init: *Expr; @Optional
 
-        new :: (ident: string, init: *Expr, storage_class: Storage_Class, line: int, start: int) -> *Decl #expand {
+        new :: (ident: string, var_type: *Decl_Type, init: *Expr, storage_class: Storage_Class, line: int, start: int) -> *Decl #expand {
             assert(ident != "", "ident can't be null");
             var := New(Var_Decl);
             var.ident = ident;
             var.storage_class = storage_class;
             var.loc = .{line, start};
             var.init = init;
+            var.type = var_type;
             return var;
         }
     }
@@ -401,12 +446,32 @@ Ast :: struct {
         VAR;
         PREFIX;
         POSTFIX;
+        CAST;
     };
 
     Expr :: struct {
         kind: Expr_Kind;
         using loc: Source_Location;
     }
+
+    Expr_Cast :: struct {
+        #as using base: Expr;
+        kind = .CAST;
+
+        target_type: *Decl_Type;
+        expr: *Expr;
+
+        new :: (target_type: *Decl_Type, expr: *Expr, line: int, start: int) -> *Expr #expand {
+            assert(target_type != null, "target_type cannot be null");
+            assert(expr != null, "expr cannot be null");
+            cast_expr := New(Expr_Cast);
+            cast_expr.line = line;
+            cast_expr.start = start;
+            cast_expr.target_type = target_type;
+            cast_expr.expr = expr;
+            return cast_expr;
+        }
+    };
 
     Expr_Assignment :: struct {
         #as using base: Expr;
@@ -444,14 +509,52 @@ Ast :: struct {
         }
     }
 
+    Constant :: struct {
+        kind: Kind;
+        Kind :: enum { INT; LONG; };
+    }
+
+    Constant_Int :: struct {
+        #as using base: Constant;
+        kind = .INT;
+        value: int;
+
+        new :: (value: int) -> *Constant_Int #expand {
+            constant := New(Constant_Int);
+            constant.value = value;
+            return constant;
+        }
+    }
+
+    Constant_Long :: struct {
+        #as using base: Constant;
+        kind = .LONG;
+        value: s64;
+
+        new :: (value: s64) -> *Constant_Long #expand {
+            constant := New(Constant_Long);
+            constant.value = value;
+            return constant;
+        }
+    }
+
     Expr_Constant :: struct {
         #as using base: Expr;
         kind = Expr_Kind.CONSTANT;
-        value: int;
+        value: *Constant;
 
-        new :: (constant: int, line: int, start: int) -> *Expr #expand {
+        new_int :: (value: int, line: int, start: int) -> *Expr #expand {
             expr := New(Expr_Constant);
             expr.loc = .{line, start};
+            constant := Constant_Int.new(value);
+            expr.value = constant;
+            return expr;
+        }
+
+        new_long :: (value: s64, line: int, start: int) -> *Expr #expand {
+            expr := New(Expr_Constant);
+            expr.loc = .{line, start};
+            constant := Constant_Long.new(value);
             expr.value = constant;
             return expr;
         }

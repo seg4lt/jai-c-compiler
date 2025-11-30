@@ -21,7 +21,10 @@ print_errors :: (error_reporter: *Error_Reporter, panic: bool = true) #expand {
     for error_item: error_reporter.error_items {
         log_error("%", error_item.msg);
     }
-    if panic exit(1);
+    if panic {
+        print_stack_trace(context.stack_trace);
+        exit(1);
+    }
 }
 
 error_report :: (using error_reporter: *Error_Reporter, line: int, start: int, detail_msg_fmt: string, args: .. Any, loc := #caller_location) #expand {

@@ -133,6 +133,9 @@ resolve_fn_decl :: (using fn_decl: *Ast.Fn_Decl, scope: *Scope_Idents, erp: *Err
         if old_entry.type == .FN && old_entry.has_body && body != null {
             error_report(erp, line, start, "duplicate function declaration! : %", ident);
         }
+        if old_entry.type == .FN {
+            // MARK
+        }
         if old_entry.type == .VAR && old_entry.from_current_scope {
             error_report(erp, line, start, "function name conflicts with variable name: %", ident);
         }
@@ -183,6 +186,9 @@ unwrap_group_expr :: (expr: *Ast.Expr) -> *Ast.Expr {
 
 resolve_expr :: (expr: *Ast.Expr, scope: *Scope_Idents, erp: *Error_Reporter) {
     if #complete expr.kind == {
+        case .CAST; 
+            expr_cast := expr.(*Ast.Expr_Cast);
+            resolve_expr(expr_cast.expr, scope, erp);
         case .POSTFIX;
             expr_postfix := cast(*Ast.Expr_Postfix) expr;
             inner_expr := unwrap_group_expr(expr_postfix.expr);
