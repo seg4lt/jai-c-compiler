@@ -245,7 +245,7 @@ print_stmt_ast :: (writer: *Writer, stmt: *Ast.Stmt, depth: int) {
             write(writer, "{\n");
             print_block_ast(writer, stmt_compound.block, depth + 1, true);
             print_space(writer, depth);
-            write(writer, "}");
+            write(writer, "}\n");
         case .RETURN;
             stmt_return := cast(*Ast.Stmt_Return) stmt;
             write(writer, "return");

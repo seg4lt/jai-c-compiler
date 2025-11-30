@@ -49,6 +49,7 @@ get_var_init_value :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx)
 
 typecheck_file_scope_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx) {
     initial_value := get_var_init_value(var_decl, ctx);
+    if var_decl.init set_builtin_type(var_decl.init, get_owned_type(var_decl.type));
 
     global := storage_class != .STATIC;
 
@@ -103,6 +104,7 @@ get_owned_type :: (type: *Ast.Builtin_Type) -> *Ast.Builtin_Type {
 
 typecheck_local_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx, can_be_static: bool = true) {
     symbol_exists, existing_symbol := table_find(st, var_decl.ident);
+    if init set_builtin_type(init, get_owned_type(var_decl.type));
     if symbol_exists {
         if existing_symbol.kind != .VAR
             error_report(erp, line, start, "this is not type variable");
