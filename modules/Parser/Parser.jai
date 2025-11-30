@@ -444,18 +444,41 @@ parse_expr :: (parser: *Parser, min_prec: int)  -> *Expr {
     return left;
 }
 
+parse_constant :: (parser: *Parser) -> *Expr {
+    literal_value := consume(parser);
+    if literal_value.type == .LONG_LITERAL {
+        long_value, success := string_to_int(slice(literal_value.value, 0, literal_value.value.count-1), T = s64);
+        if !success parse_err(parser, "expected long found %", literal_value.value);
+        return Expr_Constant.new_long(long_value, literal_value.line, literal_value.start);
+    }
+    if literal_value.type == .INT_LITERAL {
+        int_value, success := string_to_int(literal_value.value, T = s64);
+        if !success parse_err(parser, "expected int found %", literal_value.value);
+
+        if int_value > (2^31 - 1)
+            return Expr_Constant.new_long(int_value, literal_value.line, literal_value.start);
+
+        return Expr_Constant.new_int(int_value, literal_value.line, literal_value.start);
+    }
+    unreachable("** compiler bug ** expected long or int literal found %", literal_value.value);
+    return null;
+}
+
 parse_factor :: (parser: *Parser) -> *Expr {
     if peek(parser).*.type ==  {
-        case .LONG_LITERAL;
-            long_literal := consume(parser, .LONG_LITERAL);
-            long_value, success := string_to_int(slice(long_literal.value, 0, long_literal.value.count-1), T = s64);
-            if !success  parse_err(parser, "expected long found %", long_literal.value);
-            return Expr_Constant.new_long(long_value, long_literal.line, long_literal.start);
+        case .LONG_LITERAL; #through;
         case .INT_LITERAL;
-            int_literal := consume(parser, .INT_LITERAL);
-            int_value, success := string_to_int(int_literal.value);
-            if !success  parse_err(parser, "expected int found %", int_literal.value);
-            return Expr_Constant.new_int(int_value, int_literal.line , int_literal.start);
+            return parse_constant(parser);
+        // case .LONG_LITERAL;
+        //     long_literal := consume(parser, .LONG_LITERAL);
+        //     long_value, success := string_to_int(slice(long_literal.value, 0, long_literal.value.count-1), T = s64);
+        //     if !success  parse_err(parser, "expected long found %", long_literal.value);
+        //     return Expr_Constant.new_long(long_value, long_literal.line, long_literal.start);
+        // case .INT_LITERAL;
+        //     int_literal := consume(parser, .INT_LITERAL);
+        //     int_value, success := string_to_int(int_literal.value);
+        //     if !success  parse_err(parser, "expected int found %", int_literal.value);
+        //     return Expr_Constant.new_int(int_value, int_literal.line , int_literal.start);
         case .MINUS; #through;
         case .NOT; #through;
         case .BITWISE_NOT;
