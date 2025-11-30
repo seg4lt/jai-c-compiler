@@ -261,7 +261,7 @@ print_stmt_ast :: (writer: *Writer, stmt: *Ast.Stmt, depth: int) {
     }
 }
 
-print_decl_type :: (writer: *Writer, decl_type: *Ast.Builtin_Type) {
+print_builtin_type :: (writer: *Writer, decl_type: *Ast.Builtin_Type) {
     if #complete decl_type.kind == {
         case .INT; write(writer, "int");
         case .LONG; write(writer, "long");
@@ -269,12 +269,19 @@ print_decl_type :: (writer: *Writer, decl_type: *Ast.Builtin_Type) {
     }
 }
 
+#add_context print_expr_type: bool = false;
 print_expr_ast :: (writer: *Writer, expr: *Ast.Expr) {
+    if context.print_expr_type {
+        write(writer, "< (");
+        write(writer, " % ", expr.kind);
+        print_builtin_type(writer, expr.type);
+        write(writer, " ) ");
+    } 
     if #complete expr.kind == {
         case .CAST; 
             expr_cast := expr.(*Ast.Expr_Cast);
             write(writer, "(");
-            print_decl_type(writer, expr_cast.target_type);
+            print_builtin_type(writer, expr_cast.target_type);
             write(writer, ") ");
             print_expr_ast(writer, expr_cast.expr);
         case .PREFIX;
@@ -365,6 +372,7 @@ print_expr_ast :: (writer: *Writer, expr: *Ast.Expr) {
             print_expr_ast(writer, expr_binary.right);
             write(writer, ")");
     }
+    if context.print_expr_type write(writer, " > ");
 }
 
 print_space :: (writer: *Writer, depth: int) {

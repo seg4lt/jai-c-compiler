@@ -5,6 +5,8 @@ sema :: (ast: *Ast.Program, st: *Symbol_Table, erp: *Error_Reporter, debug_log: 
     sema_typecheck(ast, st, erp);
 
     if debug_log {
+        context.print_expr_type = true;
+        defer context.print_expr_type = false;
         print("\n-- AFTER SEMA --\n");
         print_program_ast(*stdout_writer_new(), ast);
         // TODO(seg4lt): add proper symbol printer for debugging
