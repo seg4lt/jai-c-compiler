@@ -20,10 +20,10 @@ Symbol_Var :: struct {
     kind = .VAR;
 
     ident : string;
-    type  : *Ast.Decl_Type;
+    type  : *Ast.Builtin_Type;
     attr  : Var_Attr;
 
-    new :: (ident: string, type: *Ast.Decl_Type, attr: Var_Attr) -> *Symbol #expand {
+    new :: (ident: string, type: *Ast.Builtin_Type, attr: Var_Attr) -> *Symbol #expand {
         assert(type.kind != .FN, "var cannot have fn type");
         result := New(Symbol_Var);
         result.attr = attr;
@@ -39,11 +39,11 @@ Symbol_Fn :: struct {
 
     ident    : string;
     params   : [..]string; // just identifiers for params
-    type     : *Ast.Decl_Type_Fn;
+    type     : *Ast.Builtin_Type_Fn;
     defined  : bool;
     global   : bool;
 
-    new :: (ident: string, type: *Ast.Decl_Type_Fn, params: [..]string, defined: bool, global: bool) -> *Symbol #expand {
+    new :: (ident: string, type: *Ast.Builtin_Type_Fn, params: [..]string, defined: bool, global: bool) -> *Symbol #expand {
         result := New(Symbol_Fn);
         result.ident = copy_string(ident);
         result.params = params;
@@ -82,7 +82,28 @@ Initial_Value_Kind :: enum { TENTATIVE; INITIAL; NO_INITIALIZER; };
 
 Initial_Value :: struct {
     kind: Initial_Value_Kind;
-    value: *Ast.Constant;
+    value: Static_Init;
+}
+
+Static_Init :: struct {
+    kind: Kind;
+    value: s64;
+
+    Kind :: enum { INT; LONG; };
+}
+
+static_init_int :: (value: int) -> Static_Init #expand {
+    result: Static_Init;
+    result.kind = .INT;
+    result.value = value;
+    return result;
+}
+
+static_init_long :: (value: s64) -> Static_Init #expand {
+    result: Static_Init;
+    result.kind = .LONG;
+    result.value = value;
+    return result;
 }
 
 tentative :: () -> Initial_Value #expand {
@@ -91,7 +112,7 @@ tentative :: () -> Initial_Value #expand {
     return result;
 }
 
-initial :: (val: *Ast.Constant) -> Initial_Value #expand {
+initial :: (val: Static_Init) -> Initial_Value #expand {
     result: Initial_Value;
     result.kind = .INITIAL;
     result.value = val;

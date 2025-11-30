@@ -9,45 +9,43 @@ Ast :: struct {
         }
     }
 
-    // TODO: Maybe this needs to be merged with Symbol_Table types?
-    // Symbol_Table has more info, so maybe not? Need to think more
-    Decl_Type :: struct {
+    Builtin_Type :: struct {
         kind: Kind;
 
         Kind :: enum { INT; LONG; FN; };
     };
-    Decl_Type_Int :: struct {
-        #as using base: Decl_Type;
+    Builtin_Type_Int :: struct {
+        #as using base: Builtin_Type;
         kind = .INT;
 
-        new :: () -> *Decl_Type_Int #expand {
-            decl_type := New(Decl_Type_Int);
-            return decl_type;
+        new :: () -> *Builtin_Type_Int #expand {
+            builtin_type := New(Builtin_Type_Int);
+            return builtin_type;
         }
     };
 
-    Decl_Type_Long :: struct {
-        #as using base: Decl_Type;
+    Builtin_Type_Long :: struct {
+        #as using base: Builtin_Type;
         kind = .LONG;
 
-        new :: () -> *Decl_Type_Long #expand {
-            decl_type := New(Decl_Type_Long);
-            return decl_type;
+        new :: () -> *Builtin_Type_Long #expand {
+            builtin_type := New(Builtin_Type_Long);
+            return builtin_type;
         }
     };
 
-    Decl_Type_Fn :: struct {
-        #as using base: Decl_Type;
+    Builtin_Type_Fn :: struct {
+        #as using base: Builtin_Type;
         kind = .FN;
-        params: [..]*Decl_Type;
-        return_type: *Decl_Type; 
+        params: [..]*Builtin_Type;
+        return_type: *Builtin_Type; 
         
-        new :: (params: [..]*Decl_Type, return_type: *Decl_Type) -> *Decl_Type_Fn #expand {
+        new :: (params: [..]*Builtin_Type, return_type: *Builtin_Type) -> *Builtin_Type_Fn #expand {
             assert(return_type != null, "return_type cannot be null");
-            decl_type := New(Decl_Type_Fn);
-            decl_type.params = params;
-            decl_type.return_type = return_type;
-            return decl_type;
+            builtin_type := New(Builtin_Type_Fn);
+            builtin_type.params = params;
+            builtin_type.return_type = return_type;
+            return builtin_type;
         } 
     };
 
@@ -58,7 +56,7 @@ Ast :: struct {
         kind: Decl_Kind;
         ident: string;
         storage_class: Storage_Class;
-        type: *Decl_Type;
+        type: *Builtin_Type;
         using loc: Source_Location;
     };
 
@@ -73,7 +71,7 @@ Ast :: struct {
             using loc: Source_Location;
         }
 
-        new :: (ident: string, fn_type: *Decl_Type, params: [..]*Fn_Param, block: *Block, storage_class: Storage_Class, line: int, start: int) -> *Fn_Decl #expand {
+        new :: (ident: string, fn_type: *Builtin_Type, params: [..]*Fn_Param, block: *Block, storage_class: Storage_Class, line: int, start: int) -> *Fn_Decl #expand {
             assert(ident != "", "ident can't be null");
             fn := New(Fn_Decl);
             fn.ident = ident;
@@ -96,7 +94,7 @@ Ast :: struct {
         kind = Decl_Kind.VAR;
         init: *Expr; @Optional
 
-        new :: (ident: string, var_type: *Decl_Type, init: *Expr, storage_class: Storage_Class, line: int, start: int) -> *Decl #expand {
+        new :: (ident: string, var_type: *Builtin_Type, init: *Expr, storage_class: Storage_Class, line: int, start: int) -> *Decl #expand {
             assert(ident != "", "ident can't be null");
             var := New(Var_Decl);
             var.ident = ident;
@@ -451,17 +449,19 @@ Ast :: struct {
 
     Expr :: struct {
         kind: Expr_Kind;
+        type: *Builtin_Type;
         using loc: Source_Location;
     }
+
 
     Expr_Cast :: struct {
         #as using base: Expr;
         kind = .CAST;
 
-        target_type: *Decl_Type;
+        target_type: *Builtin_Type;
         expr: *Expr;
 
-        new :: (target_type: *Decl_Type, expr: *Expr, line: int, start: int) -> *Expr #expand {
+        new :: (target_type: *Builtin_Type, expr: *Expr, line: int, start: int) -> *Expr #expand {
             assert(target_type != null, "target_type cannot be null");
             assert(expr != null, "expr cannot be null");
             cast_expr := New(Expr_Cast);
@@ -492,7 +492,8 @@ Ast :: struct {
 
     Expr_Binary :: struct {
         #as using base: Expr;
-        kind = Expr_Kind.BINARY;
+        kind = .BINARY;
+
         op: Binary_Operator;
         left: *Expr;
         right: *Expr;
@@ -540,7 +541,7 @@ Ast :: struct {
 
     Expr_Constant :: struct {
         #as using base: Expr;
-        kind = Expr_Kind.CONSTANT;
+        kind = .CONSTANT;
         value: *Constant;
 
         new_int :: (value: int, line: int, start: int) -> *Expr #expand {
@@ -711,4 +712,10 @@ Ast :: struct {
         RIGHT_SHIFT;
         SUB;
     }
+}
+
+set_builtin_type :: (expr: *Ast.Expr, type: *Ast.Builtin_Type) {
+    assert(expr != null, "expr cannot be null");
+    assert(type != null, "type cannot be null");
+    expr.type = type;
 }

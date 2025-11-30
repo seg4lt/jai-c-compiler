@@ -48,7 +48,7 @@ parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl {
     params, params_type := parse_fn_params(parser);
     consume(parser, .RPAREN);
     
-    fn_type := Decl_Type_Fn.new(params_type, return_type);
+    fn_type := Builtin_Type_Fn.new(params_type, return_type);
     
     body := ifx peek(parser).type == .SEMICOLON {
         consume(parser, .SEMICOLON);
@@ -59,9 +59,9 @@ parse_fn_decl :: (parser: *Parser, only_decl: bool = false) -> *Fn_Decl {
     return Fn_Decl.new(value, fn_type, params, body, storage_class, line, start);
 }
 
-parse_fn_params :: (parser: *Parser) -> ([..]*Fn_Decl.Fn_Param, [..]*Decl_Type) {
+parse_fn_params :: (parser: *Parser) -> ([..]*Fn_Decl.Fn_Param, [..]*Builtin_Type) {
     params: [..]*Fn_Decl.Fn_Param;
-    params_type: [..]*Decl_Type;
+    params_type: [..]*Builtin_Type;
     if peek(parser).type == .VOID {
         consume(parser, .VOID);
         return params, params_type;
@@ -137,34 +137,34 @@ is_decl :: (parser: *Parser, offset: int = 0) -> bool {
 }
 
 
-parse_type :: (parser: *Parser) -> *Decl_Type {
+parse_type :: (parser: *Parser) -> *Builtin_Type {
     if peek(parser).type == {
-        case .INT; consume(parser); return Decl_Type_Int.new();
-        case .LONG; consume(parser); return Decl_Type_Long.new();
+        case .INT; consume(parser); return Builtin_Type_Int.new();
+        case .LONG; consume(parser); return Builtin_Type_Long.new();
     }
     return null;
 }
 
 // TODO - support for signed/unsigned
 // This is very crude and needs to be improved
-parse_type :: (parser: *Parser, type_hint: []string) -> *Decl_Type {
+parse_type :: (parser: *Parser, type_hint: []string) -> *Builtin_Type {
     if type_hint.count == 0 parse_err(parser, "type hint is required");
 
     if type_hint.count == 1 {
-        if type_hint.data.* == "int" return Decl_Type_Int.new();
-        if type_hint.data.* == "long" return Decl_Type_Long.new();
+        if type_hint.data.* == "int" return Builtin_Type_Int.new();
+        if type_hint.data.* == "long" return Builtin_Type_Long.new();
         parse_err(parser, "invalid type hint: %", type_hint.data);
     }
     if type_hint.count == 2 {
-        if array_find(type_hint, "long") return Decl_Type_Long.new(); 
-        if array_find(type_hint, "int") return Decl_Type_Int.new();
+        if array_find(type_hint, "long") return Builtin_Type_Long.new(); 
+        if array_find(type_hint, "int") return Builtin_Type_Int.new();
         parse_err(parser, "invalid type hint: %", type_hint.data);
     }
     parse_err(parser, "invalid type hint: %", type_hint.data);
     return null;
 }
 
-parse_type_and_storage_class :: (parser: *Parser) -> (*Decl_Type, Storage_Class) {
+parse_type_and_storage_class :: (parser: *Parser) -> (*Builtin_Type, Storage_Class) {
     type_hints: [..]string;
     storage_classes: [..]Storage_Class;
 
