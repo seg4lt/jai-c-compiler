@@ -510,6 +510,7 @@ Ast :: struct {
         }
     }
 
+
     Constant :: struct {
         kind: Kind;
         Kind :: enum { INT; LONG; };

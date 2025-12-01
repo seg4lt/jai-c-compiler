@@ -15,6 +15,52 @@ parse_ast :: (tokens: []Token, error_reporter: *Error_Reporter, debug_log: bool 
     return program;
 }
 
+clone :: (type: *Ast.Builtin_Type) -> *Ast.Builtin_Type {
+    if #complete type.kind == {
+        case .INT; return Ast.Builtin_Type_Int.new();
+        case .LONG; return Ast.Builtin_Type_Long.new();
+        case .FN;
+            fn_type := type.(*Ast.Builtin_Type_Fn);
+            owned_params: [..]*Ast.Builtin_Type;
+            for param: fn_type.params {
+                array_add(*owned_params, clone(param));
+            }
+            return Ast.Builtin_Type_Fn.new(owned_params, clone(fn_type.return_type));
+    }
+}
+
+clone :: (constant: *Constant) -> *Constant {
+    if #complete constant.kind == {
+        case .INT; return Constant_Int.new(constant.(*Constant_Int).value);
+        case .LONG; return Constant_Long.new(constant.(*Constant_Long).value);
+    }
+}
+
+get_common_type :: (type1: *Ast.Builtin_Type, type2: *Ast.Builtin_Type) -> is_same: bool,  *Ast.Builtin_Type {
+    if is_builtin_type_same(type1, type2) return true, type1;
+    return false, Ast.Builtin_Type_Long.new();
+}
+
+is_builtin_type_same :: (type1: *Ast.Builtin_Type, type2: *Ast.Builtin_Type) -> bool {
+    if #complete type1.kind == {
+        case .INT; return type2.kind == .INT;
+        case .LONG; return type2.kind == .LONG;
+        case .FN; 
+            if type2.kind != .FN return false;
+
+            type1_fn_type := type1.(*Ast.Builtin_Type_Fn);
+            type2_fn_type := type2.(*Ast.Builtin_Type_Fn);
+
+            if !is_builtin_type_same(type1_fn_type.return_type, type2_fn_type.return_type) return false;
+            if type1_fn_type.params.count != type2_fn_type.params.count return false;
+            for param: type1_fn_type.params {
+                if !is_builtin_type_same(param, type2_fn_type.params[it_index]) return false;
+            }
+            return true;
+    }
+    return false;
+}
+
 #scope_module
 
 parse_err :: (parser: *Parser, msg_fmt: string, args: .. Any) #expand {

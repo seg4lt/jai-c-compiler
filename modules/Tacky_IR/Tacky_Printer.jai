@@ -28,6 +28,20 @@ print_tacky_fn :: (fn: *Top_Level_Fn, writer: *Writer) {
 print_tacky_inst :: (inst: *Instruction, writer: *Writer) {
     write(writer, "\n    ");
     if #complete inst.kind == {
+        case .SIGNED_EXTEND; 
+            signed_extend := inst.(*Instruction_Signed_Extend);
+            write(writer, "SignedExtend(src: ");
+            print_tacky_val(signed_extend.src, writer);
+            write(writer, ", dst: ");
+            print_tacky_val(signed_extend.dst, writer);
+            write(writer, ")");
+        case .TRUNCATE;
+            truncate := inst.(*Instruction_Truncate);
+            write(writer, "Truncate(src: ");
+            print_tacky_val(truncate.src, writer);
+            write(writer, ", dst: ");
+            print_tacky_val(truncate.dst, writer);
+            write(writer, ")");
         case .FN_CALL;
             fn_call := cast(*Instruction_Fn_Call) inst;
             write(writer, "FnCall(ident: %, args: [", fn_call.ident);

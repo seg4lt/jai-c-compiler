@@ -33,10 +33,10 @@ run_compiler :: () -> success: bool = true {
         sema(ast, *symbols, *erp, DEBUG_LOG,, ctx.parser_arena);
     }
 
-    // tacky := ifx args.flags & .TACKY && ast && !has_error(*erp) {
-    //     defer deinit(*ctx, .PARSER);
-    //     gen_tacky(ast, *symbols, DEBUG_LOG,, ctx.tacky_arena);
-    // }
+    tacky := ifx args.flags & .TACKY && ast && !has_error(*erp) {
+        defer deinit(*ctx, .PARSER);
+        gen_tacky(ast, *symbols, DEBUG_LOG,, ctx.tacky_arena);
+    }
 
     // asm_ir := ifx args.flags & .CODE_GEN && tacky && !has_error(*erp) {
     //     defer deinit(*ctx, .TACKY);

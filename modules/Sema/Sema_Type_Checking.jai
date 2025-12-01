@@ -11,6 +11,7 @@ sema_typecheck :: (pg: *Ast.Program, st: *Symbol_Table, erp: *Error_Reporter) {
     }
 }
 
+
 #scope_file
 
 Typecheck_Ctx :: struct {
@@ -49,7 +50,7 @@ get_var_init_value :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx)
 
 typecheck_file_scope_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx) {
     initial_value := get_var_init_value(var_decl, ctx);
-    if var_decl.init set_builtin_type(var_decl.init, get_owned_type(var_decl.type));
+    if var_decl.init set_builtin_type(var_decl.init, clone(var_decl.type));
 
     global := storage_class != .STATIC;
 
@@ -84,27 +85,14 @@ typecheck_file_scope_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typ
     }
 
     new_attr := static_var(initial_value, global);
-    owned_type : *Ast.Builtin_Type = get_owned_type(var_decl.type);
+    owned_type : *Ast.Builtin_Type = clone(var_decl.type);
     table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, owned_type, new_attr));
 }
 
-get_owned_type :: (type: *Ast.Builtin_Type) -> *Ast.Builtin_Type {
-    if #complete type.kind == {
-        case .INT; return Ast.Builtin_Type_Int.new();
-        case .LONG; return Ast.Builtin_Type_Long.new();
-        case .FN;
-            fn_type := type.(*Ast.Builtin_Type_Fn);
-            owned_params: [..]*Ast.Builtin_Type;
-            for param: fn_type.params {
-                array_add(*owned_params, get_owned_type(param));
-            }
-            return Ast.Builtin_Type_Fn.new(owned_params, get_owned_type(fn_type.return_type));
-    }
-}
 
 typecheck_local_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typecheck_Ctx, can_be_static: bool = true) {
     symbol_exists, existing_symbol := table_find(st, var_decl.ident);
-    if init set_builtin_type(init, get_owned_type(var_decl.type));
+    if init set_builtin_type(init, clone(var_decl.type));
     if symbol_exists {
         if existing_symbol.kind != .VAR
             error_report(erp, line, start, "this is not type variable");
@@ -126,7 +114,7 @@ typecheck_local_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typechec
             if init != null error_report(erp, line, start, "initializer on local extern is not allowed");
             if !symbol_exists {
                 attr := static_var(no_initializer(), true);
-                table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), attr));
+                table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, clone(var_decl.type), attr));
             }
         case .STATIC;
             if !can_be_static 
@@ -153,9 +141,9 @@ typecheck_local_var_decl :: (using var_decl: *Ast.Var_Decl, using ctx: *Typechec
                 error_report(erp, line, start, "non-constant initializer on local static variable");
             }
             attr := static_var(initial_value, false);
-            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), attr));
+            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, clone(var_decl.type), attr));
         case .NONE;
-            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, get_owned_type(var_decl.type), local_var()));
+            table_set(st, copy_string(var_decl.ident), Symbol_Var.new(var_decl.ident, clone(var_decl.type), local_var()));
             if var_decl.init typecheck_expr(var_decl.init, ctx);
     }
 }
@@ -215,7 +203,7 @@ typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, using ctx: *Typecheck_Ctx, fi
                 ident, existing_fn.params.count, params.count);
         }
     }
-    fn_symbol := Symbol_Fn.new(ident, get_owned_type(fn_decl.type).(*Ast.Builtin_Type_Fn), fn_params, defined = has_body || already_defined, global = global);
+    fn_symbol := Symbol_Fn.new(ident, clone(fn_decl.type).(*Ast.Builtin_Type_Fn), fn_params, defined = has_body || already_defined, global = global);
 
     if !symbol_exists || has_body table_set(st, copy_string(ident,, st.allocator), fn_symbol);
 
@@ -223,7 +211,7 @@ typecheck_fn_decl :: (using fn_decl: *Ast.Fn_Decl, using ctx: *Typecheck_Ctx, fi
         fn_return_type := fn_decl.type.(*Ast.Builtin_Type_Fn).return_type;
         for params {
             param_type := type.(*Ast.Builtin_Type_Fn).params[it_index];
-            table_set(st, copy_string(it.ident), Symbol_Var.new(it.ident, get_owned_type(param_type), local_var()));
+            table_set(st, copy_string(it.ident), Symbol_Var.new(it.ident, clone(param_type), local_var()));
         }
         typecheck_block(body, *(clone_ctx(ctx, override_return_type = fn_return_type)));
     }
@@ -446,31 +434,6 @@ maybe_explicit_cast :: (expr: *Ast.Expr, target_type: *Ast.Builtin_Type) -> *Ast
     cast_expr := Ast.Expr_Cast.new(target_type, expr, expr.line, expr.start);
     set_builtin_type(cast_expr, target_type);
     return cast_expr;
-}
-
-get_common_type :: (type1: *Ast.Builtin_Type, type2: *Ast.Builtin_Type) -> is_same: bool,  *Ast.Builtin_Type {
-    if is_builtin_type_same(type1, type2) return true, type1;
-    return false, Ast.Builtin_Type_Long.new();
-}
-
-is_builtin_type_same :: (type1: *Ast.Builtin_Type, type2: *Ast.Builtin_Type) -> bool {
-    if #complete type1.kind == {
-        case .INT; return type2.kind == .INT;
-        case .LONG; return type2.kind == .LONG;
-        case .FN; 
-            if type2.kind != .FN return false;
-
-            type1_fn_type := type1.(*Ast.Builtin_Type_Fn);
-            type2_fn_type := type2.(*Ast.Builtin_Type_Fn);
-
-            if !is_builtin_type_same(type1_fn_type.return_type, type2_fn_type.return_type) return false;
-            if type1_fn_type.params.count != type2_fn_type.params.count return false;
-            for param: type1_fn_type.params {
-                if !is_builtin_type_same(param, type2_fn_type.params[it_index]) return false;
-            }
-            return true;
-    }
-    return false;
 }
 
 #scope_file

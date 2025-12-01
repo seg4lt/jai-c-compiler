@@ -9,6 +9,8 @@ Tacky :: struct {
         LABEL;
         RETURN;
         UNARY;
+        SIGNED_EXTEND;
+        TRUNCATE;
     }
 
     Unary_Op :: enum {
@@ -53,11 +55,11 @@ Tacky :: struct {
     Val_Constant :: struct {
         #as using base: Val;
         kind = Val_Kind.CONSTANT;
-        constant: int;
+        constant: *Ast.Constant;
 
-        new :: (value: int) -> *Val_Constant {
+        new :: (value: *Ast.Constant) -> *Val_Constant {
             v := New(Val_Constant);
-            v.constant = value;
+            v.constant = clone(value);
             return v;
         }
     }
@@ -77,6 +79,37 @@ Tacky :: struct {
     Instruction :: struct {
         kind: Instruction_Kind;
     }
+
+    Instruction_Signed_Extend :: struct {
+        #as using base: Instruction;
+        kind = .SIGNED_EXTEND;
+
+        src: *Val;
+        dst: *Val;
+
+        new :: (src: *Val, dst: *Val) -> *Instruction_Signed_Extend {
+            i := New(Instruction_Signed_Extend);
+            i.src = src;
+            i.dst = dst;
+            return i;
+        }
+    }
+
+    Instruction_Truncate :: struct {
+        #as using base: Instruction;
+        kind = .TRUNCATE;
+
+        src: *Val;
+        dst: *Val;
+
+        new :: (src: *Val, dst: *Val) -> *Instruction_Truncate {
+            i := New(Instruction_Truncate);
+            i.src = src;
+            i.dst = dst;
+            return i;
+        }
+    }
+
 
     Instruction_Binary :: struct {
         #as using base: Instruction;
@@ -228,16 +261,20 @@ Tacky :: struct {
 
     Top_Level_Static_Var :: struct {
         #as using base: Top_Level;
-        kind = Top_Level_Kind.STATIC_VAR;
+        kind = .STATIC_VAR;
+
+        type: *Ast.Builtin_Type;
+        init: Static_Init;
         ident: string;
         global: bool;
-        init: int;
 
-        new :: (ident: string, global: bool, init: int) -> *Top_Level_Static_Var {
+        new :: (type: *Ast.Builtin_Type, ident: string, global: bool, init: Static_Init) -> *Top_Level_Static_Var {
+            assert(type != null, "type cannot be null");
             sv := New(Top_Level_Static_Var);
+            sv.type = clone(type);
+            sv.init = init;
             sv.ident = copy_string(ident);
             sv.global = global;
-            sv.init = init;
             return sv;
         }
     }
@@ -256,4 +293,5 @@ Tacky :: struct {
 Tacky_Ctx :: struct {
     temp_var_index  : int = 0;
     label_index     : int = 0;
+    st: *Symbol_Table;
 }
