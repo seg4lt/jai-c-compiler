@@ -25,6 +25,7 @@ print_asm_inst :: (writer: *Writer, inst: *Asm.Instruction) {
     }
 
     if #complete inst.kind == {
+        case .MOVSX; assert(false, "MOVSX not implemented");
         case .MOV;
             mov := cast(*Asm.Instruction_Mov) inst;
             write(writer, "% ", inst.kind);
@@ -39,10 +40,6 @@ print_asm_inst :: (writer: *Writer, inst: *Asm.Instruction) {
             write(writer, "\n");
         case .RET;
             write(writer, "% ", inst.kind);
-            write(writer, "\n");
-        case .ALLOCATE_STACK;
-            alloc := cast(*Asm.Instruction_Allocate_Stack) inst;
-            write(writer, "ASTK %", alloc.size);
             write(writer, "\n");
         case .CDQ;
             write(writer, "CDQ ");
@@ -97,10 +94,6 @@ print_asm_inst :: (writer: *Writer, inst: *Asm.Instruction) {
             push := cast(*Asm.Instruction_Push) inst;
             write(writer, "PUSH ");
             print_asm_operand(writer, push.operand);
-            write(writer, "\n");
-        case .DEALLOCATE_STACK;
-            dealloc := cast(*Asm.Instruction_Deallocate_Stack) inst;
-            write(writer, "DSTK %", dealloc.size);
             write(writer, "\n");
     }
 }

@@ -23,6 +23,7 @@ fix_instructions :: (insts: []*Instruction, st: *Symbol_Table) -> stack_size: in
 
     for inst: insts {
         if #complete inst.kind == {
+            case .MOVSX; assert(false, "MOVSX not implemented");
             case .MOV;
                 mov := cast(*Instruction_Mov) inst;
                 mov.src = pseudo_to_stack(*table, st, mov.src);
@@ -50,8 +51,6 @@ fix_instructions :: (insts: []*Instruction, st: *Symbol_Table) -> stack_size: in
             case .CDQ;              #through;
             case .RET;              #through;
             case .CALL;             #through;
-            case .DEALLOCATE_STACK; #through;
-            case .ALLOCATE_STACK;   #through;
             case .LABEL;            #through;
             case .JMP_CC;           #through;
             case .JMP;              continue;

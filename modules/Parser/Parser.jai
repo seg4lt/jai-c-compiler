@@ -547,7 +547,6 @@ parse_factor :: (parser: *Parser) -> *Expr {
         case .LPAREN;
             grp_start_tok := consume(parser, .LPAREN);
             target_type := parse_type(parser);
-            log("target_type: %", target_type.kind);
             if target_type {
                 consume(parser, .RPAREN);
                 expr_to_cast := parse_factor(parser);

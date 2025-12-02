@@ -38,10 +38,10 @@ run_compiler :: () -> success: bool = true {
         gen_tacky(ast, *symbols, DEBUG_LOG,, ctx.tacky_arena);
     }
 
-    // asm_ir := ifx args.flags & .CODE_GEN && tacky && !has_error(*erp) {
-    //     defer deinit(*ctx, .TACKY);
-    //     asm_gen(tacky, *symbols, DEBUG_LOG,, ctx.asm_ir_arena);
-    // }
+    asm_ir := ifx args.flags & .CODE_GEN && tacky && !has_error(*erp) {
+        defer deinit(*ctx, .TACKY);
+        asm_gen(tacky, *symbols, DEBUG_LOG,, ctx.asm_ir_arena);
+    }
 
     // if args.flags & .ALL && asm_ir && !has_error(*erp) {
     //     defer deinit(*ctx, .ASM_IR);

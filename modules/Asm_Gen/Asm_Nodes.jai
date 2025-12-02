@@ -1,20 +1,28 @@
 Asm :: struct {
+    Instruction_Size :: enum #specified { 
+        BYTE     :: 1;
+        LONGWORD :: 4; 
+        QUADWORD :: 8; 
+    }
+
     Instruction_Kind :: enum {
-        ALLOCATE_STACK;
         BINARY;
         CALL;
         CDQ;
         CMP;
-        DEALLOCATE_STACK;
         IDIV;
         JMP;
         JMP_CC;
         LABEL;
         MOV;
+        MOVSX;
         PUSH;
         RET;
         SET_CC;
         UNARY;
+        // these are replaced with addq and subq now that we support instructions size
+        // ALLOCATE_STACK;
+        // DEALLOCATE_STACK;
     }
 
     Top_Level_Kind :: enum {
@@ -85,6 +93,7 @@ Asm :: struct {
     Operand_Imm :: struct {
         #as using base: Operand;
         kind = Operand_Kind.IMM;
+
         value: int;
     }
 
@@ -113,21 +122,17 @@ Asm :: struct {
     }
 
     Instruction :: struct {
-        kind: Instruction_Kind;
-    }
-
-    Instruction_Allocate_Stack :: struct {
-        #as using base: Instruction;
-        kind = Instruction_Kind.ALLOCATE_STACK;
-        size: int;
+        kind : Instruction_Kind;
+        size : Instruction_Size;
     }
 
     Instruction_Binary :: struct {
         #as using base: Instruction;
         kind = Instruction_Kind.BINARY;
-        op: Bin_Op;
-        src1: *Operand;
-        src2: *Operand;
+
+        op   : Bin_Op;
+        src1 : *Operand;
+        src2 : *Operand;
     }
 
     Instruction_Call :: struct {
@@ -144,20 +149,16 @@ Asm :: struct {
     Instruction_Cmp :: struct {
         #as using base: Instruction;
         kind = Instruction_Kind.CMP;
-        op1: *Operand;
-        op2: *Operand;
-    }
 
-    Instruction_Deallocate_Stack :: struct {
-        #as using base: Instruction;
-        kind = Instruction_Kind.DEALLOCATE_STACK;
-        size: int;
+        op1  : *Operand;
+        op2  : *Operand;
     }
 
     Instruction_Idiv :: struct {
         #as using base: Instruction;
         kind = Instruction_Kind.IDIV;
-        operand: *Operand;
+
+        operand : *Operand;
     }
 
     Instruction_Jmp :: struct {
@@ -181,9 +182,18 @@ Asm :: struct {
 
     Instruction_Mov :: struct {
         #as using base: Instruction;
-        kind = Instruction_Kind.MOV;
-        src: *Operand;
-        dst: *Operand;
+        kind = .MOV;
+
+        src     : *Operand;
+        dst     : *Operand;
+    }
+
+    Instruction_Movsx :: struct {
+        #as using base: Instruction;
+        kind = .MOVSX;
+
+        src     : *Operand;
+        dst     : *Operand;
     }
 
     Instruction_Push :: struct {
@@ -207,8 +217,9 @@ Asm :: struct {
     Instruction_Unary :: struct {
         #as using base: Instruction;
         kind = Instruction_Kind.UNARY;
-        op: Unary_Op;
-        operand: *Operand;
+
+        op      : Unary_Op;
+        operand : *Operand;
     }
 
     Top_Level :: struct {
@@ -217,19 +228,22 @@ Asm :: struct {
 
     Top_Level_Static :: struct {
         #as using base: Top_Level;
-        kind = Top_Level_Kind.STATIC;
-        ident: string;
-        global: bool;
-        init: int;
+        kind = .STATIC;
+
+        ident     : string;
+        global    : bool;
+        init      : Static_Init;
+        alignment : int;
     }
 
     Top_Level_Fn :: struct {
         #as using base: Top_Level;
         kind = Top_Level_Kind.FN;
-        ident: string;
-        instructions: [..]*Instruction;
-        stack_size: int;
-        global: bool;
+
+        ident         : string;
+        instructions  : [..]*Instruction;
+        stack_size    : int;
+        global        : bool;
     }
 
     Program :: struct {
@@ -278,49 +292,57 @@ ret :: () -> *Instruction #expand {
     return New(Instruction_Ret);
 }
 
-mov :: (src: *Operand, dst: *Operand) -> *Instruction #expand {
+mov :: (src: *Operand, dst: *Operand, size: Instruction_Size) -> *Instruction #expand {
     m := New(Instruction_Mov);
     m.src = src;
     m.dst = dst;
+    m.size = size;
     return m;
 }
 
-cmp :: (op1: *Operand, op2: *Operand) -> *Instruction #expand {
+cmp :: (op1: *Operand, op2: *Operand, size: Instruction_Size) -> *Instruction #expand {
     c := New(Instruction_Cmp);
     c.op1 = op1;
     c.op2 = op2;
+    c.size = size;
     return c;
 }
 
 set_cc :: (cond_code: Cond_Code, operand: *Operand) -> *Instruction #expand {
     s := New(Instruction_Set_Cc);
+    s.size = .BYTE;
     s.cond_code = cond_code;
     s.operand = operand;
     return s;
 }
 
-unary :: (op: Unary_Op, operand: *Operand) -> *Instruction #expand {
+unary :: (op: Unary_Op, operand: *Operand, size: Instruction_Size) -> *Instruction #expand {
     u := New(Instruction_Unary);
     u.op = op;
     u.operand = operand;
+    u.size = size;
     return u;
 }
 
-binary :: (op: Bin_Op, src1: *Operand, src2: *Operand) -> *Instruction #expand {
+binary :: (op: Bin_Op, src1: *Operand, src2: *Operand, size: Instruction_Size) -> *Instruction #expand {
     b := New(Instruction_Binary);
     b.op = op;
     b.src1 = src1;
     b.src2 = src2;
+    b.size = size;
     return b;
 }
 
-cdq :: () -> *Instruction #expand {
-    return New(Instruction_Cdq);
+cdq :: (size: Instruction_Size) -> *Instruction #expand {
+    c := New(Instruction_Cdq);
+    c.size = size;
+    return c;
 }
 
-idiv :: (operand: *Operand) -> *Instruction #expand {
+idiv :: (operand: *Operand, size: Instruction_Size) -> *Instruction #expand {
     i := New(Instruction_Idiv);
     i.operand = operand;
+    i.size = size;
     return i;
 }
 
@@ -343,12 +365,6 @@ jmp :: (target: string) -> *Instruction #expand {
     return j;
 }
 
-allocate_stack :: (size: int) -> *Instruction #expand {
-    a := New(Instruction_Allocate_Stack);
-    a.size = size;
-    return a;
-}
-
 push :: (operand: *Operand) -> *Instruction #expand {
     p := New(Instruction_Push);
     p.operand = operand;
@@ -361,16 +377,11 @@ call :: (ident: string) -> *Instruction #expand {
     return c;
 }
 
-deallocate_stack :: (size: int) -> *Instruction #expand {
-    d := New(Instruction_Deallocate_Stack);
-    d.size = size;
-    return d;
-}
-
-top_level_static_var :: (ident: string, global: bool, init: int) -> *Top_Level #expand {
+top_level_static_var :: (ident: string, global: bool, alignment: int, init: Static_Init) -> *Top_Level #expand {
     s := New(Top_Level_Static);
     s.ident = ident;
     s.global = global;
+    s.alignment = alignment;
     s.init = init;
     return s;
 }

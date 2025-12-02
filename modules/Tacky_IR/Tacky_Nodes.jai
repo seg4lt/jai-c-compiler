@@ -54,7 +54,7 @@ Tacky :: struct {
 
     Val_Constant :: struct {
         #as using base: Val;
-        kind = Val_Kind.CONSTANT;
+        kind = .CONSTANT;
         constant: *Ast.Constant;
 
         new :: (value: *Ast.Constant) -> *Val_Constant {

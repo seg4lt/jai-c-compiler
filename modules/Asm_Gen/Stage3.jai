@@ -36,6 +36,7 @@ fix_instructions :: (old_instructions: []*Instruction, stack_size: int) -> [..]*
 
     for oi: old_instructions {
         if #complete oi.kind == {
+            case .MOVSX; assert(false, "MOVSX not implemented");
             case .MOV;
                 movi := cast(*Instruction_Mov) oi;
                 if is_memory_addr(movi.src) && is_memory_addr(movi.dst) {

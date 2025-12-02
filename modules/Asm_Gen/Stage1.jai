@@ -1,20 +1,28 @@
 #scope_module
 
+get_alignment :: (type: *Ast.Builtin_Type) -> int {
+    if type.kind == .INT return 4;
+    if type.kind == .LONG return 8;
+    assert(false, "unsupported type: %", type.kind);
+    return 0; // unreachable
+}
+
 map_to_asm :: (pgt: *Tacky.Program, st: Symbol_Table) -> *Program {
-    top_level_asms: [..]*Top_Level;
+    top_asm: [..]*Top_Level;
     for pgt.items {
         if #complete it.kind == {
             case .STATIC_VAR;
                 sv := cast(*Tacky.Top_Level_Static_Var) it;
-                array_add(*top_level_asms, top_level_static_var(sv.ident, sv.global, sv.init));
+                alignment := get_alignment(sv.type);
+                array_add(*top_asm, top_level_static_var(sv.ident, sv.global, alignment, sv.init));
             case .FN;
                 fn_tacky := cast(*Tacky.Top_Level_Fn) it;
                 fn := map_fn(fn_tacky, st);
-                array_add(*top_level_asms, top_level_fn(fn.ident, fn.instructions, fn.stack_size, fn.global));
+                array_add(*top_asm, top_level_fn(fn.ident, fn.instructions, fn.stack_size, fn.global));
         }
     }
     pg := New(Program);
-    pg.top_level = top_level_asms;
+    pg.top_level = top_asm;
     return pg;
 }
 
@@ -23,14 +31,12 @@ map_to_asm :: (pgt: *Tacky.Program, st: Symbol_Table) -> *Program {
 map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
     instructions : [..]*Instruction;
 
-    found_sym, sym := table_find(*st, fn_tacky.ident);
-    if !found_sym assert(false, "function % not found in symbol table", fn_tacky.ident);
-    if sym.kind != .FN assert(false, "Symbol % is not a function", fn_tacky.ident);
+    found_symbol, symbol := table_find(*st, fn_tacky.ident);
+    if !found_symbol && symbol.kind != .FN assert(false, "function % not found in symbol table", fn_tacky.ident);
 
     // fn args already has a name - but they don't have values
     // we need to move value as per System V calling convention to respective pseudo registers
-    fn_sym := cast(*Symbol_Fn) sym;
-    fn_params := fn_sym.params;
+    fn_params := symbol.(*Symbol_Fn).params;
 
     register_args  := array_view(fn_params, 0, min(fn_params.count, COUNT_REGISTER_FOR_ARGS));
     stack_args     := ifx fn_params.count > COUNT_REGISTER_FOR_ARGS
@@ -39,11 +45,11 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
 
     for register_args {
         register_to_use := ARGS_REGISTERS[it_index];
-        asm_arg         := pseudo(it.ident);
+        asm_arg         := pseudo(it);
         array_add(*instructions, mov(reg(register_to_use, .DWORD), asm_arg));
     }
     for stack_args {
-        asm_arg := pseudo(it.ident);
+        asm_arg := pseudo(it);
         src := stack(STACK_ALIGNMENT + (it_index * PUSH_SIZE));
         array_add(*instructions, mov(src, asm_arg));
     }
@@ -59,13 +65,21 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
     return fn;
 }
 
+get_instruction_size :: (constant: *Ast.Constant) -> Instruction_Size {
+    if constant.kind == .INT return .LONGWORD;
+    if constant.kind == .LONG return .QUADWORD;
+
+    unreachable("unsupported constant type: %", constant.kind);
+    return .LONGWORD;
+}
+
 map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
     if #complete instt.kind == {
         case .RETURN;
             ret_inst := cast(*Tacky.Instruction_Return) instt;
             src := to_operand(ret_inst.val);
             dst := reg(.AX, .DWORD);
-            array_add(insts, mov(src, dst));
+            array_add(insts, mov(src, dst, .LONGWORD));
             array_add(insts, ret());
         case .UNARY;
             unary_i := cast(*Tacky.Instruction_Unary) instt;
@@ -73,13 +87,13 @@ map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
                 zero := imm(0);
                 src := to_operand(unary_i.src);
                 dst := to_operand(unary_i.dst);
-                array_add(insts, mov(zero, dst));
-                array_add(insts, cmp(zero, src));
+                array_add(insts, mov(zero, dst, get_instruction_size(unary_i.dst)));
+                array_add(insts, cmp(zero, src, get_instruction_size(src)));
                 array_add(insts, set_cc(.EE, dst));
             } else {
                 src := to_operand(unary_i.src);
                 dst := to_operand(unary_i.dst);
-                array_add(insts, mov(src, dst));
+                array_add(insts, mov(src, dst, get_instruction_size(src)));
 
                 op: Unary_Op = ---;
                 if #complete unary_i.op == {
