@@ -49,7 +49,8 @@ Tacky :: struct {
     }
 
     Val :: struct {
-        kind: Val_Kind;
+        kind: Val_Kind; 
+        type: *Ast.Builtin_Type;
     }
 
     Val_Constant :: struct {
@@ -57,9 +58,10 @@ Tacky :: struct {
         kind = .CONSTANT;
         constant: *Ast.Constant;
 
-        new :: (value: *Ast.Constant) -> *Val_Constant {
+        new :: (value: *Ast.Constant, type: *Ast.Builtin_Type) -> *Val_Constant {
             v := New(Val_Constant);
             v.constant = clone(value);
+            v.type = type;
             return v;
         }
     }
@@ -69,9 +71,10 @@ Tacky :: struct {
         kind = Val_Kind.VARIABLE;
         variable: string;
 
-        new :: (ident: string) -> *Val_Variable {
+        new :: (ident: string, type: *Ast.Builtin_Type) -> *Val_Variable {
             v := New(Val_Variable);
             v.variable = copy_string(ident);
+            v.type = type;
             return v;
         }
     }

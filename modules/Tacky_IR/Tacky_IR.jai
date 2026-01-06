@@ -56,7 +56,7 @@ gen_fn_tacky :: (ctx: *Tacky_Ctx, fn_ast: *Ast.Fn_Decl) -> *Top_Level_Fn {
     instructions: [..]*Instruction;
     if fn_ast.body  {
         gen_instructions(ctx, *instructions, fn_ast.body);
-        array_add(*instructions, ret(constant(Ast.Constant_Int.new(0))));
+        array_add(*instructions, ret(constant(Ast.Constant_Int.new(0), Ast.Builtin_Type_Int.new())));
     }
     found_symbol, symbol := table_find(ctx.st, fn_ast.ident);
     assert(found_symbol);
@@ -93,7 +93,7 @@ gen_instructions_decl :: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction
             if (decl_var.storage_class == .STATIC)  return;
 
             result := gen_expr(ctx, instructions, decl_var.init);
-            dst := variable(decl_var.ident);
+            dst := variable(decl_var.ident, decl_var.type);
             array_add(instructions, copy(result, dst));
         case .FN;
             decl_fn := cast(*Ast.Fn_Decl) decl_ast;
@@ -260,7 +260,7 @@ gen_stmt_switch:: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction, switc
         if it.is_default continue;
 
         // we create an expression to check if matches case we have
-        case_value := constant(Ast.Constant_Int.new(string_to_int(it.value)));
+        case_value := constant(Ast.Constant_Int.new(string_to_int(it.value)), switch_condition.type);
         condition := make_var(ctx, switch_condition.type);
         array_add(instructions, binary(.EQUAL_EQUAL, switch_expr_val, case_value, condition));
 
@@ -306,7 +306,7 @@ gen_expr :: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *
         case .PREFIX;
             expr_prefix := cast(*Ast.Expr_Prefix) expr_ast;
             inner_expr_result := gen_expr(ctx, instructions, expr_prefix.expr);
-            one := constant(Ast.Constant_Int.new(1));
+            one := constant(Ast.Constant_Int.new(1), Ast.Builtin_Type_Int.new());
             dst := make_var(ctx, expr_prefix.expr.type);
             if #complete expr_prefix.op == {
                 case .ADD;
@@ -325,7 +325,7 @@ gen_expr :: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *
             old_value     := copy(expr_val_tacky, old_value_dst);
             array_add(instructions, old_value);
 
-            one := constant(Ast.Constant_Int.new(1));
+            one := constant(Ast.Constant_Int.new(1), Ast.Builtin_Type_Int.new());
             if #complete expr_postfix.op == {
                 case .ADD;
                     dst := make_var(ctx, expr_postfix.expr.type);
@@ -379,10 +379,10 @@ gen_expr :: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *
             return gen_expr(ctx, instructions, expr_group.expr);
         case .CONSTANT;
             expr_constant := cast(*Ast.Expr_Constant) expr_ast;
-            return constant(clone(expr_constant.value));
+            return constant(clone(expr_constant.value), expr_constant.type);
         case .VAR;
             expr_var := cast(*Ast.Expr_Var) expr_ast;
-            return variable(expr_var.ident);
+            return variable(expr_var.ident, expr_var.type);
         case .ASSIGNMENT;
             expr_assignment := cast(*Ast.Expr_Assignment) expr_ast;
             result := gen_expr(ctx, instructions, expr_assignment.src);
@@ -391,7 +391,7 @@ gen_expr :: (using ctx: *Tacky_Ctx, instructions: *[..]*Instruction, expr_ast: *
                 assert(false, "What!! dst has to be variable. sema didn't catch this!!! : %", expr_assignment.dst);
 
             dst_var := cast(*Ast.Expr_Var) expr_assignment.dst;
-            dst := variable(dst_var.ident);
+            dst := variable(dst_var.ident, dst_var.type);
             array_add(instructions, copy(result, dst));
             return dst;
         case .TERNARY;
@@ -433,7 +433,7 @@ gen_logical_and :: (ctx: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: A
     array_add(instructions, jump_if_zero(src2, label_false));
 
     result_var := make_var(ctx, bin_ast.type);
-    one        := constant(Ast.Constant_Int.new(1));
+    one        := constant(Ast.Constant_Int.new(1), Ast.Builtin_Type_Int.new());
 
     array_add(instructions, copy(one, result_var));
 
@@ -442,7 +442,7 @@ gen_logical_and :: (ctx: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: A
     array_add(instructions, jump(label_end));
     array_add(instructions, label(label_false));
 
-    zero := constant(Ast.Constant_Int.new(0));
+    zero := constant(Ast.Constant_Int.new(0), Ast.Builtin_Type_Int.new());
     array_add(instructions, copy(zero, result_var));
 
     array_add(instructions, label(label_end));
@@ -459,7 +459,7 @@ gen_logical_or :: (ctx: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: As
     array_add(instructions, jump_if_not_zero(src2, label_false));
 
     result_var := make_var(ctx, bin_ast.type);
-    zero       := constant(Ast.Constant_Int.new(0));
+    zero       := constant(Ast.Constant_Int.new(0), Ast.Builtin_Type_Int.new());
 
     array_add(instructions, copy(zero, result_var));
 
@@ -468,7 +468,7 @@ gen_logical_or :: (ctx: *Tacky_Ctx, instructions: *[..]*Instruction, bin_ast: As
     array_add(instructions, jump(label_end));
     array_add(instructions, label(label_false));
 
-    one := constant(Ast.Constant_Int.new(1));
+    one := constant(Ast.Constant_Int.new(1), Ast.Builtin_Type_Int.new());
     array_add(instructions, copy(one, result_var));
 
     array_add(instructions, label(label_end));
@@ -502,12 +502,12 @@ ret :: (val: *Val) -> *Instruction #expand {
     return Instruction_Return.new(val);
 }
 
-constant :: (value: *Ast.Constant) -> *Val #expand {
-    return Val_Constant.new(value);
+constant :: (value: *Ast.Constant, type: *Ast.Builtin_Type) -> *Val #expand {
+    return Val_Constant.new(value, type);
 }
 
-variable :: (ident: string) -> *Val #expand {
-    return Val_Variable.new(ident);
+variable :: (ident: string, type: *Ast.Builtin_Type) -> *Val #expand {
+    return Val_Variable.new(ident, type);
 }
 
 copy :: (src: *Val, dst: *Val) -> *Instruction #expand {
@@ -552,7 +552,7 @@ truncate :: (src: *Val, dst: *Val) -> *Instruction #expand {
 
 make_var :: (using ctx: *Tacky_Ctx, type: *Ast.Builtin_Type) -> *Val {
     defer temp_var_index += 1;
-    var := Val_Variable.new(sprint("tmp.%", temp_var_index));
+    var := Val_Variable.new(sprint("tmp.%", temp_var_index), type);
     table_set(st, var.variable, Symbol_Var.new(var.variable, type, local_var()));
     return var;
 }

@@ -1,14 +1,16 @@
 asm_gen :: (pgt: *Tacky.Program, st: *Symbol_Table, $debug_log: bool = false) -> *Program {
     program_asm := map_to_asm(pgt, st);
     if debug_log print_asm(*stdout_writer_new(), program_asm, 1);
-    
+
     fix_pseudo_register(program_asm, st);
     if debug_log print_asm(*stdout_writer_new(), program_asm, 2);
 
-    fixed_asm := fix_asm(program_asm);
-    if debug_log print_asm(*stdout_writer_new(), fixed_asm, 3);
+    return program_asm;
+
+    // fixed_asm := fix_asm(program_asm);
+    // if debug_log print_asm(*stdout_writer_new(), fixed_asm, 3);
     
-    return  fixed_asm;
+    // return  fixed_asm;
 }
 
 #scope_file

@@ -1,9 +1,4 @@
 Asm :: struct {
-    Instruction_Size :: enum #specified { 
-        BYTE     :: 1;
-        LONGWORD :: 4; 
-        QUADWORD :: 8; 
-    }
 
     Instruction_Kind :: enum {
         BINARY;
@@ -58,13 +53,15 @@ Asm :: struct {
         RIGHT_SHIFT;
         SUB;
     }
-
-    Register_Size :: enum #specified {
+    Size :: enum #specified {
         BYTE  :: 1;
         WORD  :: 2;
-        DWORD :: 4;
-        QWORD :: 8;
+        LONGWORD :: 4;
+        QUADWORD :: 8;
     }
+    Register_Size    :: Size;
+    Instruction_Size :: Size;
+    
 
     Register :: enum {
         AX;
@@ -290,6 +287,14 @@ imm :: (value: int) -> *Operand #expand {
 
 ret :: () -> *Instruction #expand {
     return New(Instruction_Ret);
+}
+
+movsx :: (src: *Operand, dst: *Operand, size: Instruction_Size) -> *Instruction #expand {
+    m := New(Instruction_Movsx);
+    m.src = src;
+    m.dst = dst;
+    m.size = size;
+    return m;
 }
 
 mov :: (src: *Operand, dst: *Operand, size: Instruction_Size) -> *Instruction #expand {

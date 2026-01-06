@@ -1,20 +1,13 @@
 #scope_module
 
-get_alignment :: (type: *Ast.Builtin_Type) -> int {
-    if type.kind == .INT return 4;
-    if type.kind == .LONG return 8;
-    assert(false, "unsupported type: %", type.kind);
-    return 0; // unreachable
-}
-
 map_to_asm :: (pgt: *Tacky.Program, st: Symbol_Table) -> *Program {
     top_asm: [..]*Top_Level;
     for pgt.items {
         if #complete it.kind == {
             case .STATIC_VAR;
                 sv := cast(*Tacky.Top_Level_Static_Var) it;
-                alignment := get_alignment(sv.type);
-                array_add(*top_asm, top_level_static_var(sv.ident, sv.global, alignment, sv.init));
+                alignment := get_size(sv.type);
+                array_add(*top_asm, top_level_static_var(sv.ident, sv.global, xx alignment, sv.init));
             case .FN;
                 fn_tacky := cast(*Tacky.Top_Level_Fn) it;
                 fn := map_fn(fn_tacky, st);
@@ -36,7 +29,9 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
 
     // fn args already has a name - but they don't have values
     // we need to move value as per System V calling convention to respective pseudo registers
-    fn_params := symbol.(*Symbol_Fn).params;
+    symbol_fn       := symbol.(*Symbol_Fn);
+    fn_params       := symbol_fn.params;
+    fn_params_types := symbol_fn.type.params;
 
     register_args  := array_view(fn_params, 0, min(fn_params.count, COUNT_REGISTER_FOR_ARGS));
     stack_args     := ifx fn_params.count > COUNT_REGISTER_FOR_ARGS
@@ -46,12 +41,14 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
     for register_args {
         register_to_use := ARGS_REGISTERS[it_index];
         asm_arg         := pseudo(it);
-        array_add(*instructions, mov(reg(register_to_use, .DWORD), asm_arg));
+        size            := get_size(fn_params_types[it_index]);
+        array_add(*instructions, mov(reg(register_to_use, size), asm_arg, size));
     }
     for stack_args {
         asm_arg := pseudo(it);
         src := stack(STACK_ALIGNMENT + (it_index * PUSH_SIZE));
-        array_add(*instructions, mov(src, asm_arg));
+        // Question: Do I need to set instruction size based on type here? 
+        array_add(*instructions, mov(src, asm_arg, .QUADWORD));
     }
 
     for fn_tacky.instructions map_instructions(*instructions, it);
@@ -65,46 +62,58 @@ map_fn :: (fn_tacky: *Tacky.Top_Level_Fn, st: Symbol_Table) -> *Top_Level_Fn {
     return fn;
 }
 
-get_instruction_size :: (constant: *Ast.Constant) -> Instruction_Size {
-    if constant.kind == .INT return .LONGWORD;
-    if constant.kind == .LONG return .QUADWORD;
-
-    unreachable("unsupported constant type: %", constant.kind);
-    return .LONGWORD;
-}
 
 map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
     if #complete instt.kind == {
+        case .SIGNED_EXTEND;
+            se := instt.(*Tacky.Instruction_Signed_Extend);
+            src := to_operand(se.src);
+            dst := to_operand(se.dst);
+            size := get_size(se.dst.type);
+            array_add(insts, movsx(src, dst, size));
+        case .TRUNCATE;
+            tr := instt.(*Tacky.Instruction_Truncate);
+            src := to_operand(tr.src);
+            dst := to_operand(tr.dst);
+            size := get_size(tr.dst.type);
+            array_add(insts, mov(src, dst, size));
         case .RETURN;
             ret_inst := cast(*Tacky.Instruction_Return) instt;
             src := to_operand(ret_inst.val);
-            dst := reg(.AX, .DWORD);
-            array_add(insts, mov(src, dst, .LONGWORD));
+            size := get_size(ret_inst.val.type);
+            dst := reg(.AX, size);
+            array_add(insts, mov(src, dst, size));
             array_add(insts, ret());
         case .UNARY;
-            unary_i := cast(*Tacky.Instruction_Unary) instt;
-            if unary_i.op == .NOT {
+            unary_inst := cast(*Tacky.Instruction_Unary) instt;
+            src := to_operand(unary_inst.src);
+            dst := to_operand(unary_inst.dst);
+            if unary_inst.op == .NOT {
                 zero := imm(0);
-                src := to_operand(unary_i.src);
-                dst := to_operand(unary_i.dst);
-                array_add(insts, mov(zero, dst, get_instruction_size(unary_i.dst)));
-                array_add(insts, cmp(zero, src, get_instruction_size(src)));
+                array_add(insts, mov(zero, dst, get_size(unary_inst.dst.type)));
+                array_add(insts, cmp(zero, src, get_size(unary_inst.src.type)));
                 array_add(insts, set_cc(.EE, dst));
             } else {
-                src := to_operand(unary_i.src);
-                dst := to_operand(unary_i.dst);
-                array_add(insts, mov(src, dst, get_instruction_size(src)));
-
+                array_add(insts, mov(src, dst, get_size(unary_inst.src.type)));
                 op: Unary_Op = ---;
-                if #complete unary_i.op == {
+                if #complete unary_inst.op == {
                     case .BITWISE_NOT; op = .BITWISE_NOT;
                     case .NEGATE;      op = .NEG;
                     case .NOT; assert(false, "unreachable");
                 }
-                array_add(insts, unary(op, dst));
+                array_add(insts, unary(op, dst, get_size(unary_inst.dst.type)));
             }
         case .BINARY;
             binary_i := cast(*Tacky.Instruction_Binary) instt;
+            src1 := to_operand(binary_i.src1);
+            src2 := to_operand(binary_i.src2);
+            dst  := to_operand(binary_i.dst);
+            op := map_binary_op(binary_i.op);
+
+            size_src1 := get_size(binary_i.src1.type);
+            size_src2 := get_size(binary_i.src2.type);
+            size_dst  := get_size(binary_i.dst.type);
+
             if #complete binary_i.op == {
                 case .ADD;          #through;
                 case .BITWISE_AND;  #through;
@@ -114,36 +123,29 @@ map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
                 case .MUL;          #through;
                 case .RIGHT_SHIFT;  #through;
                 case .SUB;
-                    src1 := to_operand(binary_i.src1);
-                    dst := to_operand(binary_i.dst);
-                    array_add(insts, mov(src1, dst));
-
-                    op := map_binary_op(binary_i.op);
-                    src2 := to_operand(binary_i.src2);
-                    array_add(insts, binary(op, src2, dst));
+                    array_add(insts, mov(src1, dst, size_src1));
+                    array_add(insts, binary(op, src2, dst, size_src2));
                 case .DIV; #through;
                 case .MOD;
                     // load divident to AX register
-                    src1           := to_operand(binary_i.src1);
-                    first_move_dst := reg(.AX, .DWORD);
-                    array_add(insts, mov(src1, first_move_dst));
+                    first_move_dst := reg(.AX, size_src1);
+                    array_add(insts, mov(src1, first_move_dst, size_src1));
 
                     // Sign-extend EAX into RDX;RAX
-                    array_add(insts, cdq());
+                    array_add(insts, cdq(size_src1));
 
                     // perform IDIV with divident src2
-                    src2 := to_operand(binary_i.src2);
-                    array_add(insts, idiv(src2));
+                    array_add(insts, idiv(src2, size_src2));
 
                     // move the result from specified register to dst
                     final_mov_src : *Operand = ---;
                     if binary_i.op == {
-                        case .DIV; final_mov_src = reg(.AX, .DWORD);
-                        case .MOD; final_mov_src = reg(.DX, .DWORD);
+                        case .DIV; final_mov_src = reg(.AX, size_dst);
+                        case .MOD; final_mov_src = reg(.DX, size_dst);
                         case;      assert(false, "Div shouldn't get any other operator: %", binary_i.op);
                     }
                     final_mov_dst := to_operand(binary_i.dst);
-                    array_add(insts, mov(final_mov_src, final_mov_dst));
+                    array_add(insts, mov(final_mov_src, final_mov_dst, size_dst));
                 case .EQUAL_EQUAL;   #through;
                 case .GREATER;       #through;
                 case .GREATER_EQUAL; #through;
@@ -151,18 +153,18 @@ map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
                 case .LESS_EQUAL;    #through;
                 case .NOT_EQUAL;
                     dst := to_operand(binary_i.dst);
-                    array_add(insts, mov(imm(0), dst));
+                    array_add(insts, mov(imm(0), dst, size_dst));
 
                     src2 := to_operand(binary_i.src2);
                     if binary_i.src1.kind == {
                         case .CONSTANT;
                             src1 := to_operand(binary_i.src1);
-                            ireg := reg(.R11, .DWORD);
-                            array_add(insts, mov(src1, ireg));
-                            array_add(insts, cmp(src2, ireg));
+                            ireg := reg(.R11, size_src1);
+                            array_add(insts, mov(src1, ireg, size_src1));
+                            array_add(insts, cmp(src2, ireg, size_src2));
                         case .VARIABLE;
                             src1 := to_operand(binary_i.src1);
-                            array_add(insts, cmp(src2, src1));
+                            array_add(insts, cmp(src2, src1, size_src2));
                     }
                     cc := to_condition_code(binary_i.op);
                     array_add(insts, set_cc(cc, dst));
@@ -173,20 +175,23 @@ map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
         case .JUMP_IF_NOT_ZERO;
             jnz := cast(*Tacky.Instruction_Jump_If_Not_Zero) instt;
             cond_var := to_operand(jnz.condition);
+            size := get_size(jnz.condition.type);
             zero := imm(0);
-            array_add(insts, cmp(zero, cond_var));
+            array_add(insts, cmp(zero, cond_var, size));
             array_add(insts, jmp_cc(.NE, jnz.target));
         case .JUMP_IF_ZERO;
             jz := cast(*Tacky.Instruction_Jump_If_Zero) instt;
             cond_var := to_operand(jz.condition);
+            size := get_size(jz.condition.type);
             zero := imm(0);
-            array_add(insts, cmp(zero, cond_var));
+            array_add(insts, cmp(zero, cond_var, size));
             array_add(insts, jmp_cc(.EE, jz.target));
         case .COPY;
             copy_inst := cast(*Tacky.Instruction_Copy) instt;
             src := to_operand(copy_inst.src);
             dst := to_operand(copy_inst.dst);
-            array_add(insts, mov(src, dst));
+            size := get_size(copy_inst.src.type);
+            array_add(insts, mov(src, dst, size));
         case .JUMP;
             jmp_inst := cast(*Tacky.Instruction_Jump) instt;
             array_add(insts, jmp(jmp_inst.target));
@@ -198,32 +203,37 @@ map_instructions :: (insts: *[..]*Instruction, instt: *Tacky.Instruction) {
                              else   .[];
 
             stack_padding := ifx stack_args.count % 2 == 0 then 0 else PUSH_SIZE;
-            if stack_padding != 0 array_add(insts, allocate_stack(stack_padding));
+            if stack_padding != 0 
+                array_add(insts, binary(.SUB, imm(stack_padding), reg(.RSP, .QUADWORD), .QUADWORD));
 
             for register_args {
                 register_to_use := ARGS_REGISTERS[it_index];
                 assembly_arg := to_operand(it);
-                array_add(insts, mov(assembly_arg, reg(register_to_use, .DWORD)));
+                size := get_size(it.type);
+                array_add(insts, mov(assembly_arg, reg(register_to_use, size), size));
             }
 
             for < stack_args {
                 asm_arg := to_operand(it);
-                if asm_arg.kind == .REG || asm_arg.kind == .IMM {
+                size := get_size(it.type);
+
+                if asm_arg.kind == .REG || asm_arg.kind == .IMM || size == .QUADWORD  {
                     array_add(insts, push(asm_arg));
                 } else {
-                    array_add(insts, mov(asm_arg, reg(.AX, .DWORD)));
-                    array_add(insts, push(reg(.AX, .QWORD)));
+                    array_add(insts, mov(asm_arg, reg(.AX, .LONGWORD), .LONGWORD));
+                    array_add(insts, push(reg(.AX, size)));
                 }
             }
 
             array_add(insts, call(fn_call.ident));
             bytes_to_remove := (stack_args.count * PUSH_SIZE) + stack_padding;
             if bytes_to_remove > 0 {
-                array_add(insts, deallocate_stack(bytes_to_remove));
+                array_add(insts, binary(.ADD, imm(bytes_to_remove), reg(.RSP, .QUADWORD), .QUADWORD));
             }
 
             assembly_dst := to_operand(fn_call.dst);
-            array_add(insts, mov(reg(.AX, .DWORD), assembly_dst));
+            size := get_size(fn_call.dst.type);
+            array_add(insts, mov(reg(.AX, size), assembly_dst, size));
     }
 }
 
@@ -268,12 +278,18 @@ to_operand :: (val: *Tacky.Val) -> *Operand {
     if #complete val.kind == {
         case .CONSTANT; 
             constant := cast(*Tacky.Val_Constant) val;
-            return imm(constant.constant);
+            constant_value : s64 = ---;
+            if #complete constant.constant.kind == {
+                case .INT; constant_value = constant.constant.(*Ast.Constant_Int).value;
+                case .LONG; constant_value = constant.constant.(*Ast.Constant_Long).value;
+            }
+            return imm(constant_value);
         case .VARIABLE; 
             variable := cast(*Tacky.Val_Variable) val;
             return pseudo(variable.variable);
     }
 }
+
 
 #scope_file
 using Symbol_Table;
